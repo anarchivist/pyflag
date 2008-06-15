@@ -53,9 +53,9 @@ class CiscoPixSyslogged(Simple.SimpleLog):
         """ We create a standard set of tables to support the pix logs """
         self.dbh.execute("""CREATE TABLE if not exists `%s` (
         `id` INT NOT NULL AUTO_INCREMENT ,
-        `syslog_ts` TIMESTAMP NOT NULL ,
+        `syslog_ts` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
         `hostname` VARCHAR( 50 ) NOT NULL ,
-        `pix_ts` TIMESTAMP NOT NULL ,
+        `pix_ts` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
         `pix_code` VARCHAR( 50 ) NOT NULL ,
         `message` MEDIUMTEXT NOT NULL ,
         PRIMARY KEY ( `id` )
@@ -63,7 +63,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
 
         self.dbh.execute("""CREATE TABLE if not exists `conn_%s` (
         `id` INT NOT NULL,
-        `pix_ts` TIMESTAMP NOT NULL ,
+        `pix_ts` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
         `direction` VARCHAR(10) ,
         `conn_number` INT ,
         `protocol` VARCHAR(10) ,

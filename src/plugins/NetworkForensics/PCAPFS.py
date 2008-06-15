@@ -59,7 +59,7 @@ class NetworkingInit(FlagFramework.EventHandler):
         `iosource` varchar(50),
         `offset` BIGINT NOT NULL ,
         `length` INT NOT NULL ,
-        `ts_sec` TIMESTAMP,
+        `ts_sec` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00',
         `ts_usec` INT NOT NULL,
         KEY `id` (`id`)
         )""")
@@ -119,7 +119,7 @@ class ConnectionDetailsTable(FlagFramework.CaseTable):
         [ IPType, dict(name='Destination IP', column='dest_ip')],
         [ ShortIntegerType, dict(name='Destination Port', column='dest_port')],
         [ IntegerType, dict(name='ISN', column='isn'), 'unsigned default 0'],
-        [ TimestampType, dict(name='Timstamp', column='ts_sec'), 'default 0']
+        [ TimestampType, dict(name='Timstamp', column='ts_sec')]
         ]
         
 class CachedWriter:

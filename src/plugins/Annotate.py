@@ -47,7 +47,7 @@ class AnnotationCaseInit(FlagFramework.EventHandler):
 
         case_dbh.execute("""CREATE TABLE if not exists `timeline` (
         `id` INT(11) not null auto_increment,
-        `time` timestamp,
+        `time` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
         `notes` TEXT,
         `category` VARCHAR( 250 ) NOT NULL default 'Note',
         PRIMARY KEY(`id`)

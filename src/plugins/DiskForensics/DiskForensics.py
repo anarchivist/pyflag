@@ -244,7 +244,7 @@ class MACTimes(FlagFramework.EventHandler):
         dbh.execute("""create table if not exists mac(
         `inode_id` INT NOT NULL default 0,
         `status` varchar(8) default '',
-        `time` timestamp NULL,
+        `time` timestamp NOT NULL default '0000-00-00 00:00:00',
         `m` int default NULL,
         `a` tinyint default NULL,
         `c` tinyint default NULL,

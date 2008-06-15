@@ -36,6 +36,7 @@ import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi,Cookie
 import TreeObj
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
+import pyflag.Time as Time
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -407,7 +408,11 @@ class HTTPScanner(StreamScannerFactory):
 
 
             ## stream.ts_sec is already formatted in DB format
+            ## need to convert back to utc/gmt as paths are UTC
             timestamp =  stream.get_packet_ts(offset)
+            print timestamp
+            print timestamp.__class__
+            timestamp = Time.convert(timestamp, case=self.case, evidence_tz="UTC")
             try:
                 date_str = timestamp.split(" ")[0]
             except:

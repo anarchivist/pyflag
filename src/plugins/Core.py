@@ -293,11 +293,15 @@ class CaseDBInit(FlagFramework.EventHandler):
         PRIMARY KEY(`id`)
         )""")        
 
-        # create the "groupware" tables
+        # create the "groupware" tables 
+        # NOTE: davec: DISABLED contact/appointment/journal, not currently
+        # used, should be moved into plugin if ever re-enabled anyway.  
+        # FIXME: move email into RFC2822 scanner since thats what seems to use
+        # it
         case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
+        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
+        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
+        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:

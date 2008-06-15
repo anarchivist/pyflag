@@ -102,12 +102,12 @@ class PstScan(GenScanFactory):
                     args = dict(size = len(property_data))
 
                     try:
-                        args['ctime'] = properties.get('create_date',
+                        args['_ctime'] = properties.get('create_date',
                                                        properties['arrival_date'])
                     except: pass
 
                     try:
-                        args['mtime'] = properties.get('modify_date',
+                        args['_mtime'] = properties.get('modify_date',
                                                        properties['sent_date'])
                     except: pass
                     

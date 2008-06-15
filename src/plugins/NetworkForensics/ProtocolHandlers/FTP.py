@@ -516,7 +516,7 @@ class FTPTables(FlagFramework.EventHandler):
             `server_banner` text,
             `welcome_banner` text,
             `total_bytes` int(32),
-            `start_time` timestamp,
+            `start_time` timestamp not null default '0000-00-00 00:00:00',
             `inode` varchar(255)
             )""")
 
@@ -528,7 +528,7 @@ class FTPTables(FlagFramework.EventHandler):
             `command_type` varchar(128),
             `command` varchar(128),
             `data` text,
-            `timestamp` timestamp,
+            `timestamp` timestamp not null default '0000-00-00 00:00:00',
             `data_stream` varchar(255)
             )""")
         
@@ -544,7 +544,7 @@ class FTPTables(FlagFramework.EventHandler):
             `destination_port` int(16) not null,
             `purpose` varchar(255) not null,
             `inode` varchar(255) not null,
-            `time_created` timestamp not null
+            `time_created` timestamp not null default '0000-00-00 00:00:00'
             )""")
 
         

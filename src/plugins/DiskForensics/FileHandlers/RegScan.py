@@ -44,7 +44,7 @@ class RegEventHandler(FlagFramework.EventHandler):
           'REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST',\
           'REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST',\
           'Unknown') NOT NULL,
-        `modified` TIMESTAMP,
+        `modified` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00',
         `reg_key` VARCHAR(200) NOT NULL,
         `value` text,
         key (`inode_id`))""")        
@@ -115,7 +115,7 @@ class RegistryScan(GenScanFactory):
                     reg_handle.mass_insert(inode_id = inode_id,
                                            path=new_path,
                                            offset=v['data']['offs_data'],
-                                           modified=nk_key['WriteTS'],
+                                           _modified="from_unixtime(%d)" % nk_key['WriteTS'].get_value(),
                                            type=v['data']['val_type'],
                                            reg_key=v['keyname'],
                                            value=v['data']

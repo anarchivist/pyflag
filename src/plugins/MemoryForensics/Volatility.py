@@ -41,7 +41,7 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         `active_threads` INT not null,
         `inherited_from` INT not null,
         `handle_count` INT not null,
-        `create_time` TIMESTAMP NULL
+        `create_time` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00'
         )""")
 
         case_dbh.execute("""CREATE TABLE if not exists `open_files` (
@@ -71,7 +71,7 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         `iosource` VARCHAR(250),
         `proto`  int not null,
         `port` int not null,
-        `create_time` TIMESTAMP NULL)""")
+        `create_time` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00')""")
         
 class IOSourceAddressSpace(FileAddressSpace):
     def __init__(self, fd):
@@ -241,7 +241,7 @@ class Memory(DBFS):
             new_inode = "I%s|N%s" % (iosource_name, task)
             inode_id = self.VFSCreate(None, new_inode,
                                       "%s/%s/exe" % (mount_point, task_info['pid']),
-                                      mtime = create_time,
+                                      _mtime = create_time,
                                       link = task_info['image_file_name'],
                                       _fast = True)
 
@@ -275,7 +275,7 @@ class Memory(DBFS):
                                    "%s/%s/Modules/Base 0x%X" % ( mount_point,
                                                                  task_info['pid'],
                                                                  base),
-                                   mtime = create_time,
+                                   _mtime = create_time,
                                    link = path,
                                    size = size,
                                    _fast = True)

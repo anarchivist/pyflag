@@ -147,6 +147,8 @@ class ViewFile(Reports.report):
         ui.start_table(**{'class':'PyFlagTable'})
         ui.row("File Name", "Modified    ", "Size", **{'class':'hilight'})
         for zinfo in z.filelist:
+        	## FIXME: This is evidence local time.
+        	## should we bother to convert to case local?
             date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time
             ui.row(zinfo.filename, date, zinfo.file_size)
 

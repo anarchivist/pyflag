@@ -220,12 +220,15 @@ def convert(timeval, case=None, evidence_tz=None):
     case_tz = get_case_tz(case)
 
     # convert to datetime if not already
+    if isinstance(timeval, str):
+        timeval = time.strptime(timeval, "%Y-%m-%d %H:%M:%S")[:-2]
+
     if not isinstance(timeval, datetime.datetime):
-    	timeval = datetime.datetime(*timeval)
+        timeval = datetime.datetime(*timeval)
 
     # set a timezone if none is set
     if not timeval.tzinfo:
-    	timeval = datetime.datetime(tzinfo=evidence_tz, *timeval.timetuple()[:6])
+        timeval = datetime.datetime(tzinfo=evidence_tz, *timeval.timetuple()[:6])
 
     dt = timeval.astimezone(case_tz)
     return time.strftime("%Y-%m-%d %H:%M:%S", dt.timetuple())

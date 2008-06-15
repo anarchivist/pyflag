@@ -42,9 +42,9 @@ class MozHistEventHandler(FlagFramework.EventHandler):
         `url`  VARCHAR(500) NOT NULL,
         host VARCHAR(250),
         `Typed` int,
-        `LastVisitDate` TIMESTAMP,
+        `LastVisitDate` TIMESTAMP NULL default '0000-00-00 00:00:00',
         `VisitCount` INT,
-        `FirstVisitDate` TIMESTAMP,
+        `FirstVisitDate` TIMESTAMP NULL default '0000-00-00 00:00:00',
         `Referrer` VARCHAR(500)
         )""")
 
@@ -189,7 +189,8 @@ class Mork(Magic.Magic):
         ( 100, '// <!-- <mdb:mork:z v="1.4"/> -->' ),
         ]
 
-## Mozilla Cache handling
+## Mozilla Cache handling, populates the http table as used by the http
+## scanner.
 
 import httplib
 import StringIO
