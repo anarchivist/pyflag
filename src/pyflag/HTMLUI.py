@@ -183,7 +183,7 @@ class HTMLUI(UI.GenericUI):
         
         for k,v in options.items():
             if v:
-                result.append("%s=%r"% (k,FlagFramework.urlencode(v.__str__())))
+                result.append("%s=%r"% (k,quote_quotes(v.__str__())))
 
         return ' '.join(result)
 
@@ -1656,6 +1656,9 @@ config.add_option("MAX_DATA_DUMP_SIZE", default=2048, type='int',
 
 config.add_option("REFRESH", default=3, type='int',
                   help="Polling frequency of the gui when analysing")
+
+config.add_option("THEME", default='Menu',
+                  help="Theme to use (currently Menu, AJAX)")
 
 
 HTMLUITableRenderer = UI.TableRenderer

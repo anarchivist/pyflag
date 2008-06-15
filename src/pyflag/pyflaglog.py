@@ -122,8 +122,9 @@ def log(level,message):
             LOG_QUEUE.put((level,message), False)
         except Full:
             pass
+        import pyflag.FlagFramework as FlagFramework
         
-        sys.stderr.write(string + "\n")
+        sys.stderr.write(FlagFramework.smart_str(string) + "\n")
         sys.stderr.flush()
         
     if level<=ERRORS and level>0:

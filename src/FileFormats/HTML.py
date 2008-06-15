@@ -47,7 +47,10 @@ def decode_entity(string):
     return re.sub("&#(\d+);", decoder, string)
 
 def decode_unicode(string):
-    return re.sub(r"\\u(....)", lambda x: struct.pack("H",int(x.group(1),16)).decode("utf16").encode("utf8"), string)
+    try:
+        return re.sub(r"\\u(....)", lambda x: struct.pack("H",int(x.group(1),16)).decode("utf16").encode("utf8"), string)
+    except:
+        return string
 
 def decode(string):
     return decode_unicode(decode_entity(unquote(string)))

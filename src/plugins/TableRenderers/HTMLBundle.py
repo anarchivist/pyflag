@@ -144,6 +144,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                     cell_ui =  elements[i].render_html(value,self)
                 except Exception, e:
                     pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
+                    cell_ui = ''
 
                 ## Render the row styles so that equal values on
                 ## the sorted column have the same style

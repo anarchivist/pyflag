@@ -199,7 +199,7 @@ def selector_display(self, description=None, variable=None, result=None, table=N
     tmp2=result.__class__(result)
     tmp3=result.__class__(result)
     tmp3.textfield('','new_%s' % variable)
-    tmp2.start_table(bgcolor='lightgray')
+    tmp2.start_table(bgcolor='#eeeeeeee')
     tmp2.row(tmp," or ",tmp3)
     tmp2.end_table()
     result.row(description,tmp2)

@@ -478,9 +478,6 @@ def Server(HandlerClass = FlagServerHandler,
     pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s" % (sa,))
     httpd.serve_forever()
 
-config.add_option("THEME", default='Menu',
-                  help="Theme to use (currently Menu, AJAX)")
-
 config.add_option("HTTPSERVER_BINDIF", default='127.0.0.1',
                   help="Interface to listen on for http connections")
 

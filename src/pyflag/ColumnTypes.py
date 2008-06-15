@@ -318,11 +318,9 @@ class ColumnType:
         into HTML
         """
         if value:
-            ## Remove non printable chars:
-            value = ''.join([ x for x in value.__str__() if ord(x)>31 ])
             import pyflag.HTMLUI as HTMLUI
             result = HTMLUI.HTMLUI(initial = True)
-            result.text(value, wrap='full')
+            result.text(FlagFramework.smart_unicode(value), wrap='full')
             value = result.__str__()
             
         return value

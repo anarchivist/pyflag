@@ -89,7 +89,7 @@ def get_traceback(e,result):
     result.text(get_bt_string(e))            
 
 
-STORE = Store.Store()
+STORE = Store.Store(1000)
 
 class FlagException(Exception):
     """ Generic Flag Exception """
@@ -1008,8 +1008,11 @@ def smart_unicode(s, encoding='utf-8', errors='ignore'):
         else:
             s = unicode(str(s), encoding, errors)
     elif not isinstance(s, unicode):
-        s = s.decode(encoding, errors)
-
+        try:
+            s = s.decode(encoding, errors)
+        except:
+            s = s.decode('utf8', errors)
+            
     return s
 
 def smart_str(s, encoding='utf-8', errors='strict'):
