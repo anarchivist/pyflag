@@ -24,6 +24,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
+import pyflag.Time as Time
 import re
 from NetworkScanner import *
 
@@ -164,7 +165,10 @@ class POPScanner(StreamScannerFactory):
             ## Add a new VFS node
             offset, length = f[1]
             new_inode="%s|o%s:%s" % (combined_inode,offset, length)
-            date_str = stream.ts_sec.split(" ")[0]
+
+            ds_timestamp = Time.convert(stream.ts_sec, case=self.case, evidence_tz="UTC")
+            date_str = ds_timestamp.split(" ")[0]
+
             path, inode, inode_id = self.fsfd.lookup(inode=combined_inode)
             path=os.path.normpath(path+"/../../../../../")
 

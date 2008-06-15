@@ -32,7 +32,7 @@ AC_PYTHON_DEVEL()
 AC_PYTHON_MODULE(MySQLdb, REQUIRED, [ You must install the python-mysql package ])
 AC_PYTHON_MODULE(pexpect, REQUIRED, [ You must install the python-pexpect package ])
 AC_PYTHON_MODULE(PIL, REQUIRED, [ You must install the python-imaging package ])
-AC_PYTHON_MODULE(dateutil, OPTIONAL, [ Installing the python-dateutil package will provide enhanced date parsing support. ])
+AC_PYTHON_MODULE(dateutil, REQUIRED, [ You must install the python-dateutil package ])
 
 # check for binaries
 AC_PATH_PROG([MYSQL], mysql)

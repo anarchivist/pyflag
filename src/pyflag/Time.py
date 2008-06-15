@@ -207,6 +207,9 @@ def parse(timestr, case=None, evidence_tz=None, **options):
     """ Parse a time string using dateutil.parser.  Current Time and Evidence
     timezone are used as a defaults for missing values on parsing. The result
     is a time string suitable for mysql expressed in case timezone """
+    if not timestr:
+    	return None
+
     evidence_tz = gettz(evidence_tz)
     case_tz = get_case_tz(case)
 

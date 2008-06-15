@@ -36,6 +36,7 @@ import pyflag.Reports as Reports
 import pyflag.FileSystem as FileSystem
 import re, urllib
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Time as Time
 import LiveCom
 
 def parse_json(string):
@@ -197,7 +198,8 @@ class GmailScanner(LiveCom.HotmailScanner):
                 if i[0]=='mi':
                     result['From'] = gmail_unescape(i[7])
                     result['Subject'] = gmail_unescape(i[16])
-                    result['Sent'] = guess_date(gmail_unescape(i[15]))
+                    #result['Sent'] = guess_date(gmail_unescape(i[15]))
+                    result['Sent'] = Time.parse(gmail_unescape(i[15]), case=self.case, evidence_tz=None)
                     for x in i[9]:
                         try:
                             if x[0][0]=='me':

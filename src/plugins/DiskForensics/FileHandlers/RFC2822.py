@@ -30,6 +30,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import email, email.Utils,time
 from pyflag.FileSystem import File
+import pyflag.Time as Time
 
 
 class RFC2822(Scanner.GenScanFactory):

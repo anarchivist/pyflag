@@ -32,6 +32,7 @@ import pyflag.ColumnTypes as ColumnTypes
 import pyflag.FileSystem as FileSystem
 import pyflag.FlagFramework as FlagFramework
 import pyflag.ColumnTypes as ColumnTypes
+import pyflag.Time as Time
 
 class YahooMailScan(LiveCom.HotmailScanner):
     """ Detect YahooMail Sessions """
@@ -189,7 +190,8 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
             try:
                 date = header.find("div", {"id":"message_view_date"}).text()
-                result['sent'] = ColumnTypes.guess_date(date).__str__()
+                #result['sent'] = ColumnTypes.guess_date(date).__str__()
+                result['sent'] = Time.parse(date, case=self.case, evidence_tz=None)
             except AttributeError: pass
 
             context = None
@@ -242,7 +244,8 @@ class YahooMailScan(LiveCom.HotmailScanner):
                 result['Message'] = msgbody.innerHTML()
                 
             if 'Sent' in result:
-                result['Sent'] = ColumnTypes.guess_date(result['Sent'])
+                #result['Sent'] = ColumnTypes.guess_date(result['Sent'])
+                result['Sent'] = Time.parse(result['Sent'], case=self.case, evidence_tz=None) 
 
             ## Find the message id:
             tag = header.find('input', dict(name='MsgId'))

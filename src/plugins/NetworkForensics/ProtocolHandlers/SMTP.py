@@ -31,6 +31,7 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Time as Time
 
 config.add_option("SMTP_PORTS", default="[25,]",
                   help="A list of ports to be considered for SMTP transactions")
@@ -151,7 +152,8 @@ class SMTPScanner(StreamScannerFactory):
             path, combined_inode, inode_id =self.fsfd.lookup(inode=combined_inode)
             path=os.path.normpath(path+"/../../../../../")
             new_inode="%s|o%s:%s" % (combined_inode,offset,length)
-            date_str = stream.ts_sec.split(" ")[0]
+            ds_timestamp = Time.convert(stream.ts_sec, case=self.case, evidence_tz="UTC")
+            date_str = ds_timestamp.split(" ")[0]
 
             self.fsfd.VFSCreate(None, new_inode,
                                 "%s/SMTP/%s/Message_%s" % (path,

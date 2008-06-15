@@ -410,11 +410,9 @@ class HTTPScanner(StreamScannerFactory):
             ## stream.ts_sec is already formatted in DB format
             ## need to convert back to utc/gmt as paths are UTC
             timestamp =  stream.get_packet_ts(offset)
-            print timestamp
-            print timestamp.__class__
-            timestamp = Time.convert(timestamp, case=self.case, evidence_tz="UTC")
+            ds_timestamp = Time.convert(timestamp, case=self.case, evidence_tz="UTC")
             try:
-                date_str = timestamp.split(" ")[0]
+                date_str = ds_timestamp.split(" ")[0]
             except:
                 date_str = stream.ts_sec.split(" ")[0]
                 
@@ -437,7 +435,7 @@ class HTTPScanner(StreamScannerFactory):
             url = p.request.get("url")
             try:
                 date = p.response.get("date")
-                date = self.parse_date_time_string(date)
+                date = Time.parse(date, case=self.case, evidence_tz=None) 
             except (KeyError,ValueError):
                 date = 0
 
