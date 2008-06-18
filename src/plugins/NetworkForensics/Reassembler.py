@@ -206,6 +206,7 @@ class StreamFile(File):
                 outfd_position = initial_len
 
             try:
+                #print "(Packet %s) Seeking to %s" % (row['packet_id'], outfd_position,),
                 out_fd.seek(outfd_position)
             except Exception,e:
                 print FlagFramework.get_bt_string(e)
@@ -214,7 +215,9 @@ class StreamFile(File):
             # Only try to write if there is a reverse file.
             if fds[index]>0:
                 fds[index].seek(row['cache_offset'])
-                out_fd.write(fds[index].read(row['length']))
+                data = fds[index].read(row['length'])
+                #print "Writing %s %r" % (row['length'],data)
+                out_fd.write(data)
 
             # Maintain the length of the file
             outfd_len = max(outfd_len, outfd_position+row['length'])

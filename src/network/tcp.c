@@ -54,6 +54,7 @@ void pad_to_first_packet(TCPStream self) {
   } else if(pad_length<0) {
     tcp->packet.data_len -= -pad_length;
     tcp->packet.data += -pad_length;
+    tcp->packet.header.seq += -pad_length;
 
     if(tcp->packet.data_len<0) {
       tcp->packet.data_len=0;
@@ -182,6 +183,27 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
       /** Adjust the data payload of the packet by the difference */
       tcp->packet.data+=diff;
       tcp->packet.data_len-=diff;
+
+      /** 
+	  We need to adjust the sequence numbers by this amount. This
+	  is the same as if the retransmitted packet delivers extra
+	  data from the end of the previous packet. Here is an
+	  example:
+
+	  Packet A: Seq x len y
+	  Packet B: Seq x len y+z
+
+	  Packet B retransmits packet A and add z more bytes to Packet
+	  A. In this case we call the callback with packet A, and
+	  expect seq x+y. When packet B arrives, we trim y bytes off
+	  its data and increase its sequence number to x+y so its as
+	  if packet B was:
+	  
+	  Packet B: Seq x+y len z
+
+	  This means we favour old packets. (See Ptacek and Newshams paper)
+      */
+      tcp->packet.header.seq += diff;
 
       /** Call our callback with this */
       self->state = PYTCP_DATA;
