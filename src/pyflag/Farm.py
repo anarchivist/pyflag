@@ -208,6 +208,14 @@ config.add_option("JOB_QUEUE", default=10, type='int',
                   help='Number of jobs to take on at once')
 
 def start_workers():
+    if config.FLUSH:
+        dbh = DB.DBO()
+        print "Deleting job queue"
+        dbh.execute("delete from jobs")
+
+    if config.WORKERS == 0:
+        return
+    
     for i in range(config.WORKERS):
        pid = os.fork()
        ## Parents:
@@ -302,8 +310,3 @@ def wake_workers():
 
 config.add_option("FLUSH", default=False, action='store_true',
                   help='There are no workers currently processing, flush job queue.')
-
-if config.FLUSH:
-    dbh = DB.DBO()
-    print "Deleting job queue"
-    dbh.execute("delete from jobs")

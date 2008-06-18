@@ -55,8 +55,14 @@ class Mounted(IO.Image):
             if query.has_key('filename'):
                 ## Check to see that filename is in the upload dir:
                 filename = os.path.normpath(query['filename'])
-                query['directory'] = os.path.dirname(filename)
-                
+                        ## Check if iosrc is a directory or a file:
+                try:
+                    os.listdir(filename)
+                    query['directory'] = filename
+                except OSError,e:
+                    print e
+                    query['directory'] = os.path.dirname(filename)
+
             if not query.has_key('directory'):
                 raise IOError("Mandatory parameter 'directory' not provided")
             else:
@@ -105,16 +111,22 @@ class MountedFS(DBFS):
         else:
             return -1
     
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name, scanners=None, directory = None):
         DBFS.load(self, mount_point, iosource_name)
         iosrc = self.iosource
-        
-        pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % iosrc.directory)
+        path = iosrc.directory
+        pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % path)
         dbh_file=DB.DBO(self.case)
         dbh_file.mass_insert_start('file')
         
         dbh_inode=DB.DBO(self.case)
         dbh_inode.mass_insert_start('inode')
+
+        if scanners:
+            scanner_string = ",".join(scanners)
+            pdbh = DB.DBO()
+            pdbh.mass_insert_start('jobs')
+            cookie = int(time.time())
 
         ## This deals with a mounted filesystem - we dont get the full
         ## forensic joy, but we can handle more filesystems than
@@ -122,7 +134,7 @@ class MountedFS(DBFS):
         ## the filesystem first, we also need to be running as root or
         ## we may not be able to stat all the files :-(
         def insert_into_table(mode ,root ,name):
-            rel_root = FlagFramework.normpath(mount_point + "/" + root[len(iosrc.directory):] + "/")
+            rel_root = FlagFramework.normpath(mount_point + "/" + root[len(path):] + "/")
             try:
                 s=os.lstat(os.path.join(root,name))
             except OSError:
@@ -149,6 +161,16 @@ class MountedFS(DBFS):
                                  status = 'alloc',
                                  path = rel_root,
                                  name = name)
+
+            ## If needed schedule inode for scanning:
+            if scanners and mode=='r/r':
+                pdbh.mass_insert(
+                    command = 'Scan',
+                    arg1 = self.case,
+                    arg2 = inode,
+                    arg3= scanner_string,
+                    cookie=cookie,
+                    )
                                  
             ## Fixme - handle symlinks
             try:

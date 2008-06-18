@@ -154,7 +154,8 @@ def expand(sql, params):
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
-            result = u"_binary'%s'" % escape(params[d['count']].decode("latin1"))
+            data = params[d['count']].decode("latin1")
+            result = u"_binary'%s'" % escape(data,"'")
 
         d['count'] +=1
         return result
@@ -704,7 +705,7 @@ class DBO:
         for k,v in columns.items():
             ## _field means to pass the field
             if k.startswith("__"):
-                v="_binary'%s'" % escape(v)
+                v=expand("%b" % (v,))
                 k=k[2:]
             elif k.startswith('_'):
                 k=k[1:]

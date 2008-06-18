@@ -156,7 +156,7 @@ class scan(pyflagsh.command):
             pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r", (cookie,
                          self.environment._CASE))
             row = pdbh.fetch()
-            if row['total']==0: break
+            if row and row['total']==0: break
 
             time.sleep(1)
 
