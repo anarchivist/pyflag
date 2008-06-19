@@ -116,7 +116,7 @@ class StreamFile(File):
         self.packet_list = None
 
     def make_tabs(self):
-        names, cbs = self.fd.make_tabs()
+        names, cbs = File.make_tabs(self)
 
         names.extend( [ "Show Packets", "Combined stream"])
         cbs.extend([ self.show_packets, self.combine_streams ])

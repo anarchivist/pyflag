@@ -696,38 +696,8 @@ class HTTPFile(Core.OffsetFile):
     The format is offset:length:inode_id
     """
     specifier = 'H'
-    def __init__(self, case, fd, inode):
-        Core.OffsetFile.__init__(self, case, fd, inode)
-
-        ## We parse out the offset and length from the inode string
-        tmp = inode.split('|')[-1]
-        tmp = tmp[1:].split(":")
-        self.offset = int(tmp[0])
-        self.readptr=0
-
-        ## Seek our parent file to its initial position
-        self.fd.seek(self.offset)
-
-        try:
-            self.size=int(tmp[1])
-            if self.size == 0: self.size=sys.maxint
-        except IndexError:
-            self.size=sys.maxint
-
-        try:
-            self.http_inode_id = int(tmp[2])
-        except IndexError:
-            self.http_inode_id = 0
-
-        # crop size if it overflows IOsource
-        # some iosources report size as 0 though, we must check or size will
-        # always be zero
-        if fd.size != 0 and self.size + self.offset > fd.size:
-            self.size = fd.size - self.offset
-
-
     def make_tabs(self):
-        names, cbs = self.fd.make_tabs()
+        names, cbs = Core.OffsetFile.make_tabs(self)
         names.extend( ["HTTP"])
         cbs.extend([self.http])
 
@@ -739,15 +709,15 @@ class HTTPFile(Core.OffsetFile):
 
     def http(self, query, result):
         inode_id = self.lookup_id()
-        result.table(
-            elements = [ StringType('Property', 'key'),
-                         StringType('Value', 'value'),
-                         ],
-            table = 'http_parameters',
-            where = 'inode_id = %s' % inode_id,
-            case = query['case'],
-            )
-
+        if inode_id:
+            result.table(
+                elements = [ StringType('Property', 'key'),
+                             StringType('Value', 'value'),
+                             ],
+                table = 'http_parameters',
+                where = 'inode_id = %s' % inode_id,
+                case = query['case'],
+                )
 
     def stats(self, query, result):
         ## Add some http stuff to it:

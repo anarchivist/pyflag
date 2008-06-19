@@ -96,6 +96,9 @@ class Menu(Theme.BasicTheme):
         try:
             case_selector.case_selector()
         except:pass
+        try:
+            query = ui.defaults
+        except: query = {}
 
         result = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
@@ -104,9 +107,10 @@ class Menu(Theme.BasicTheme):
             <title>%s</title>
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" media="all" />
             <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
-            <script> window.__pyflag_parent = "main"; window.__pyflag_name = "main"; </script>
+            <script> window.__pyflag_parent = "%s"; window.__pyflag_name = "%s"; </script>
           </head>
-        <body>\n''' % title
+        <body>\n''' % (title, query.get("__pyflag_parent","main"),
+                       query.get("__pyflag_name", "main"))
 
         result += self.menu_javascript
 

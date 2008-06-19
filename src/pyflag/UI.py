@@ -359,11 +359,8 @@ class GenericUI:
                     )
 
                 ## Submit all the nodes in the display:
-                def submit_all(query,result):
-                    sql = result._make_sql(elements = elements, filter_elements = elements,
-                                           table = tablename, case=case, filter=query.get('filter',''),
-                                           order = query.get('order',0))
-
+                def submit_all(query,new_result):
+                    sql = result.renderer._make_sql(query)
                     dbh.execute(sql)
                     new_query = query.clone()
 #                    new_query.remove('callback_stored',self.callback)
@@ -372,7 +369,7 @@ class GenericUI:
                     for row in dbh:
                         new_query[name] = row['Filename']
 
-                    result.refresh(0,new_query, pane='parent')
+                    new_result.refresh(0,new_query, pane='parent')
 
                 result.toolbar(cb=submit_all, text="Submit all", icon='yes.png')
 

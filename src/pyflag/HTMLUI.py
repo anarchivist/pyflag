@@ -989,6 +989,7 @@ class HTMLUI(UI.GenericUI):
 
         ## Render with it:
         r.render(self.defaults, self)
+        self.renderer = r
         
     def xxtable(self,elements=[],table='',where='1',groupby = None, _groupby=None, case=None,
               limit_context='limit', filter='filter',hidden='_hidden',
@@ -1581,10 +1582,11 @@ class HTMLUI(UI.GenericUI):
             del q[context]
             q[context]=i
 
+            js = self._calculate_js_for_pane(target = q, pane="self")
             if(i==context_str):
                 out+="<div class='TabActive'><span>%s</span></div>\n" % i
             else:
-                out+="<div class='Tab' onclick='document.location=\"f?%s\"'><span>%s</span></div>\n" % (q,i)
+                out+="<div class='Tab' onclick=\"%s\"><span>%s</span></div>\n" % (js, i)
         
 ##        out='\n<div id="notebook"><ul id="topmenu">'
         

@@ -269,7 +269,7 @@ def render_annotate_inode_id(self, inode_id, row, result):
         value1="..%s" % inode[-13:]
     else:
         value1 = inode
-    tmp2.link(value1, tooltip = inode, target=link)
+    tmp2.link(value1, tooltip = inode, target=link, pane="new")
     result.row(tmp1,tmp2)
 
 def operator_annotated(self, column, operator, pattern):

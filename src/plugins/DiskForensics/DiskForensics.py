@@ -50,20 +50,33 @@ order=30
 
 BLOCKSIZE=20
 
-def make_inode_link(query,result, variable='inode'):
+def make_inode_link(fd, query,ui, variable='inode'):
     """ Returns a ui based on result with links to each level of the
     inode"""
-    out = result.__class__(result)
-    
+    result = []
     tmp =  query[variable].split('|')
-    for i in range(len(tmp)):
+
+    for i in range(len(tmp)-1,-1,-1):
         new_query = query.clone()
         del new_query[variable]
-        new_query[variable]= '|'.join(tmp[:i+1])
-        tmp_result = result.__class__(result)
-        tmp_result.link(tmp[i],target=new_query, pane='pane')
-        out.text(" ")
-        out.text(tmp_result)
+        tmp_result = ui.__class__(ui)
+        try:
+            inode_id = fd.lookup_id()
+        except: continue
+        
+        if inode_id:
+            new_query.set("inode_id",inode_id)
+            tmp_result.link(tmp[i],target=new_query, pane='pane')
+        else:
+            tmp_result.text(tmp[i])
+        fd = fd.fd
+
+        result.insert(0, tmp_result)
+
+    out = result[0]
+    for i in range(1,len(result)):
+        out.text("|")
+        out.text(result[i])
 
     return out
 
@@ -201,12 +214,13 @@ class ViewFile(Reports.report):
             fd = fsfd.open(inode_id=query['inode_id'])
             query['inode'] = fd.inode
 
+        if not fd: return
         image = Graph.Thumbnailer(fd,300)
         
         ## Make a series of links to each level of this inode - this
         ## way we can view parents of this inode.
         tmp = result.__class__(result)
-        tmp.text("Viewing file in inode ",make_inode_link(query,result))
+        tmp.text("Viewing file in inode ",make_inode_link(fd, query,result))
         result.heading(tmp)
         
         try:
