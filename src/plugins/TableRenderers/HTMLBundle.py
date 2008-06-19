@@ -561,7 +561,7 @@ class Export(Farm.Task):
         filename = "inodes/%s_explain.html" % inode_id
         
         result.decoration='naked'
-        fd.explain(None, result)
+        fd.explain(None, result, fd=fd)
         
         table_renderer.add_file_from_string(filename, result.display())
 

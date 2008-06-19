@@ -262,7 +262,8 @@ class DBFS(FileSystem):
         dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777,
-                  _fast=False, inode_id=None, **properties):
+                  _fast=False, inode_id=None, update_only=False,
+                  **properties):
         ## Basically this is how this function works - if root_inode
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
@@ -281,20 +282,22 @@ class DBFS(FileSystem):
             directory_string = "r/r"
 
         ## Normalise the path:
-        new_filename=os.path.normpath(new_filename)
-        
-        ## Make sure that all intermediate dirs exist:
-        dirs = os.path.dirname(new_filename).split("/")
         dbh = DB.DBO(self.case)
         dbh.check_index('file','path', 200)
         dbh.check_index('file','name', 200)
-        for d in range(len(dirs)-1,0,-1):
-            path = "/".join(dirs[:d])+"/"
-            path = FlagFramework.normpath(path)
-            dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
-            if not dbh.fetch():
-                dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
-            else: break
+
+        if new_filename:
+            new_filename=os.path.normpath(new_filename)
+
+            ## Make sure that all intermediate dirs exist:
+            dirs = os.path.dirname(new_filename).split("/")
+            for d in range(len(dirs)-1,0,-1):
+                path = "/".join(dirs[:d])+"/"
+                path = FlagFramework.normpath(path)
+                dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
+                if not dbh.fetch():
+                    dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+                else: break
 
         ## Fixes bug0035: directories get interpolated above and need
         ## not be specifically inserted.
@@ -321,8 +324,15 @@ class DBFS(FileSystem):
                     inode_properties[t] = properties[t]
                 except KeyError: pass
 
-        dbh.insert('inode', **inode_properties)
-        inode_id = dbh.autoincrement()
+        if inode_id and update_only:
+            dbh.update('inode', where="inode_id=%s" % inode_id,
+                       **inode_properties)
+        else:
+            dbh.insert('inode', **inode_properties)
+            inode_id = dbh.autoincrement()
+
+        if not new_filename:
+            return inode_id
 
         ## Now add to the file and inode tables:
         file_props = dict(path = FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
@@ -416,7 +426,7 @@ class DBFS(FileSystem):
 
         else:
             dbh.check_index('file','inode')
-            dbh.execute("select inode_id,concat(path,name) as path from file where inode=%r order by status limit 1", inode)
+            dbh.execute("select inode.inode_id,concat(path,name) as path from file join inode on inode.inode_id = file.inode_id where inode.inode=%r order by file.status limit 1", inode)
             res = dbh.fetch()
             if not res:
                 raise RuntimeError("VFS Inode %s not known" % inode)
@@ -833,7 +843,7 @@ class File:
             
         result.row(self.__class__.__name__, self.__doc__, **{'class': 'explainrow'})
 
-    def summary(self,query,result):
+    def summary(self, query,result):
         """ This method draws a summary of the file.
 
         We basically hand off all processing to the ViewFile report -
@@ -976,7 +986,7 @@ class File:
 
         return result
 
-    def stats(self, query,result):
+    def stats(self, query,result, merge = None):
         """ Show statistics about the file """
         fsfd = DBFS(query['case'])
         istat = fsfd.istat(inode=query['inode'])
@@ -992,9 +1002,12 @@ class File:
                       open_tree=base_path, case=query['case'])
                   )
         left.row("Filename:",'',link)
+        if merge:
+            istat.update(merge)
+            
         try:
             for k,v in istat.iteritems():
-                left.row('%s:' % k,'',v)
+                left.row('%s:' % k,'',v, align='left')
         except AttributeError:
             pass
 

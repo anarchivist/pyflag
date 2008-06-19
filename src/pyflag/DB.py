@@ -395,7 +395,7 @@ class DBO:
         c = self.dbh.cursor()
         try:
             c.execute('set time_zone = (select value from meta where property="TZ")')
-        except MySQLdb.Error, e:
+        except Exception:
             pass
 
     def __init__(self,case=None):

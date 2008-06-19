@@ -384,7 +384,7 @@ class HTTPScanner(StreamScannerFactory):
             offset, size = f
 
             ## Create the VFS node:
-            new_inode="%s|o%s:%s" % (combined_inode,offset,size)
+            new_inode="%s|H%s:%s" % (combined_inode,offset,size)
 
             try:
                 if 'chunked' in p.response['transfer-encoding']:
@@ -428,7 +428,15 @@ class HTTPScanner(StreamScannerFactory):
                                                               escape(p.request['url'])),
                                            mtime=timestamp, size=size
                                            )
-                
+
+            ## Update the inode again:
+            #new_inode = new_inode % inode_id
+            ## This updates the inode table with the new inode
+            #self.fsfd.VFSCreate(None,new_inode,
+            #                    None, update_only = True,
+            #                    inode_id = inode_id
+            #                    )
+            
             ## Store information about this request in the
             ## http table:
             host = p.request.get("host",IP2str(stream.dest_ip))
@@ -679,6 +687,84 @@ class BrowseHTTPRequests(Reports.report):
             names=['HTTP Requests','HTTP Sessions'],
             callbacks = [tabular_view, tree_view]
             )
+
+import plugins.Core as Core
+class HTTPFile(Core.OffsetFile):
+    """ A HTTP Object
+
+    The inode name specifies an offset and a length into our parent Inode as well as the http object inode.
+    The format is offset:length:inode_id
+    """
+    specifier = 'H'
+    def __init__(self, case, fd, inode):
+        Core.OffsetFile.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        self.offset = int(tmp[0])
+        self.readptr=0
+
+        ## Seek our parent file to its initial position
+        self.fd.seek(self.offset)
+
+        try:
+            self.size=int(tmp[1])
+            if self.size == 0: self.size=sys.maxint
+        except IndexError:
+            self.size=sys.maxint
+
+        try:
+            self.http_inode_id = int(tmp[2])
+        except IndexError:
+            self.http_inode_id = 0
+
+        # crop size if it overflows IOsource
+        # some iosources report size as 0 though, we must check or size will
+        # always be zero
+        if fd.size != 0 and self.size + self.offset > fd.size:
+            self.size = fd.size - self.offset
+
+
+    def make_tabs(self):
+        names, cbs = self.fd.make_tabs()
+        names.extend( ["HTTP"])
+        cbs.extend([self.http])
+
+        ## update the stats with our version
+        idx = names.index("Statistics")
+        cbs[idx] = self.stats
+
+        return names,cbs
+
+    def http(self, query, result):
+        inode_id = self.lookup_id()
+        result.table(
+            elements = [ StringType('Property', 'key'),
+                         StringType('Value', 'value'),
+                         ],
+            table = 'http_parameters',
+            where = 'inode_id = %s' % inode_id,
+            case = query['case'],
+            )
+
+
+    def stats(self, query, result):
+        ## Add some http stuff to it:
+        inode_id = self.lookup_id()
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from http where inode_id = %r limit 1" , inode_id)
+        row = dbh.fetch()
+
+        ## Get our parent stats
+        self.fd.stats(query, result, merge=row)
+
+    def explain(self, query, result):
+        self.fd.explain(query,result)
+
+        result.row("HTTP","Extract %s bytes from %s starting at byte %s" % (self.size,
+                                                                            self.fd.inode,
+                                                                            self.offset))
 
 class Chunked(File):
     """ This reads chunked HTTP Streams.

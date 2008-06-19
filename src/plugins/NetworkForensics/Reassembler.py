@@ -121,7 +121,6 @@ class StreamFile(File):
         names.extend( [ "Show Packets", "Combined stream"])
         cbs.extend([ self.show_packets, self.combine_streams ])
 
-        print names
         return names, cbs
 
     def read(self,len=None):

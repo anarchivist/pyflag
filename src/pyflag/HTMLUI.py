@@ -278,12 +278,13 @@ class HTMLUI(UI.GenericUI):
                         
         self.result+="<tr %s>\n" % self.opt_to_str(options)
         for column in columns:
-            try:
-                column = long(column)
-                td_opts['class'] = 'Integer'
-            except:
-                td_opts['class'] = ''
-                
+            if not options.has_key('align'):
+                try:
+                    column = long(column)
+                    td_opts['class'] = 'Integer'
+                except:
+                    td_opts['class'] = ''
+        
             self.result += "<%s %s>%s</%s>" % (type,self.opt_to_str(td_opts),column,type)
 
         self.result+="</tr>\n"
