@@ -1,0 +1,8 @@
+For more docs, refer to The Sleuth Kit Informer at:
+
+   www.sleuthkit.org/informer
+
+
+brian
+
+CVS Date: $Date: 2007/12/18 22:43:29 $

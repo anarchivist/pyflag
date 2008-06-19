@@ -1,1 +1,1 @@
-SUBDIRS	= auxtools imgtools mmtools fstools python
+SUBDIRS	= sleuthkit-2.52 python

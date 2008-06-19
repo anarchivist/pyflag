@@ -14,10 +14,14 @@
 #include "list.h"
 #include "misc.h"
 #include "talloc.h"
-#include "fs_tools.h"
-#include "mm_tools.h"
-#include "ntfs.h"
- 
+//#include "fs_tools.h"
+//#include "mm_tools.h"
+//#include "ntfs.h"
+#include "tsk/libtsk.h"
+#include "tsk/fs/tsk_ntfs.h"
+
+static int TSK_IMG_INFO_TYPE_PYFILE_TYPE	=	0x40;
+
 /*
  * Suggested functions:
  * skfs:
@@ -86,19 +90,19 @@ malloc anywhere since free is always mapped to talloc_free and it is
 an error to try to talloc_free a regular malloc.
 
 */
-extern void *global_talloc_context;
+//extern void *global_talloc_context;
 
 // This is used to fix tsk_error_get's stupid behaviour of returning
 // null when no error occured.
 char *error_get() {
-  char *result = tsk_error_get();
+  const char *result = tsk_error_get();
 
   if(!result) result="";
 
-  return result;
+  return (char *)result;
 };
 
-static u_int8_t
+static TSK_WALK_RET_ENUM
 inode_walk_callback(TSK_FS_INFO *fs, TSK_FS_INODE *fs_inode, void *ptr) {
     PyObject *inode, *list;
     list = (PyObject *)ptr;
@@ -178,7 +182,7 @@ void listdent_add_dent(TSK_FS_DENT *fs_dent, TSK_FS_DATA *fs_data, struct dentwa
  * This is a based on the callback in fls_lib.c, it adds an entry for each
  * named ADS in NTFS
  */
-static uint8_t
+static TSK_WALK_RET_ENUM
 listdent_walk_callback_dent(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) {
     struct dentwalk *dentlist = (struct dentwalk *)ptr;
 
@@ -257,7 +261,7 @@ listdent_walk_callback_dent(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) 
 }
 
 /* callback function for dent_walk used by listdir */
-static uint8_t listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr) {
+static TSK_WALK_RET_ENUM listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr) {
     PyObject *tmp;
     PyObject *list = (PyObject *)ptr;
 
@@ -273,8 +277,8 @@ static uint8_t listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent
 }
 
 /* callback function for file_walk, populates a block list */
-static u_int8_t
-getblocks_walk_callback(TSK_FS_INFO *fs, DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr) {
+static TSK_WALK_RET_ENUM
+getblocks_walk_callback(TSK_FS_INFO *fs, TSK_DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr) {
 
     struct block *b;
     skfile *file = (skfile *) ptr;
@@ -297,8 +301,8 @@ getblocks_walk_callback(TSK_FS_INFO *fs, DADDR_T addr, char *buf, size_t size, T
 }
 
 /* lookup an inode from a path */
-INUM_T lookup_inode(TSK_FS_INFO *fs, char *path) {
-    INUM_T ret;
+TSK_INUM_T lookup_inode(TSK_FS_INFO *fs, char *path) {
+    TSK_INUM_T ret;
     char *tmp = talloc_strdup(NULL,path);
     /* this is evil and modifies the path! */
     tsk_fs_ifind_path(fs, 0, tmp, &ret);
@@ -307,7 +311,8 @@ INUM_T lookup_inode(TSK_FS_INFO *fs, char *path) {
 }
 
 /* callback for lookup_path */
-static uint8_t
+//static uint8_t
+TSK_WALK_RET_ENUM
 lookup_path_cb(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) {
     struct dentwalk *dent = (struct dentwalk *)ptr;
 
@@ -341,7 +346,7 @@ int lookup_path(TSK_FS_INFO *fs, struct dentwalk *dent) {
 }
 
 /* parse an inode string into inode, type, id */
-int parse_inode_str(char *str, INUM_T *inode, uint32_t *type, uint32_t *id) {
+int parse_inode_str(char *str, TSK_INUM_T *inode, uint32_t *type, uint32_t *id) {
     char *ptr;
 
     errno = 0;
@@ -368,9 +373,9 @@ void print_current_exception() {
  */
 
 /* Return the size read and -1 if error */
-static SSIZE_T
-pyfile_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
-                   OFF_T len, OFF_T offset) {
+static ssize_t
+pyfile_read_random(TSK_IMG_INFO * img_info, TSK_OFF_T vol_offset, char *buf,
+                   size_t len, TSK_OFF_T offset) {
 
     PyObject *res;
 #if PY_VERSION_HEX >= 0x02050000 // python2.5
@@ -423,7 +428,7 @@ pyfile_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     return read;
 }
 
-OFF_T
+TSK_OFF_T
 pyfile_get_size(TSK_IMG_INFO * img_info) {
     return img_info->size;
 }
@@ -514,7 +519,7 @@ pyfile_open(PyObject *fileobj) {
 
 /************* SKFS ***************/
 static PyObject *skfs_close(skfs *self) {
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     if(self->fs)
         self->fs->close(self->fs);
@@ -526,7 +531,7 @@ static PyObject *skfs_close(skfs *self) {
 
 static void
 skfs_dealloc(skfs *self) {
-  global_talloc_context = self->context;
+  //global_talloc_context = self->context;
 
   // This is not deeded here as skfs_close gets called already
   //  Py_DECREF(skfs_close(self));
@@ -556,7 +561,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 	allocated against that.
     */
     self->context = talloc_size(NULL,1);
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     /* initialise the img and filesystem */
     tsk_error_reset();
@@ -596,7 +601,7 @@ static PyObject *
 skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *list;
     char *path=NULL;
-    INUM_T inode;
+    TSK_INUM_T inode;
     int flags=0;
     /* these are the boolean options with defaults */
     int alloc=1, unalloc=0;
@@ -608,7 +613,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
         return NULL; 
 
     /** Set the talloc context: */
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     tsk_error_reset();
     inode = lookup_inode(self->fs, path);
@@ -630,7 +635,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     if(tsk_errno) {
       char *error = error_get();
       Py_DECREF(list);
-      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", inode, error);
     };
 
     return list;
@@ -690,11 +695,11 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     int names=1, inodes=0;
     PyObject *fileargs, *filekwds;
     skfs_walkiter *iter;
-    INUM_T inode=0;
+    TSK_INUM_T inode=0;
 
     static char *kwlist[] = {"path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKiiii", kwlist, &path, &inode, 
                                     &alloc, &unalloc, &names, &inodes))
@@ -730,7 +735,7 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     int alloc=0, unalloc=1;
     int flags=TSK_FS_INODE_FLAG_UNALLOC | TSK_FS_INODE_FLAG_USED;
     PyObject *list;
-    INUM_T inode=0;
+    TSK_INUM_T inode=0;
 
     static char *kwlist[] = {"inode", "alloc", "unalloc", NULL};
 
@@ -738,7 +743,7 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
                                     &alloc, &unalloc))
         return NULL; 
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
     // ignore args for now and just do full walk (start->end)
     list = PyList_New(0);
     self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
@@ -774,7 +779,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *result;
     PyObject *inode_obj;
     char *path=NULL;
-    INUM_T inode=0;
+    TSK_INUM_T inode=0;
     TSK_FS_INODE *fs_inode;
     int type=0, id=0;
 
@@ -787,14 +792,14 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     if(path) {
         tsk_error_reset();
         inode = lookup_inode(self->fs, path);
         if(inode == 0) {
 	  char *error = error_get();
-	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode,  error);
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, inode,  error);
 	};
     } else {
         /* inode can be an int or a string */
@@ -813,7 +818,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     fs_inode = self->fs->inode_lookup(self->fs, inode);
     if(fs_inode == NULL) {
       char *error = error_get();
-      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", inode, error);
     };
 
     result = build_stat_result(fs_inode);
@@ -852,7 +857,7 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *result;
     PyObject *inode_obj;
     char *path=NULL;
-    INUM_T inode=0;
+    TSK_INUM_T inode=0;
     TSK_FS_INODE *fs_inode;
     int type=0, id=0;
 
@@ -865,14 +870,14 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
     if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     if(path) {
         tsk_error_reset();
         inode = lookup_inode(self->fs, path);
         if(inode == 0) {
 	  char *error = error_get();
-	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode,  error);
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, inode,  error);
 	};
     } else {
         /* inode can be an int or a string */
@@ -891,7 +896,7 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
     fs_inode = self->fs->inode_lookup(self->fs, inode);
     if(fs_inode == NULL) {
       char *error = error_get();
-      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", inode, error);
     };
 
     if(S_ISLNK(fs_inode->mode) && fs_inode->link) {
@@ -909,7 +914,7 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
  * */
 static void 
 skfs_walkiter_dealloc(skfs_walkiter *self) {
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     Py_DECREF(self->skfs);
     talloc_free(self->context);
@@ -923,7 +928,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     struct dentwalk *root;
     int alloc=1, unalloc=0;
     int names=1, inodes=0;
-    INUM_T inode;
+    TSK_INUM_T inode;
 
     static char *kwlist[] = {"filesystem", "path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
@@ -939,7 +944,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
 
     /* setup the talloc context */
     self->context = talloc_size(NULL, 1);
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     /* set flags */
     self->flags = self->myflags = 0;
@@ -986,7 +991,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     /* are we done ? */
     if(list_empty(&self->walklist->list))
@@ -1148,12 +1153,12 @@ static int
 skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     char *filename=NULL;
     PyObject *inode_obj=NULL;
-    INUM_T inode=0;
+    TSK_INUM_T inode=0;
     PyObject *skfs_obj;
     TSK_FS_INFO *fs;
     int flags;
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     self->type = 0;
     self->id = 0;
@@ -1260,7 +1265,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     int slack=0, overread=0;
     off_t maxsize;
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     fs = ((skfs *)self->skfs)->fs;
 
@@ -1314,7 +1319,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 
     /* perform overread if necessary have to use direct block IO for this */
     if(slack && overread) {
-        DADDR_T last_block = 0;
+        TSK_DADDR_T last_block = 0;
         struct block *b;
         TSK_DATA_BUF *blockbuf;
         int len;
@@ -1356,7 +1361,7 @@ skfile_seek(skfile *self, PyObject *args, PyObject *kwds) {
     off_t maxsize;
     TSK_FS_INFO *fs;
 
-    global_talloc_context = self->context;
+    //global_talloc_context = self->context;
 
     fs = ((skfs *)self->skfs)->fs;
 
@@ -1435,7 +1440,8 @@ skfile_close(skfile *self) {
  #define MM_TYPE_VOL     0x02
 */
 
-static uint8_t mmls_callback(TSK_MM_INFO *mminfo, PNUM_T num, TSK_MM_PART *part, int flag, void *ptr) {
+static TSK_WALK_RET_ENUM
+mmls_callback(TSK_MM_INFO *mminfo, TSK_PNUM_T num, TSK_MM_PART *part, int flag, void *ptr) {
     PyObject *partlist = (PyObject *)ptr;
     PyObject *thispart;
 
@@ -1461,7 +1467,7 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
 
     /** Create a NULL talloc context for us. Now everything will be
 	allocated against that.  */
-    global_talloc_context = talloc_size(NULL,1);
+    //global_talloc_context = talloc_size(NULL,1);
 
     /* initialise the img */
     tsk_error_reset();
@@ -1479,7 +1485,7 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
       char *error = error_get();
       PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", error);
       img->close(img);
-      talloc_free(global_talloc_context); global_talloc_context = NULL;
+      //talloc_free(global_talloc_context); global_talloc_context = NULL;
       return NULL;
     }
 
@@ -1493,7 +1499,7 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
         Py_DECREF(partlist);
         mm->close(mm);
         img->close(img);
-        talloc_free(global_talloc_context); global_talloc_context = NULL;
+        //talloc_free(global_talloc_context); global_talloc_context = NULL;
         return NULL;
     }
 
@@ -1502,7 +1508,7 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
     /* cleanup */
     mm->close(mm);
     img->close(img);
-    talloc_free(global_talloc_context); global_talloc_context = NULL;
+    //talloc_free(global_talloc_context); global_talloc_context = NULL;
 
     return partlist;
 }

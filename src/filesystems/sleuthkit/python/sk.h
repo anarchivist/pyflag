@@ -5,7 +5,8 @@
 
 #include "list.h"
 #include "talloc.h"
-#include "fs_tools.h"
+//#include "fs_tools.h"
+#include "tsk/libtsk.h"
 
 /******************************************************************
  * Helpers and SK integration stuff
@@ -18,7 +19,7 @@
 /* stores the major elements of TSK_FS_DENT */
 struct dentwalk {
     char *path;
-    INUM_T inode;
+    TSK_INUM_T inode;
     uint8_t ent_type;
     uint32_t type;
     uint32_t id;
@@ -34,23 +35,23 @@ typedef struct {
 
 /* tracks block lists */
 struct block {
-    DADDR_T addr;
+    TSK_DADDR_T addr;
     int size;
     struct list_head list;
 };
 
 /* callback functions for dent_walk, populate a file list */
-static uint8_t
+static TSK_WALK_RET_ENUM
 listdent_walk_callback_dent(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr);
-static uint8_t
+static TSK_WALK_RET_ENUM
 listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr);
 
 /* callback function for file_walk, populates a block list */
-static u_int8_t
-getblocks_walk_callback(TSK_FS_INFO *fs, DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr);
+static TSK_WALK_RET_ENUM
+getblocks_walk_callback(TSK_FS_INFO *fs, TSK_DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr);
 
 /* lookup an inode from a path */
-INUM_T lookup_inode(TSK_FS_INFO *fs, char *path);
+TSK_INUM_T lookup_inode(TSK_FS_INFO *fs, char *path);
 int lookup_path(TSK_FS_INFO *fs, struct dentwalk *dent);
 
 /******************************************************************
@@ -220,7 +221,7 @@ static PyTypeObject skfs_walkiterType = {
 
 typedef struct {
     PyObject_HEAD
-    INUM_T inode;
+    TSK_INUM_T inode;
 	uint32_t type;
 	uint32_t id;
     char alloc;
@@ -397,8 +398,8 @@ static PyTypeObject skfileType = {
 };
 
 // This is not in sleuthkit header
-uint8_t ntfs_find_file(TSK_FS_INFO *fs, INUM_T inode_toid, uint32_t type_toid, 
-               uint16_t id_toid, int flags, TSK_FS_DENT_TYPE_WALK_CB action, void *ptr);
+uint8_t ntfs_find_file(TSK_FS_INFO *fs, TSK_INUM_T inode_toid, uint32_t type_toid, uint16_t id_toid, int flags, TSK_FS_DENT_TYPE_WALK_CB action, void *ptr);
 
 
+uint8_t ntfs_find_file(TSK_FS_INFO *, TSK_INUM_T, uint32_t, uint16_t, int, TSK_FS_DENT_TYPE_WALK_CB, void *ptr);
 
