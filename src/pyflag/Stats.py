@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 class Handler:
     """ A Stats handler is called to render some stats on the current VSF.
 

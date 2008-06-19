@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ## pyFLAG utility script designed to run in a cron to allow automated moving/copying and pyflag processing of data
 ## gregsfdev@users.sourceforge.net
 

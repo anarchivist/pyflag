@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ File to define a base class for packet handlers.
 
 Packet handlers are similar to scanners but are invoked for each

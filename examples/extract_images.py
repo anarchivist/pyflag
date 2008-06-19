@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ A program demonstrating the automation of flag using the Flag Shell and python.
 
 We extract all the files with type like image into the /tmp/ directory"""

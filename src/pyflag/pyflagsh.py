@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
 # Gavin Jackson <gavz@users.sourceforge.net>

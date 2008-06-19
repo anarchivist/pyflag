@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ This module handles OLE2 files, such as Microsoft office files.
 
 We currently implement support for the following file formats:

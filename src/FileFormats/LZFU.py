@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ The LZFU is a MS specific compression used for rtf files. It is mainly used in PST files """
 from format import *
 from plugins.FileFormats.BasicFormats import *

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ This is a parser for the table search widget. The parser
 implements a simple language for structured queries depending on the
 type of the columns presented.

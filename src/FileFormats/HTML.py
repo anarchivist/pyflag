@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ This is an implementation of a HTML parser using the pyflag lexer. 
 
 We do not use pythons native sgml parser because that is too fragile

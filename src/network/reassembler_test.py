@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import _dissect
 import reassembler
 import DB

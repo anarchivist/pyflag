@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pyflag.IO as IO
 import pyflag.Registry as Registry
 Registry.Init()

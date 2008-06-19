@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ A script which goes through a case and reports the yahoo mail
 version encountered
 """

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Read and write ZIP files.
 

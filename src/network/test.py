@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import DB
 
 import _dissect

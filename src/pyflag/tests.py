@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************

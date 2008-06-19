@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pyflag.HTMLUI as HTMLUI
 import pyflag.DB as DB
 import pyflag.conf

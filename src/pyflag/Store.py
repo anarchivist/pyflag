@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """  This file implements a memory store for python objects.
 
 A memory store is a single semi/persistant storage for object

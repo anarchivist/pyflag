@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ This is an implementation of Magic file header detection.
 
 The standard Magic scheme is not powerful enough to correctly identify

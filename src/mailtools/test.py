@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pst
 
 f = pst.PstFile("/tmp/outlook.pst")

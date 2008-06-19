@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ Utilities related to scanners """
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>

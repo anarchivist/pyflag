@@ -1,4 +1,4 @@
-#! /usr/bin/python2.4
+#!/usr/bin/env python
 """ Python Character Mapping Codec for MS PST. The MS PST codec is
 used to encode PST files (outlook local storage files) using
 'compressible encryption'. This is actually a simple substitution

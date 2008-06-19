@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import _dissect
 import pyflag.conf
 config=pyflag.conf.ConfObject()

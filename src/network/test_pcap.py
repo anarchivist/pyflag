@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pypcap
 
 fd = pypcap.PyPCAP(open("/var/tmp/uploads/stdcapture_0.3.pcap"))

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # ******************************************************
 # Copyright 2006
 # Michael Cohen <scudette@users.sourceforge.net>

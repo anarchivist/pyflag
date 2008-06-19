@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 def eval_expression(elements, name, operator, arg, ui):
 #    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:

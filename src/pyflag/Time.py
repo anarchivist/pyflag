@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ This module has a number of useful Time manipulation utilities
 """
 import _strptime, time
