@@ -237,6 +237,14 @@ class MountedFS_file(File):
     def tell(self):
         return self.fd.tell()
 
+    def explain(self, query, result):
+        name = self.fd.name
+        ## Trim the upload directory if present
+        if name.startswith(config.UPLOADDIR):
+            name = name[len(config.UPLOADDIR):]
+            
+        result.row("Filename","%s" % name, **{'class':'explainrow'})
+
 ## Unit tests:
 import pyflag.tests as tests
 

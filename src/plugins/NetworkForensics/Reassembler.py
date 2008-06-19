@@ -111,12 +111,18 @@ class StreamFile(File):
         self.look_for_cached()
         self.read(0)
         
-        self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
-        self.stat_names.extend([ "Show Packets", "Combined stream"])
-
         ## This is a cache of packet lists that we keep so we do not
         ## have to hit the db all the time.
         self.packet_list = None
+
+    def make_tabs(self):
+        names, cbs = self.fd.make_tabs()
+
+        names.extend( [ "Show Packets", "Combined stream"])
+        cbs.extend([ self.show_packets, self.combine_streams ])
+
+        print names
+        return names, cbs
 
     def read(self,len=None):
         ## Call our baseclass to see if we have cached data:

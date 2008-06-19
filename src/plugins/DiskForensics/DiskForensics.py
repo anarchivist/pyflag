@@ -217,9 +217,11 @@ class ViewFile(Reports.report):
         except:
             pass
 
+        names, callbacks = fd.make_tabs()
+        
         result.notebook(
-            names=fd.stat_names,
-            callbacks=fd.stat_cbs,
+            names=names,
+            callbacks=callbacks,
             context="mode"
             )
 
@@ -232,7 +234,7 @@ class ViewFile(Reports.report):
                                        ),
                        pane = 'pane'
                        )
-            
+
     def form(self,query,result):
         result.defaults = query
         result.case_selector()

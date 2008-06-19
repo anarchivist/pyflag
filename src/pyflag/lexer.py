@@ -178,6 +178,9 @@ class Lexer:
             print "Tried to pop the state but failed - possible recursion error"
             return None
 
+    def close(self):
+        """ Just a conveniece function to force us to parse all the data """
+        while self.next_token(): pass
 
 class SelfFeederMixIn(Lexer):
     """ This mixin is used to make a lexer which feeds itself one

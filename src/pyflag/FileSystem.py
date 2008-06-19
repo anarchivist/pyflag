@@ -599,9 +599,6 @@ class File:
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
         # Install default views
-        self.stat_names = ["Statistics","HexDump", "TextDump", "Download","Summary", "Explain"]
-        self.stat_cbs=[self.stats,self.hexdump,self.textdump, self.download, self.summary, self.explain]
-
         # each file should remember its own part of the inode
         self.case = case
         self.fd = fd
@@ -789,6 +786,29 @@ class File:
         else:
             raise StopIteration
 
+    def make_tabs(self):
+        """ A callback to render the tabs view in the View Inode report """
+        try:
+            names, cbs = self.fd.make_tabs()
+        except  AttributeError:
+            names = []
+        
+        stat_names = ["Statistics","HexDump", "TextDump", "Download","Summary", "Explain"]
+        stat_cbs =   [self.stats,
+                      self.hexdump,
+                      self.textdump,
+                      self.download,
+                      self.summary,
+                      self.explain]
+
+        ## Can our baseclass add anything?
+        for i in range(len(names)):
+            if names[i] not in stat_names:
+                stat_names.append(names[i])
+                stat_cbs.append(cbs[i])
+        
+        return stat_names, stat_cbs
+
     def readline(self,delimiter='\n'):
         """ Emulates a readline by reading upto the \n """
         buffer = ''
@@ -807,8 +827,9 @@ class File:
     def explain(self, query, result):
         """ This method is called to explain how we arrive at this
         data"""
-        if self.fd:
+        try:
             self.fd.explain(query, result)
+        except AttributeError: pass
             
         result.row(self.__class__.__name__, self.__doc__, **{'class': 'explainrow'})
 
@@ -833,7 +854,8 @@ class File:
         max=config.MAX_DATA_DUMP_SIZE
 
         def textdumper(offset, data,result):
-            result.text(data, font='typewriter', sanitise='full', wrap='full', color='red')
+            result.text(data, font='typewriter', sanitise='full', wrap='full', style='red',
+                        max_lines = 500)
         
         return self.display_data(query,result, max, textdumper)
 

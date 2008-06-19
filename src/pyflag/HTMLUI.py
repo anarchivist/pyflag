@@ -422,19 +422,18 @@ class HTMLUI(UI.GenericUI):
             
         self.form_parms[name]=value
 
-    def checkbox(self,description,name,value, tooltip=None, **options):
+    def checkbox(self,description,name,value, tooltip=None, reverse=False, **options):
         """ Create a checkbox input for the name,value pair given. """
-        opt_str = ''
-        if options:
-            opt_str = self.opt_to_str(options)
-        
         if value in self.defaults.getarray(name):
             opt_str += 'checked'
 
         if tooltip:
             description = self.tooltipise(tooltip, description)
-            
-        self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value,opt_str))
+
+        if reverse:
+            self.result+="<tr><td align=right><input type=checkbox name=\"%s\" value=\"%s\"></td><td>%s</td></tr>\n" % (name,value, description)
+        else:
+            self.row(description,"<input type=checkbox name=\"%s\">" % (name,value), **options)
         if self.form_parms.has_key(name):
             del self.form_parms[name]
             
@@ -1165,7 +1164,9 @@ class HTMLUI(UI.GenericUI):
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
-
+        
+        self.max_lines = options.get('max_lines',0)
+        
         #If the user finished with this text box, we need to flush it
         if options.has_key('finish'):
             self.result += self.text_var+"</font>"
@@ -1203,6 +1204,7 @@ class HTMLUI(UI.GenericUI):
             else:
                 self.result += "%s%s" % (format,d)
 
+        line_count = 0
         for d in cuts:
             self.text_var = "%s" % d
             line_break="<br>\n"
@@ -1223,7 +1225,16 @@ class HTMLUI(UI.GenericUI):
                         if len(new_line)<len(line) and i<len(new_lines)-1:
                             self.result+="&nbsp;" * (wrap-len(new_line))
                             self.result+="<img src='images/next_line.png'>"
+                            
                         self.result+=line_break
+                        line_count += 1
+
+                        if self.max_lines>0 and line_count > self.max_lines:
+                            break
+                        
+                    if self.max_lines>0 and line_count > self.max_lines:
+                        break
+                        
                 self.result+=line_break
             else:
                 do_options(self.text_var,options)

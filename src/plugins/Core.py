@@ -464,7 +464,7 @@ class FileTable(FlagFramework.CaseTable):
     """ File table - Complements the VFS inodes with filenames """
     name = 'file'
     columns = [ [ InodeIDType, {} ],
-                [ StringType, dict(name = 'Inode_deprecated', column = 'inode')],
+                [ StringType, dict(name = 'Inode String', column = 'inode')],
                 [ StringType, dict(name = 'Mode', column = 'mode', width=3)],
                 [ StringType, dict(name = 'Status', column = 'status', width=8)],
                 [ FilenameType, {}],
@@ -476,7 +476,7 @@ class InodeTable(FlagFramework.CaseTable):
     name = 'inode'
     primary = 'inode_id'
     columns = [ [ InodeIDType, {}, "auto_increment" ],
-                [ StringType, dict(name = 'Inode_', column = 'inode')],
+                [ StringType, dict(name = 'Inode String', column = 'inode')],
                 [ DeletedType, {} ],
                 [ IntegerType, dict(name = 'UID', column = 'uid')],
                 [ IntegerType, dict(name = 'GID', column = 'gid')],

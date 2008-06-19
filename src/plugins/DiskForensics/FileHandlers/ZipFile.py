@@ -329,7 +329,7 @@ class ZipFile(File):
         result.row("Zip File", "Decompress ZipFileHeader structure at "
                    "offset %s with length %s" % (self.offset, self.compressed_length))
 
-class GZ_file(DiskForensics.DBFS_file):
+class GZ_file(File):
     """ A file like object to read gzipped files. """
     specifier = 'G'
     
@@ -444,7 +444,7 @@ class DeflateFile(GZ_file):
 
         result.row("Gzip File", "Use deflate algorithm to decompress %s" % self.fd.inode)
 
-class Tar_file(DiskForensics.DBFS_file):
+class Tar_file(File):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
     

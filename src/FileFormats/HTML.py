@@ -241,7 +241,7 @@ class SanitizingTag(Tag):
                             'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols','media',
-                            'framespacing','frameborder','contenteditable',
+                            'framespacing','frameborder','contenteditable', "dir"
                             ]
 
     def css_filter(self, data):
@@ -631,10 +631,6 @@ class HTMLParser(lexer.Lexer):
             if m:
                 print "Setting charset to %s" % m.group(1)
                 self.charset[0] = m.group(1)
-
-    def close(self):
-        """ Just a conveniece function to force us to parse all the data """
-        while self.next_token(): pass
 
 if __name__ == '__main__':
     l = HTMLParser(verbose=1, tag_class = SanitizingTag)
