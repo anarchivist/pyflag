@@ -1,4 +1,4 @@
-SUBDIRS		= . libewf libiosubsys libsgzip
+SUBDIRS		= . libiosubsys libsgzip
 
 INCLUDES        	= -I$(top_srcdir)/src/include -include config.h 
 

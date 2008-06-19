@@ -13,6 +13,7 @@ AC_PROG_CC
 # check headers
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
+AC_CHECK_HEADER(libewf.h,,AC_MSG_ERROR([You Must install libewf for Expert Witness Format (encase) support]))
 AC_CHECK_HEADER(GeoIP.h,have_geoip=yes,AC_MSG_WARN([please install libgeoip-dev for ip geolocation]))
 AC_CHECK_HEADER(jpeglib.h,have_libjpeg=yes,AC_MSG_WARN([please install libjpeg62-dev for jpeg carving]))
 
@@ -56,9 +57,6 @@ AC_OUTPUT([
 	src/pyflag/Makefile 
 	src/lib/Makefile 
 	src/lib/libsgzip/Makefile
-	src/lib/libewf/Makefile
-	src/lib/libewf/libewf/Makefile
-	src/lib/libewf/ewftools/Makefile
 	src/lib/libiosubsys/Makefile
 	src/remote/Makefile
 	src/mmedia/Makefile

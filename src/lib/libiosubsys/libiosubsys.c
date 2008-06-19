@@ -353,7 +353,7 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   };
 
   TRY {
-    e = libewf_open((const char **)this->buffer->data, this->number_of_files, 
+    e = libewf_open((char **)this->buffer->data, this->number_of_files, 
 			       LIBEWF_OPEN_READ);
     this->_handle = e;
   } EXCEPT(E_ANY) {
@@ -365,7 +365,7 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
     return raise_errors(EIOError, "This does not appear to be an EWF file");
   };
 
-  self->size = libewf_get_media_size(e);
+  libewf_get_media_size(e, &self->size);
 
   talloc_set_destructor((void *)self, EWFIOSource_Destructor);
   return self;

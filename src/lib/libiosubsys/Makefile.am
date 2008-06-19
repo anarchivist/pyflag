@@ -1,4 +1,4 @@
-INCLUDES        	= -I$(top_srcdir)/src/include -include config.h  -I../libewf/include/
+INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 
 noinst_LTLIBRARIES	= libiosubsys.la
 noinst_PROGRAMS		= test
@@ -19,7 +19,8 @@ noinst_HEADERS  = $(srcdir)/*.h
 pkgpyexec_LTLIBRARIES 	= iosubsys.la
 
 libiosubsys_la_SOURCES     = libiosubsys.c
-libiosubsys_la_LIBADD      = ../liboo.la ../libsgz.la ../libexcept.la ../libewf/libewf/libewf.la
+libiosubsys_la_LIBADD      = ../liboo.la ../libsgz.la ../libexcept.la
+libiosubsys_la_LDFLAGS     = -lewf
 
 # python module specifics
 iosubsys_la_SOURCES 	= iosubsys.c
