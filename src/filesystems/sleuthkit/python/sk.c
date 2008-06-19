@@ -14,9 +14,7 @@
 #include "list.h"
 #include "misc.h"
 #include "talloc.h"
-//#include "fs_tools.h"
-//#include "mm_tools.h"
-//#include "ntfs.h"
+
 #include "tsk/libtsk.h"
 #include "tsk/fs/tsk_ntfs.h"
 
@@ -90,7 +88,10 @@ malloc anywhere since free is always mapped to talloc_free and it is
 an error to try to talloc_free a regular malloc.
 
 */
-//extern void *global_talloc_context;
+
+#ifdef SK_TALLOC_HACK
+extern void *global_talloc_context;
+#endif
 
 // This is used to fix tsk_error_get's stupid behaviour of returning
 // null when no error occured.
@@ -519,7 +520,9 @@ pyfile_open(PyObject *fileobj) {
 
 /************* SKFS ***************/
 static PyObject *skfs_close(skfs *self) {
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     if(self->fs)
         self->fs->close(self->fs);
@@ -531,7 +534,9 @@ static PyObject *skfs_close(skfs *self) {
 
 static void
 skfs_dealloc(skfs *self) {
-  //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+  global_talloc_context = self->context;
+#endif
 
   // This is not deeded here as skfs_close gets called already
   //  Py_DECREF(skfs_close(self));
@@ -561,7 +566,9 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 	allocated against that.
     */
     self->context = talloc_size(NULL,1);
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     /* initialise the img and filesystem */
     tsk_error_reset();
@@ -613,7 +620,9 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
         return NULL; 
 
     /** Set the talloc context: */
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     tsk_error_reset();
     inode = lookup_inode(self->fs, path);
@@ -699,7 +708,9 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
 
     static char *kwlist[] = {"path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKiiii", kwlist, &path, &inode, 
                                     &alloc, &unalloc, &names, &inodes))
@@ -743,7 +754,9 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
                                     &alloc, &unalloc))
         return NULL; 
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
     // ignore args for now and just do full walk (start->end)
     list = PyList_New(0);
     self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
@@ -792,7 +805,9 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     if(path) {
         tsk_error_reset();
@@ -870,7 +885,9 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
     if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     if(path) {
         tsk_error_reset();
@@ -914,7 +931,9 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
  * */
 static void 
 skfs_walkiter_dealloc(skfs_walkiter *self) {
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     Py_DECREF(self->skfs);
     talloc_free(self->context);
@@ -944,7 +963,9 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
 
     /* setup the talloc context */
     self->context = talloc_size(NULL, 1);
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     /* set flags */
     self->flags = self->myflags = 0;
@@ -991,7 +1012,9 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     /* are we done ? */
     if(list_empty(&self->walklist->list))
@@ -1158,7 +1181,9 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     TSK_FS_INFO *fs;
     int flags;
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     self->type = 0;
     self->id = 0;
@@ -1265,7 +1290,9 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     int slack=0, overread=0;
     off_t maxsize;
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     fs = ((skfs *)self->skfs)->fs;
 
@@ -1361,7 +1388,9 @@ skfile_seek(skfile *self, PyObject *args, PyObject *kwds) {
     off_t maxsize;
     TSK_FS_INFO *fs;
 
-    //global_talloc_context = self->context;
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = self->context;
+#endif
 
     fs = ((skfs *)self->skfs)->fs;
 
@@ -1467,7 +1496,9 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
 
     /** Create a NULL talloc context for us. Now everything will be
 	allocated against that.  */
-    //global_talloc_context = talloc_size(NULL,1);
+#ifdef SK_TALLOC_HACK
+    global_talloc_context = talloc_size(NULL,1);
+#endif
 
     /* initialise the img */
     tsk_error_reset();
@@ -1485,7 +1516,9 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
       char *error = error_get();
       PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", error);
       img->close(img);
-      //talloc_free(global_talloc_context); global_talloc_context = NULL;
+#ifdef SK_TALLOC_HACK
+      talloc_free(global_talloc_context); global_talloc_context = NULL;
+#endif
       return NULL;
     }
 
@@ -1499,7 +1532,9 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
         Py_DECREF(partlist);
         mm->close(mm);
         img->close(img);
-        //talloc_free(global_talloc_context); global_talloc_context = NULL;
+#ifdef SK_TALLOC_HACK
+        talloc_free(global_talloc_context); global_talloc_context = NULL;
+#endif
         return NULL;
     }
 
@@ -1508,7 +1543,9 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
     /* cleanup */
     mm->close(mm);
     img->close(img);
-    //talloc_free(global_talloc_context); global_talloc_context = NULL;
+#ifdef SK_TALLOC_HACK
+    talloc_free(global_talloc_context); global_talloc_context = NULL;
+#endif
 
     return partlist;
 }

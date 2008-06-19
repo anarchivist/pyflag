@@ -61,6 +61,11 @@
 #include "tsk_base_i.h"
 #include <errno.h>
 
+#ifdef SK_TALLOC_HACK
+#include "talloc.h"
+void *global_talloc_context=NULL;
+#endif
+
 /* tsk_malloc - allocate memory and set error values on error
  */
 char *
@@ -68,7 +73,11 @@ tsk_malloc(size_t len)
 {
     char *ptr;
 
+#ifdef SK_TALLOC_HACK
+    if ((ptr = (char *) talloc_zero_size(global_talloc_context, len)) == 0) {
+#else
     if ((ptr = (char *) malloc(len)) == 0) {
+#endif
         tsk_error_reset();
         tsk_errno = TSK_ERR_AUX_MALLOC;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "tsk_malloc: %s",
@@ -81,7 +90,11 @@ tsk_malloc(size_t len)
 char *
 tsk_realloc(char *ptr, size_t len)
 {
+#ifdef SK_TALLOC_HACK
+    if ((ptr = (char *) talloc_realloc_size(global_talloc_context, ptr, len)) == 0) {
+#else
     if ((ptr = (char *) realloc(ptr, len)) == 0) {
+#endif
         tsk_error_reset();
         tsk_errno = TSK_ERR_AUX_MALLOC;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "tsk_realloc: %s",

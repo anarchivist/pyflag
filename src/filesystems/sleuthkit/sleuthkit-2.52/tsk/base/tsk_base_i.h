@@ -38,6 +38,12 @@
     (roundup((x),(y)) - (y)))
 #endif
 
+#ifdef SK_TALLOC_HACK
+#include "talloc.h"
+#define free talloc_free
+#define malloc tsk_malloc
+#endif
+
     extern char *tsk_malloc(size_t);
     extern char *tsk_realloc(char *, size_t);
 
