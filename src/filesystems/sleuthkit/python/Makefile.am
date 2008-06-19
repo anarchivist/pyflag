@@ -1,4 +1,4 @@
-AM_CFLAGS		= -I$(top_srcdir)/src/include -include config.h 
+AM_CFLAGS		= -I$(top_srcdir)/src/include -I../sleuthkit-2.52 -include config.h
 
 # This is for the sleuthkit python module
 pkgpyexec_LTLIBRARIES 	= sk.la
