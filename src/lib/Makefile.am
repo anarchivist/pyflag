@@ -1,4 +1,4 @@
-SUBDIRS		= . libiosubsys libsgzip pyewf
+SUBDIRS		= . libiosubsys libsgzip pyewf pyaff
 
 INCLUDES        	= -I$(top_srcdir)/src/include -include config.h 
 
