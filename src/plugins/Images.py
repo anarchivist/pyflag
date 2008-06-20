@@ -252,17 +252,17 @@ class Advanced(IO.Image):
                 self.io = self.create(name, case, query_type(string=row['parameters']))
                 self.parameters = row['parameters']
 
-class SGZip(Advanced):
-    """ Sgzip is pyflags native image file format """
-    subsys = 'sgzip'
+#class SGZip(Advanced):
+#    """ Sgzip is pyflags native image file format """
+#    subsys = 'sgzip'
 
-class EWF(Advanced):
-    """ EWF is used by other forensic packages like Encase or FTK """
-    subsys = 'ewf'
+#class EWF(Advanced):
+#    """ EWF is used by other forensic packages like Encase or FTK """
+#    subsys = 'ewf'
 
-class OffsettedFile(IOSubsysFD):
-    def __init__(self, filename, offset):
-        self.fd = IO.open_URL(filename)
+class OffsettedFDFile(IOSubsysFD):
+    def __init__(self, fd, offset):
+        self.fd = fd
         self.offset = offset
         self.fd.seek(0,2)
         self.size = self.fd.tell() - offset
@@ -277,6 +277,11 @@ class OffsettedFile(IOSubsysFD):
         result = self.fd.read(length)
         self.readptr += len(result)
         return result
+
+class OffsettedFile(OffsettedFDFile):
+    def __init__(self, filename, offset):
+        fd = IO.open_URL(filename)
+        OffsettedFDFile(self, fd, offset)
 
 class Standard(Advanced):
     """ Standard image types as obtained by dd """
@@ -295,6 +300,29 @@ class Standard(Advanced):
         self.cache_io(name, case, query)
         self.io.seek(0)
         return self.io
+
+import pyaff
+
+class AFF(Standard):
+    """ Advanced Forensics Format, an open format for storage of forensic
+    evidence """
+
+    def create(self, name, case, query):
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        filename = query['filename']
+        fd = pyaff.open(filename)
+        return OffsettedFDFile(fd, offset)
+
+import pyewf
+
+class EWF(Standard):
+    """ EWF is used by other forensic packages like Encase or FTK """
+
+    def create(self, name, case, query):
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        filename = query['filename']
+        fd = pyewf.open((filename,))
+        return OffsettedFDFile(fd, offset)
 
 import Store
 
