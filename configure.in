@@ -59,6 +59,7 @@ AC_OUTPUT([
 	src/lib/Makefile 
 	src/lib/libsgzip/Makefile
 	src/lib/libiosubsys/Makefile
+	src/lib/pyewf/Makefile
 	src/remote/Makefile
 	src/mmedia/Makefile
 	src/mailtools/Makefile 
