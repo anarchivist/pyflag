@@ -248,8 +248,8 @@ def start_workers():
 
              dbh = None
              try:
+                 dbh = DB.DBO()
                  try:
-                     dbh = DB.DBO()
                      dbh.execute("lock tables jobs write")
                      sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
                      dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))

@@ -69,6 +69,8 @@ def gmail_unescape(string):
     """ We find gmail strings to be escaped in an unusual way. This
     function reverses it
     """
+    string = string.replace(r"\'","'")
+    string = string.replace(r'\"','"')
     string = re.sub(r"\\u(....)",lambda m: chr(int(m.group(1),16)), string)
     string = re.sub(r"\\>",">", string)
     string = re.sub(r"&#([^;]+);",lambda m: chr(int(m.group(1),10)), string)
@@ -212,9 +214,12 @@ class GmailScanner(LiveCom.HotmailScanner):
                 ## This is a single combined message:
                 elif i[0]=='ms':
                     message = i[13]
-                    result['From'] = gmail_unescape(message[1])
-                    result['Subject'] = gmail_unescape(message[5])
-                    result['Message'] = gmail_unescape(message[6])
+                    try: result['From'] = gmail_unescape(message[1])
+                    except IndexError: pass
+                    try: result['Subject'] = gmail_unescape(message[5])
+                    except IndexError: pass
+                    try: result['Message'] = gmail_unescape(message[6])
+                    except IndexError: pass
 
             if len(result.keys()) > 2:
                 message_id = self.insert_message(result)
@@ -233,6 +238,76 @@ class GmailScanner(LiveCom.HotmailScanner):
 ##                        pass
 
                 return message_id
+
+class GoogleDocs(LiveCom.HotmailScanner):
+    """ A scanner for google docs related pages """
+    class Scan(GmailScanner.Scan):
+        service = "Google Docs"
+        def boring(self, metadata, data=''):
+            ## This string identifies this document as worth scanning
+            if "var trixApp" in data:
+                self.parser =  HTMLParser(verbose=0)
+                return False
+
+            return True
+
+        def external_process(self, fd):
+            self.parser.close()
+            if self.process_view_document():
+                pyflaglog.log(pyflaglog.DEBUG,"Opening %s for Google Document processing" % self.fd.inode)
+
+        def process_view_document(self):
+            result = {}
+            ## Find the actions:
+            for script in self.parser.root.search("script"):
+                data = script.innerHTML()
+                m = re.search('var\s+TX_name\s+=\s+"([^"]+)";', data)
+                if m:
+                    result['subject'] = m.group(1)
+
+                m = re.search('var\s+TX_username\s+=\s+"([^"]+)";', data)
+                if m: result['from'] = m.group(1)
+
+                m = re.search('var\s+TX_emailAddress\s+=\s+"([^"]+)";', data)
+                if m: result['to'] = m.group(1)
+
+                m = re.search(r'trixApp.processAction\d+\("([^\n]+)"\);', data,
+                              re.S| re.M)
+
+                if m:
+                    result['message'] = gmail_unescape(m.group(1))
+                    open("/tmp/test.html","w").write(m.group(1))
+
+            if result:
+                return self.insert_message(result, "webmail")
+
+class WebmailViewer(FileSystem.StringIOFile):
+    """ A VFS Driver to view formatted webmail messages """
+    specifier = 'w'
+    size = 0
+    def read(self, length = None):
+        try:
+            return FileSystem.StringIOFile.read(self, length)
+        except IOError: pass
+
+        id = self.lookup_id()
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from webmail_messages where inode_id = %r limit 1" , id)
+        row = dbh.fetch()
+        if row:
+            self.size = len(row['message'])
+            return row['message']
+
+        return ''
+
+    def explain(self, query, result):
+        self.fd.explain(query, result)
+        id = self.lookup_id()
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from webmail_messages where inode_id = %r limit 1" , id)
+        row = dbh.fetch()
+        result.row("Web App", "Analyse %s transaction" % row['service'],
+                   **{'class': 'explainrow'})
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

@@ -289,6 +289,10 @@ class MozCacheScan(Scanner.GenScanFactory):
                         date=date,
                         )
 
+                ## Scan the new file using the scanner train:
+                fd=self.ddfs.open(inode_id=inode_id)
+                Scanner.scanfile(self.ddfs,fd,self.factories)
+
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
 

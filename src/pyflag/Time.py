@@ -182,7 +182,7 @@ def get_case_tz_name(case):
     dbh = DB.DBO(case)
     dbh.execute('select value from meta where property="TZ" limit 1')
     row = dbh.fetch()
-    if row['value'] == "SYSTEM":
+    if not row or row['value'] == "SYSTEM":
     	return None
     else:
         return row['value']

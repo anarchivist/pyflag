@@ -5,4 +5,4 @@ pkgpyexec_LTLIBRARIES 	= pyaff.la
 
 pyaff_la_SOURCES	= pyaff.c
 pyaff_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
-pyaff_la_LDFLAGS 	= -module $(PYTHON_LDFLAGS) -lafflib
+pyaff_la_LDFLAGS 	= -module $(PYTHON_LDFLAGS) $(LDFLAGS) -L/usr/local/lib/ -lafflib

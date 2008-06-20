@@ -281,7 +281,7 @@ class OffsettedFDFile(IOSubsysFD):
 class OffsettedFile(OffsettedFDFile):
     def __init__(self, filename, offset):
         fd = IO.open_URL(filename)
-        OffsettedFDFile(self, fd, offset)
+        OffsettedFDFile.__init__(self, fd, offset)
 
 class Standard(Advanced):
     """ Standard image types as obtained by dd """
@@ -290,7 +290,7 @@ class Standard(Advanced):
     def form(self, query, result):
         result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename", vfs=True)
         self.calculate_partition_offset(query, result)
-
+        
     def create(self, name, case, query):
         offset = self.calculate_offset_suffix(query.get('offset','0'))
         filename = query['filename']

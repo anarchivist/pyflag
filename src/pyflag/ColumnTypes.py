@@ -545,11 +545,15 @@ class StringType(ColumnType,LogParserMixin):
               ]
               
     def __init__(self, *args, **kwargs):
+        self.text = kwargs.get('text',False)
         self.width = kwargs.get('width',2000)
         ColumnType.__init__(self, *args, **kwargs)
         
     def create(self):
-        return "`%s` VARCHAR(%s) default NULL" % (self.column, self.width)
+        if self.text:
+            return "`%s` TEXT default NULL" % (self.column)
+        else:
+            return "`%s` VARCHAR(%s) default NULL" % (self.column, self.width)
 
     def code_contains(self, column, operator, arg):
         def x(row):

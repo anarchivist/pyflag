@@ -97,7 +97,7 @@ class WebMailTable(FlagFramework.CaseTable):
         [ StringType, dict(name='CC', column='CC')],
         [ StringType, dict(name='BCC', column='BCC')],
         [ StringType, dict(name='Subject', column='subject')],
-        [ StringType, dict(name='Message', column='message')],
+        [ StringType, dict(name='Message', column='message', text=True)],
         [ StringType, dict(name='Identifier', column='message_id')],
         [ TimestampType, dict(name='Sent', column='sent')],
         ]
@@ -296,8 +296,12 @@ class HotmailScanner(Scanner.GenScanFactory):
             dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
             row = dbh.fetch()
 
+            try:
+                new_inode = inode_template % self.fd.inode_id
+            except: new_inode = inode_template
+
             inode_id = self.ddfs.VFSCreate(self.fd.inode,
-                                           inode_template % self.fd.inode_id,
+                                           new_inode,
                                            "Message", mtime = row['mtime'],
                                            _fast = True)
 
@@ -409,20 +413,29 @@ class TableViewer(FileSystem.StringIOFile):
         parts = inode.split('|')
         ourinode = parts[-1][1:]
         self.size = 0
+        self.inode =inode
+        self.case = case
         self.column_to_retrieve = None
-
+                
         try:
-            self.table, self.id, self.value = ourinode.split(':')
+            self.table, self.id = ourinode.split(':')
+            self.value = self.lookup_id()
         except ValueError:
-            self.table, self.id, self.value, self.column_to_retrieve = ourinode.split(':')
-            
+            try:
+                self.table, self.id, self.value = ourinode.split(':')
+            except ValueError:
+                self.table, self.id, self.value, self.column_to_retrieve = ourinode.split(':')
+
         FileSystem.StringIOFile.__init__(self, case, fd, inode)
         self.force_cache()
-        
+
     def read(self, length = None):
         try:
             return FileSystem.StringIOFile.read(self, length)
         except IOError: pass
+
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from %s where `%s`=%r", (self.table, self.id, self.value))
 
         result = '<html><body>'
         dbh = DB.DBO(self.case)

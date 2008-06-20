@@ -611,6 +611,14 @@ class HTMLParser(lexer.Lexer):
                 self.TAG_START(None, None)
             
         elif self.tag.type=='open':
+            ## Nested tds are not allowed - a nested td implicitly
+            ## closes the previous td - this handles code like
+            ## <tr><td><td><td><td>
+            if self.tag.name == 'td' and self.stack[-1].name == 'td':
+                try:
+                    self.stack.pop(-1)
+                except: pass
+            
             ## Push the tag into the end of the stack and add it to
             ## our parent
             try:
