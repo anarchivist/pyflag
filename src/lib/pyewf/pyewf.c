@@ -164,6 +164,8 @@ static PyObject *
 ewffile_seek(ewffile *self, PyObject *args, PyObject *kwds) {
     int64_t offset=0;
     int whence=0;
+    int hack=0;
+    char foo;
 
     static char *kwlist[] = {"offset", "whence", NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwlist, 
@@ -179,6 +181,10 @@ ewffile_seek(ewffile *self, PyObject *args, PyObject *kwds) {
             break;
         case 2:
             self->readptr = self->size + offset;
+            if(offset == 0) {
+            	hack=1;
+            	self->readptr -= 1;
+            }
             break;
         default:
             return PyErr_Format(PyExc_IOError, "Invalid argument (whence): %d", whence);
@@ -186,6 +192,11 @@ ewffile_seek(ewffile *self, PyObject *args, PyObject *kwds) {
 
     if(libewf_seek_offset(self->handle, self->readptr) < 0)
         return PyErr_Format(PyExc_IOError, "libewf_seek_offset failed");
+
+    // holy crap this is aweful code!
+    if(hack) {
+    	libewf_read_buffer(self->handle, &foo, 1);
+    }
 
     Py_RETURN_NONE;
 }
