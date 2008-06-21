@@ -5,7 +5,7 @@ AC_INIT(pyflag.in)
 AC_CONFIG_HEADER([src/include/config.h])
 AC_CONFIG_HEADER([src/filesystems/sleuthkit/sleuthkit-2.52/tsk/tsk_config.h])
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE(pyflag, 0.86RC1)
+AM_INIT_AUTOMAKE(pyflag, 0.87-pre1)
 
 # check standard stuff
 AC_PROG_LIBTOOL
@@ -14,15 +14,58 @@ AC_PROG_CC
 # check headers
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
-AC_CHECK_HEADER(libewf.h,,AC_MSG_ERROR([You Must install libewf for Expert Witness Format (encase) support]))
-AC_CHECK_HEADER(GeoIP.h,have_geoip=yes,AC_MSG_WARN([please install libgeoip-dev for ip geolocation]))
+
+## Allow users to disable optional libraries:
+AC_ARG_ENABLE(afflib, 
+        [  --disable-afflib        Do not use AFFLIB even if it is installed],
+# Action if they gave this argument
+        [ if test "x$enableval" = "xyes" ; then
+            AC_CHECK_LIB([afflib], [af_open], have_libafflib=yes, have_libafflib=no)
+          elif test "x$enableval" = "xno" ; then
+            echo "Ignoring AFFLIB."
+          else
+            echo "Error: Unknown enable-afflib argument."
+            exit -1
+          fi
+        ],
+# if they did not specify aff, look for it
+        [AC_CHECK_LIB([afflib], [af_open], have_libafflib=yes, [
+		have_libafflib=no
+		AC_MSG_WARN([You must install libaff (http://www.afflib.org/) for AFF image support])
+		])]
+        )
+
+AC_ARG_ENABLE(ewf, 
+        [  --disable-ewf           Do not use libewf even if it is installed],
+# Action if they gave this argument
+        [ if test "x$enableval" = "xyes" ; then
+            AC_CHECK_LIB([ewf], [libewf_open], have_libewf=yes, [
+		have_libewf=no; 
+		])
+          elif test "x$enableval" = "xno" ; then
+            echo "Ignoring LibEWF."
+          else
+            echo "Error: Unknown enable-ewf argument."
+            exit -1
+          fi
+        ],
+# if they did not specify ewf, look for it
+        [AC_CHECK_LIB([ewf], [libewf_open], have_libewf=yes, [
+		have_libewf=no
+		AC_MSG_WARN([You must install libewf (http://www.uitwisselplatform.nl/projects/libewf/) for Expert Witness Format (encase) support])
+	])]
+        )
+
+AC_CHECK_HEADER(GeoIP.h,have_geoip=yes, [
+		have_geoip=no
+		AC_MSG_WARN([please install libgeoip-dev for ip geolocation])
+	])
+
 AC_CHECK_HEADER(jpeglib.h,have_libjpeg=yes,AC_MSG_WARN([please install libjpeg62-dev for jpeg carving]))
 
-## This doesnt work - why?
-#AC_CHECK_LIB(extractor, EXTRACTOR_getKeywords,AC_MSG_WARN([If you install libextractor, you may find more metadata about your files - this is highly recommended, but optional. Under debian/ubuntu this requires libextractor-dev and python-ctypes]))
-
-#AC_CHECK_LIB(GeoIP, GeoIP_new, AM_CONDITIONAL(HAVE_GEOIP, true))
-
+## Conditionals for automake
+AM_CONDITIONAL(HAVE_LIBAFFLIB, test "$have_libafflib" = yes)
+AM_CONDITIONAL(HAVE_LIBEWF, test "$have_libewf" = yes)
 AM_CONDITIONAL(HAVE_GEOIP, test "$have_geoip" = yes)
 AM_CONDITIONAL(HAVE_LIBJPEG, test "$have_libjpeg" = yes)
 
@@ -52,6 +95,19 @@ AC_C_BIGENDIAN()
 
 # Large file support
 AC_SYS_LARGEFILE
+
+## Tell the use what we found:
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([*****************************************])
+AC_MSG_NOTICE([PyFlag ${PACKAGE} ${VERSION} configuration])
+AC_MSG_NOTICE([EWF Support:             $have_libewf ])
+AC_MSG_NOTICE([AFF Support:             $have_libafflib ])
+AC_MSG_NOTICE([MaxMind GeoIP:           $have_geoip ])
+AC_MSG_NOTICE([Advanced JpegCarving:    $have_libjpeg ])
+AC_MSG_NOTICE([*****************************************])
+AC_MSG_NOTICE([])
+
+
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 
@@ -76,11 +132,11 @@ AC_OUTPUT([
 	src/filesystems/magic/Makefile
 	src/include/Makefile
 	debian/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/base/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/img/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/vs/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/fs/Makefile
-    src/filesystems/sleuthkit/sleuthkit-2.52/tsk/hashdb/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/base/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/img/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/vs/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/fs/Makefile
+	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/hashdb/Makefile
 	])
