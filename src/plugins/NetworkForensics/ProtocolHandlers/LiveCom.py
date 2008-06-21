@@ -504,7 +504,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         result.start_table(**{'class':'GeneralTable'})
         dbh = DB.DBO(self.case)        
         columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
-        dbh.execute("select * from webmail_messages where `id`=%r", self.id)
+        dbh.execute("select * from webmail_messages where `inode_id`=%r", self.id)
         row = dbh.fetch()
         
         dbh2 = DB.DBO(self.case)

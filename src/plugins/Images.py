@@ -115,7 +115,7 @@ class Advanced(IO.Image):
         elif suffix=='k':
             multiplier = 1024
         elif suffix=='m':
-            multiplier=1024*1024
+            multiplier = 1024**2
         elif suffix=='g':
             multiplier = 1024**3
         elif suffix=='s':
@@ -315,13 +315,79 @@ class AFF(Standard):
 
 import pyewf
 
+config.add_option("FOLLOW_SYMLINKS", default=True, action="store_false",
+                  help="Should we follow symlinks in the upload directory? This has security implications if untrusted users are able to create files/symlinks in the upload directory.")
+
 class EWF(Standard):
     """ EWF is used by other forensic packages like Encase or FTK """
+    def form(self, query, result):
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename", vfs=False)
+        self.calculate_partition_offset(query, result)        
+
+    def glob_filenames(self, filenames):
+        """ Returns the array of files found by globbing filenames on
+        numeric suffix
+        """
+        result = []
+        for f in filenames:
+            if config.FOLLOW_SYMLINKS:
+                ## Is it a symlink? This allows us to symlink to a
+                ## single file from a fileset using a simple
+                ## name. This makes it nice to manage the upload
+                ## directory because you can just put a single symlink
+                ## (e.g. freds_disk.E01) to the entire evidence set
+                ## (could be huge and mounted somewhere different then
+                ## the upload directory, e.g. an external driver). It
+                ## does pose a security risk if untrusted users are
+                ## able to create such a link (it essentially allows
+                ## them to fetch files from anywhere on the system.)
+                try:
+                    link_f = os.readlink(f)
+                    if not link_f.startswith("/"):
+                        f = os.path.join(os.path.dirname(f), link_f)
+                    else:
+                        f = link_f
+                except OSError:
+                    pass
+
+            ## If the filename we were provided with, ends with a
+            ## digit we assume that its part of an evidence set.
+            m = filename_re.match(f)
+            
+            if m:
+                globbed_filenames = []
+                dirname , base = os.path.split(m.group(1))
+                for new_f in os.listdir(dirname):
+                    if new_f.startswith(base) and filename_re.match(new_f):
+                        globbed_filenames.append(os.path.join(dirname, new_f))
+    
+
+                if not globbed_filenames:
+                    raise IOError("Unable to find file %s" % f)
+
+                ## This list must be sorted on the numeric extension
+                ## (Even if its not 0 padded so an alphabetic sort
+                ## works - I have seen some cases where the images
+                ## were named image.1 image.10 image.100):
+                def comp(x,y):
+                    m1 = filename_re.match(x)
+                    m2 = filename_re.match(y)
+                    if not m1 or not m2: return 0
+                    return int(m1.group(2)) - int(m2.group(2))
+
+                globbed_filenames.sort(comp)
+            else:
+                globbed_filenames = [f]
+
+            result.extend(globbed_filenames)
+
+        return result
 
     def create(self, name, case, query):
         offset = self.calculate_offset_suffix(query.get('offset','0'))
-        filename = query['filename']
-        fd = pyewf.open((filename,))
+        filenames = self.glob_filenames(query.getarray('filename'))
+        print "Openning ewf file %s" % (filenames,)
+        fd = pyewf.open(filenames)            
         return OffsettedFDFile(fd, offset)
 
 import Store

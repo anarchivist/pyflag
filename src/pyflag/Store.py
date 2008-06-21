@@ -75,8 +75,10 @@ class Store:
                                              ("%r" % (object,))[:100]))
         return key
 
-    def get(self, key):
-        """ Retrieve the key from the store """
+    def get(self, key, remove=False):
+        """ Retrieve the key from the store.
+        If remove is specified we remove it from the Store altogether.
+        """
         ## FIXME: This is slow for large stores... use a dict for
         ## quick reference:
         self.mutex.acquire()
@@ -91,7 +93,8 @@ class Store:
 
                     ## Reinsert it into the cache at the most recent
                     ## time:
-                    self.creation_times.append([time.time(), k, obj])
+                    if not remove:
+                        self.creation_times.append([time.time(), k, obj])
                     
                     self.check_full()
                     pyflaglog.log(pyflaglog.VERBOSE_DEBUG,

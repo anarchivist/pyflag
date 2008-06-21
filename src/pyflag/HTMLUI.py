@@ -435,7 +435,7 @@ class HTMLUI(UI.GenericUI):
         if reverse:
             self.result+="<tr><td align=right><input type=checkbox name=\"%s\" value=\"%s\"></td><td>%s</td></tr>\n" % (name,value, description)
         else:
-            self.row(description,"<input type=checkbox name=\"%s\">" % (name,value), **options)
+            self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\">" % (name,value), **options)
         if self.form_parms.has_key(name):
             del self.form_parms[name]
             

@@ -143,7 +143,7 @@ class GmailScanner(LiveCom.HotmailScanner):
             if len(result.keys())<3: return False
             
             ## Fixme: Create VFS node for attachments
-            message_id = self.insert_message(result)
+            message_id = self.insert_message(result, "webmail")
             
             ## Are there any attachments?
             for k in query.keys():
@@ -222,7 +222,7 @@ class GmailScanner(LiveCom.HotmailScanner):
                     except IndexError: pass
 
             if len(result.keys()) > 2:
-                message_id = self.insert_message(result)
+                message_id = self.insert_message(result, "webmail")
 
 ##                    try:
 ##                        attachment = message[7][0][0]

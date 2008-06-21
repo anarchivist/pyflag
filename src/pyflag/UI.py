@@ -293,6 +293,8 @@ class GenericUI:
                                  ],
                     table = 'inode',
                     case=case,
+                    order = 2,
+                    direction = 1
                     )
 
         def file_popup(query, result):
@@ -356,7 +358,8 @@ class GenericUI:
                 result.table(
                     elements = elements,
                     table = tablename,
-                    case = case
+                    case = case,
+                    order = 2, direction = 1
                     )
 
                 ## Submit all the nodes in the display:
@@ -678,13 +681,13 @@ class TableRenderer:
         ## Calculate the SQL
         query_str = "select "
         try:
-            self.order = int(query.get('order',0))
+            self.order = int(query.get('order',self.order))
         except: self.order=0
 
         try:
-            self.direction = int(query.get('direction',0))
+            self.direction = int(query.get('direction',self.direction))
         except: self.direction = 0
-        
+
         total_elements = self.elements + self.filter_elements
 
         ## Fixup the elements - if no table specified use the global
