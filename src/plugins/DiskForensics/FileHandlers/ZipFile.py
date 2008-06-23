@@ -90,12 +90,12 @@ class ZipScan(GenScanFactory):
                 info = z.infolist()[i]
                 inode = "%s|Z%s:%s" % (self.inode,info.header_offset, info.compress_size)
                 inodes.append(inode)
-
+                
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
                                     size=info.file_size,
                                     mtime=t)
-
+                
             for inode in inodes:
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
@@ -536,7 +536,7 @@ import pyflag.tests
 
 class ZipScanTest(pyflag.tests.ScannerTest):
     """ Zip File handling Tests """
-    test_case = "PyFlag Test Case"
+    test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.4.e01"
     subsystem = 'EWF'
     offset = "16128s"

@@ -409,6 +409,8 @@ iso9660_load_inodes_dir(TSK_FS_INFO * fs, TSK_OFF_T a_offs, int count,
                 return -1;
             }
 
+	    memset(in_node, 0 , sizeof(iso9660_inode_node));
+
             // the first entry should have no name and is for the current directory
             if ((i == 0) && (b_offs == sizeof(iso9660_dentry))) {
                 if (dentry->fi_len != 0) {
@@ -863,6 +865,7 @@ iso9660_dinode_copy(ISO_INFO * iso, TSK_FS_INODE * fs_inode)
 {
     TSK_FS_INFO *fs = (TSK_FS_INFO *) & iso->fs_info;
     struct tm t;
+    memset(&t, 0, sizeof(t));
 
     if (tsk_verbose)
         tsk_fprintf(stderr, "iso9660_dinode_copy: iso: %lu"
@@ -2120,6 +2123,7 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
      */
     len = 1;
     tsk_fs_guessu32(fs, (uint8_t *) & len, 1);
+    fs->endian = TSK_BIG_ENDIAN;
 
     /* load_vol_descs checks magic value */
     if (load_vol_desc(fs) == -1) {
@@ -2135,6 +2139,7 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         }
     }
 
+    fs->endian = TSK_BIG_ENDIAN;
     if (iso->pvd) {
         fs->block_size = tsk_getu16(fs->endian, iso->pvd->pvd.blk_sz_m);
         fs->block_count = tsk_getu32(fs->endian, iso->pvd->pvd.vs_sz_m);

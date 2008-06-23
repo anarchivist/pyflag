@@ -68,7 +68,7 @@ class ZipFileHeader(SimpleStruct):
         ## This is only a byte so we can find out its offet. We want
         ## to decompress the data in chunks rather than read it all at
         ## once to ensure that we dont overflow.
-        ['data' , STRING, dict(length=5) ],
+        #['data' , STRING, dict(length=5) ],
         #['data' , ZipPayload, dict(length = lambda x: int(x['compr_size']))],
         ]
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 return
         
         print h
-        offset = h['data'].buffer.offset
+        offset = h['extra_field'].buffer.offset + h['extra_field_length'].get_value()
         print hex(offset)
 
         ## Extract the file out
