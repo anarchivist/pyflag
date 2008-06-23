@@ -644,7 +644,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     if(tsk_errno) {
       char *error = error_get();
       Py_DECREF(list);
-      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to list inode %llu: %s", inode, error);
     };
 
     return list;
@@ -814,7 +814,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
         inode = lookup_inode(self->fs, path);
         if(inode == 0) {
 	  char *error = error_get();
-	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, inode,  error);
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %llu: %s", path, inode,  error);
 	};
     } else {
         /* inode can be an int or a string */
@@ -833,7 +833,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     fs_inode = self->fs->inode_lookup(self->fs, inode);
     if(fs_inode == NULL) {
       char *error = error_get();
-      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %llu: %s", inode, error);
     };
 
     result = build_stat_result(fs_inode);
@@ -894,7 +894,7 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
         inode = lookup_inode(self->fs, path);
         if(inode == 0) {
 	  char *error = error_get();
-	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, inode,  error);
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %llu: %s", path, inode,  error);
 	};
     } else {
         /* inode can be an int or a string */
@@ -913,7 +913,7 @@ skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
     fs_inode = self->fs->inode_lookup(self->fs, inode);
     if(fs_inode == NULL) {
       char *error = error_get();
-      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", inode, error);
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %llu: %s", inode, error);
     };
 
     if(S_ISLNK(fs_inode->mode) && fs_inode->link) {

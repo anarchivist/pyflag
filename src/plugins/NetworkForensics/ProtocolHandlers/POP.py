@@ -258,7 +258,7 @@ from pyflag.FileSystem import DBFS
 class POPTests(tests.ScannerTest):
     """ Tests POP Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "stdcapture_0.3.pcap.e01"
+    test_file = "stdcapture_0.4.pcap.e01"
     subsystem = "EWF"
     fstype = "PCAP Filesystem"
     

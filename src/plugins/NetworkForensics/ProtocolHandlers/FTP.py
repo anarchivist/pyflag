@@ -661,8 +661,8 @@ import pyflag.tests as tests
 class FTPTests(tests.ScannerTest):
     """ Tests FTP Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "stdcapture_0.3.pcap"
-    subsystem = "Advanced"
+    test_file = "stdcapture_0.4.pcap.e01"
+    subsystem = "EWF"
     fstype = "PCAP Filesystem"
 
     def test01FTPScanner(self):

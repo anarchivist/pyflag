@@ -139,8 +139,8 @@ import pyflag.tests
 class OLETests(pyflag.tests.ScannerTest):
     """ Tests OLE Scanner """
     test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.4.sgz"
-    subsystem = 'SGZip'
+    test_file = "pyflag_stdimage_0.4.e01"
+    subsystem = 'EWF'
     offset = "16128s"
 
     def test01OLEScanner(self):

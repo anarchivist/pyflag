@@ -294,8 +294,8 @@ import pyflag.pyflagsh as pyflagsh
 class YahooMailTests(tests.ScannerTest):
     """ Test YahooMail Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "yahoomail_simple.pcap"
-    subsystem = "Standard"
+    test_file = "yahoomail_simple.pcap.E01"
+    subsystem = "EWF"
     fstype = "PCAP Filesystem"
 
     def test01YahooMailScanner(self):

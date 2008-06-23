@@ -145,17 +145,16 @@ def insert_whois_cache(sql_ip, id, ipinfo):
                _ip = sql_ip,
                id = id,
 
-               _geoip_city = "(select id from geoip_city where city='%s' " \
-               "limit 1)" % DB.escape(ipinfo.get('city','Unknown') or                          "Unknown"),
-               
-               _geoip_country = "(select id from geoip_country where country" \
-               "='%s' limit 1)" % DB.escape(ipinfo.get("country_code3","---") or               "Unknown"),
+               _geoip_city = DB.expand("(select id from geoip_city where city=%r " \
+                                       "limit 1)", ipinfo.get('city','Unknown')),    
+               _geoip_country = DB.expand("(select id from geoip_country where country" \
+                                          "=%r limit 1)", ipinfo.get("country_code3","---"))
 
-               _geoip_org = "(select id from geoip_org where org" \
-               "='%s' limit 1)" % DB.escape(ipinfo.get("org","Unknown") or                     "Unknown"),
+               _geoip_org = DB.expand("(select id from geoip_org where org" \
+                                      "=%r limit 1)", ipinfo.get("org","Unknown"))
 
-               _geoip_isp = "(select id from geoip_isp where isp" \
-               "='%s' limit 1)" % DB.escape(ipinfo.get("isp","Unknown") or                     "Unknown"),
+               _geoip_isp = DB.expand("(select id from geoip_isp where isp" \
+                                      "=%r limit 1)", ipinfo.get("isp","Unknown"))
 
                _fast = True
                )

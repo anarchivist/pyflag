@@ -316,9 +316,8 @@ import pyflag.tests as tests
 class GmailTests(tests.ScannerTest):
     """ Tests Gmail Scanner """
     test_case = "PyFlagTestCase1"
-    test_file = 'gmail.com.pcap'
-    #test_file = 'a5707_00_01.pcap'
-    #subsystem = "EWF"
+    test_file = 'gmail.com.pcap.e01'
+    subsystem = "EWF"
     subsystem = "Advanced"
     fstype = "PCAP Filesystem"
 

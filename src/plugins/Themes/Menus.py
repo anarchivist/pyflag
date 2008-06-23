@@ -86,7 +86,7 @@ class Menu(Theme.BasicTheme):
     
     def render(self, ui=None, data='', title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         self.menu_javascript = self.make_menu_javascript(ui.defaults)
-
+                
         if not ui.toolbar_ui:
             toolbar_str='&nbsp;&nbsp;'
         else:
