@@ -68,7 +68,7 @@ class ZipFileHeader(SimpleStruct):
         ## This is only a byte so we can find out its offet. We want
         ## to decompress the data in chunks rather than read it all at
         ## once to ensure that we dont overflow.
-        ##['data' , STRING, dict(length=5) ],
+        ['data' , STRING, dict(length=5) ],
         #['data' , ZipPayload, dict(length = lambda x: int(x['compr_size']))],
         ]
 
@@ -116,26 +116,49 @@ ZIP_STORED = 0
 ZIP_DEFLATED = 8
 
 if __name__ == "__main__":
+
+    def process_header(fd, offset):
+        b = Buffer(fd=fd)[offset:]
+        
+        ## Now we read the buffer:
+        h = ZipFileHeader(b, endianess='little')
+        path = h['zip_path'].get_value()
+
+        if len(path)==0: return
+        
+        ## Make sure the zip path is all ascii:
+        for c in path:
+            if ord(c)<32 or ord(c)>128:
+                return
+        
+        print h
+        offset = h['data'].buffer.offset
+        print hex(offset)
+
+        ## Extract the file out
+        return
+    
+        fd.seek(offset)
+        data = fd.read(100)
+        print "%r" % data
+        print "%r" % decompress_data(data)
+        
+
     fd=open(sys.argv[1],'r')
+    fd2 = open(sys.argv[1])
     ## Search the buffer for the magic:
     offset = 0
     while 1:
-        data = fd.read(1024)
+        data = fd2.read(1024 * 1024)
         if len(data)==0: sys.exit(0)
-        pos = data.find("\x50\x4B\x03\x04")
-        if pos >= 0:
-            b = Buffer(fd=fd)[offset + pos:]
-            break
 
+        data_offset = 0
+        while 1:
+            data_offset=data.find("\x50\x4B\x03\x04", data_offset+1)
+            if data_offset < 0:
+                break
+                
+            process_header(fd, offset + data_offset)
+            
         offset+=len(data)
 
-    ## Now we read the buffer:
-    h = ZipFileHeader(b, endianess='little')
-    print h
-    offset = h['data'].buffer.offset
-    print hex(offset)
-    fd.seek(offset)
-    data = fd.read(100)
-    print "%r" % data
-    print "%r" % decompress_data(data)
-    

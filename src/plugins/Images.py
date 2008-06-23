@@ -301,16 +301,6 @@ class Standard(Advanced):
         self.io.seek(0)
         return self.io
 
-class AFF(Standard):
-    """ Advanced Forensics Format, an open format for storage of forensic
-    evidence """
-
-    def create(self, name, case, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
-        filename = query['filename']
-        fd = pyaff.open(filename)
-        return OffsettedFDFile(fd, offset)
-
 config.add_option("FOLLOW_SYMLINKS", default=True, action="store_false",
                   help="Should we follow symlinks in the upload directory? This has security implications if untrusted users are able to create files/symlinks in the upload directory.")
 
@@ -384,6 +374,16 @@ class EWF(Standard):
         filenames = self.glob_filenames(query.getarray('filename'))
         print "Openning ewf file %s" % (filenames,)
         fd = pyewf.open(filenames)            
+        return OffsettedFDFile(fd, offset)
+
+class AFF(Standard):
+    """ Advanced Forensics Format, an open format for storage of forensic
+    evidence """
+
+    def create(self, name, case, query):
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        filename = query['filename']
+        fd = pyaff.open(filename)
         return OffsettedFDFile(fd, offset)
 
 ## Optionally turn off the classes which are not supported (due to

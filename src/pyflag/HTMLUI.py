@@ -426,6 +426,7 @@ class HTMLUI(UI.GenericUI):
 
     def checkbox(self,description,name,value, tooltip=None, reverse=False, **options):
         """ Create a checkbox input for the name,value pair given. """
+        opt_str = ''
         if value in self.defaults.getarray(name):
             opt_str += 'checked'
 
@@ -433,9 +434,9 @@ class HTMLUI(UI.GenericUI):
             description = self.tooltipise(tooltip, description)
 
         if reverse:
-            self.result+="<tr><td align=right><input type=checkbox name=\"%s\" value=\"%s\"></td><td>%s</td></tr>\n" % (name,value, description)
+            self.result+="<tr><td align=right><input type=checkbox name=\"%s\" value=\"%s\" %s></td><td>%s</td></tr>\n" % (name,value, opt_str, description)
         else:
-            self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\">" % (name,value), **options)
+            self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value, opt_str), **options)
         if self.form_parms.has_key(name):
             del self.form_parms[name]
             
