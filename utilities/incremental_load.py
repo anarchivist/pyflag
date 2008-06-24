@@ -122,7 +122,7 @@ try:
     pyflagsh.shell_execv(command="execute",
                          argv=["Load Data.Load IO Data Source",'case=%s' % config.case,
                                "iosource=%s" % config.iosource,
-                               "subsys=Advanced",
+                               "subsys=Standard",
                                "filename=%s" % (output_file),
                                "offset=0",
                                ])
