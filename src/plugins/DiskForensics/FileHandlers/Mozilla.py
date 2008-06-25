@@ -143,19 +143,24 @@ class MozHistScan(Scanner.GenScanFactory):
                             context = 'history'
 
                     if context == 'form':
-                        dbh.insert('mozilla_form_history',
-                                   inode_id = inode_id,
-                                   id = e['id'],
-                                   name = e['Name'],
-                                   value = e['Value'])
-
+                        try:
+                            dbh.insert('mozilla_form_history',
+                                       inode_id = inode_id,
+                                       id = e['id'],
+                                       name = e['Name'],
+                                       value = e['Value'])
+                        except KeyError: continue
+                        
                     else:
-                        result = dict(
-                            inode_id = inode_id,
-                            url  = e['URL'],
-                            _LastVisitDate = "from_unixtime('%s')" % e['LastVisitDate'][:10],
-                            _FirstVisitDate = "from_unixtime('%s')" % e['FirstVisitDate'][:10],
-                            id = e['id'])
+                        try:
+                            result = dict(
+                                inode_id = inode_id,
+                                url  = e['URL'],
+                                _LastVisitDate = "from_unixtime('%s')" % e['LastVisitDate'][:10],
+                                _FirstVisitDate = "from_unixtime('%s')" % e['FirstVisitDate'][:10],
+                                id = e['id'])
+                        except KeyError:
+                            continue
 
                         try: result['Typed'] = e['Typed']
                         except: pass

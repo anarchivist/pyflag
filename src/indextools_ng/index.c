@@ -14,7 +14,7 @@ static void trie_index_dealloc(trie_index *self) {
 
 static int trie_index_init(trie_index *self, PyObject *args, PyObject *kwds) {
   int all_matches = 1;
-  int unique;
+  int unique=0;
   static char *kwlist[] = {"unique",NULL};
 
   if(kwds && !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,
