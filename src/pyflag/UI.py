@@ -529,7 +529,7 @@ class TableRenderer:
         def count_cb(query, result):
             try:
                 filter_str = query[self.filter]
-                sql = parser.parse_to_sql(filter_str, self.elements)
+                sql = parser.parse_to_sql(filter_str, self.elements, ui=None)
             except KeyError:
                 sql = 1
 
