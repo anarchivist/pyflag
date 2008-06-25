@@ -139,7 +139,7 @@ pcap_dbh.mass_insert_start("pcap")
 
 pcap_dbh.execute("select max(id) as m from pcap")
 pcap_id = pcap_dbh.fetch()['m'] or 0
-processor = pcapfs.make_processor(config.iosource, scanners)
+cookie, processor = pcapfs.make_processor(config.iosource, scanners)
 
 def load_file(filename):
     global pcap_id
@@ -174,12 +174,12 @@ def load_file(filename):
 
         ## Some progress reporting
         if pcap_id % 10000 == 0:
-            pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, packet.offset))
+            pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, offset))
 
         processor.process(packet)
 
         ## Write the packet on the output file:
-        packet_data = packet.serialise()
+        packet_data = packet.serialise("little")
         offset += len(packet_data)
         output_fd.write(packet_data)
 
@@ -232,6 +232,17 @@ while 1:
            print "Lock file found"
 
         if config.single:
+            ## Wait untill all our jobs are done
+            pdbh = DB.DBO()
+            while 1:
+                pdbh.execute("select count(*) as c from jobs where cookie = %r", cookie)
+                row = pdbh.fetch()
+                if row and row['c'] >0:
+                    time.sleep(5)
+                    continue
+                else:
+                    break
+                
             sys.exit(0)
 
         ## We need to flush the decoder:

@@ -36,6 +36,7 @@ import pypcap
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from plugins.NetworkForensics.PCAPFS import CachedWriter
+import pyflag.FlagFramework as FlagFramework
 
 parser = OptionParser(usage = """%prog [options] pcap_file ... pcap_file
 
@@ -59,15 +60,18 @@ if options.stats:
     stats_fd.write("""## Stats for streams in the following format:
 ## stream name: (packet_id, offselt, length) ....
 """)
+    stats_fd.close()
 
 CONS = 0
 
-def Callback(mode, packet, connection):
+def Callback(mode, packet, connection, options = None):
     global CONS
-    
+    import socket, struct, time
+
     if mode=='est':
         if not connection.has_key('con_id'):
             connection['con_id'] = CONS
+            connection['ts_sec'] = packet.ts_sec
             CONS +=1
             connection['reverse']['con_id'] = CONS
             CONS +=1
@@ -75,7 +79,15 @@ def Callback(mode, packet, connection):
             connection['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['con_id']))
             connection['reverse']['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['reverse']['con_id']))
 
+        ip = packet.find_type("IP")
+        connection['src_ip'] = ip.src
+        connection['dest_ip'] = ip.dest
+        connection['l'] = 0
+        connection['packets'] = []
+
         tcp = packet.find_type("TCP")
+        connection['src_port'] = tcp.source
+        connection['dest_port'] = tcp.dest
         if tcp.data_len > 0:
             Callback('data', packet, connection)
             
@@ -83,6 +95,9 @@ def Callback(mode, packet, connection):
         tcp = packet.find_type("TCP")
         data = tcp.data
         fd = connection['data']
+        connection['packets'].append(dict(offset = packet.offset,
+                                          length = len(data)))
+        connection['l'] += len(data)
         if data: fd.write(data)
 
     if mode=='destroy':
@@ -96,25 +111,25 @@ def Callback(mode, packet, connection):
             fd.write_to_file()
         except KeyError: pass
 
-def tcp_callback(s):
-    l =0
-    for i in s['length']:
-        l+=i
-    print "%sS%s->%sS%s (%s stream) %s:%s -> %s:%s Length %s" % (
-        options.prefix,s['con_id'],options.prefix,
-        s['reverse'], s['direction'],
-        socket.inet_ntoa(struct.pack(">L",s['src_ip'])), s['src_port'],
-        socket.inet_ntoa(struct.pack(">L",s['dest_ip'])), s['dest_port'], l)
+        stat = "%s: %sS%s->%sS%s %s:%s -> %s:%s Length %s\n" % (
+            time.ctime(connection['ts_sec']),
+            options.prefix,connection['con_id'],options.prefix,
+            connection['reverse']['con_id'],
+            socket.inet_ntoa(struct.pack(">L",connection['src_ip'])), connection['src_port'],
+            socket.inet_ntoa(struct.pack(">L",connection['dest_ip'])), connection['dest_port'],
+            connection['l'])
 
-    if options.stats:
-        tmp=[]
-        stats_fd.write("S%s: " % s['con_id'])
-        for i in range(len(s['packets'])):
-            tmp.append("%s" % ((s['packets'][i], s['offset'][i], s['length'][i]),))
+        if options.stats:
+            stats_fd = open(options.stats,'a')
+            stats_fd.write(stat)
+            stats_fd.close()
+            #for i in range(len(connection['packets'])):
+            #    tmp.append("%s" % ((connection['packets'][i], connection['offset'][i],
+            #                        connection['length'][i]),))
+                
+            #stats_fd.write("%s\n" % ','.join(tmp))
 
-        stats_fd.write("%s\n" % ','.join(tmp))
-
-processor = reassembler.Reassembler(packet_callback = Callback)
+processor = reassembler.Reassembler(packet_callback = FlagFramework.Curry(Callback, options=options))
 for f in args:
     try:
         pcap_file = pypcap.PyPCAP(open(f))

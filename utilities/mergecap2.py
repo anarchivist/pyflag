@@ -62,7 +62,7 @@ config.add_option("split", default=None, type='int', short_option='s',
 config.add_option("split_by_hours", default=None, type='int', 
                     help = "Split PCAP files by hours.")
 
-config.add_option("sort", default=True, action='store_false', short_option='d',
+config.add_option("dont_sort", default=False, action='store_true', short_option='d',
                   help = "Dont pre-process files in time order. This implies that files are already sorted by name.")
 
 config.add_option("output", default="little", 
@@ -128,6 +128,9 @@ class FileList:
         ## This keeps all instances of pcap files:
         self.files = []
         count = 0
+
+        if not sort:
+            print "Will not sort files in time order"
         
         ## This is a list of the time of the next packet in each file (floats):
         self.times = []
@@ -172,7 +175,7 @@ class FileList:
             self.files.insert(offset, f)
             self.times.insert(offset, f.timestamp)
         else:
-            self.files.insert(0, f)
+            self.files.append(f)
 
 
     def __iter__(self):
@@ -211,7 +214,7 @@ class FileList:
             return self.next()
 
 
-f=FileList(args, config.sort)
+f=FileList(args, sort = not config.dont_sort)
 
 ## Force endianess if necessary:
 if config.output:

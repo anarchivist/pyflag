@@ -463,8 +463,11 @@ class LiveMailViewer(FileSystem.StringIOFile):
     def __init__(self, case, fd, inode):
         parts = inode.split('|')
         self.id = parts[-1][1:]
-        dbh = DB.DBO(case)
-        dbh.execute("select * from webmail_messages where parent_inode_id=%r", (self.id))
+        self.case = case
+        self.inode = inode
+        self.inode_id = self.lookup_id()
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from webmail_messages where inode_id=%r", (self.inode_id))
         row = dbh.fetch()
         if not row: raise RuntimeError("No such message %s" % self.id)
 

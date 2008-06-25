@@ -62,6 +62,16 @@ if config.copy:
     dbh.execute("select *  from http_sundry")
     for row in dbh:
         original_id = row['id']
+
+        ## Check if the destination case already has it in its sundry table
+        dest_dbh.execute("select id from http_sundry where url = %r and present='yes' limit 1", row['url'])
+        tmp_row = dest_dbh.fetch()
+        if tmp_row: continue
+
+        ## Maybe its in the http table?
+        dest_dbh.execute("select inode_id from http where url = %r and inode_id>0 limit 1", row['url'])
+        tmp_row = dest_dbh.fetch()
+        if tmp_row: continue
         
         ## We need to reorder the sundry objects into the inode table
         ## ids and thus get a new inode id:
@@ -76,7 +86,10 @@ if config.copy:
         dest = make_filename(inode_id, config.copy)
 
         print "Copying %s to %s" % (src,dest)
-        shutil.copy(src, dest)
+        try:
+            shutil.copy(src, dest)
+        except IOError:
+            print "Failed"
 
     sys.exit(0)
         

@@ -288,7 +288,7 @@ class SanitizingTag(Tag):
         if 'src' in self.attributes:
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
 
-        if 'href' in self.attributes:
+        if 'href' in self.attributes and self.attributes['href']:
             if self.name == 'link':
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:

@@ -29,7 +29,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     limit_context = 'start_limit'
     page_name = "Page"
     description = "PyFlag Exported Page"
-
+    explain_inodes = False
+    
     def form(self, query,result):
         result.heading(self.message)
         query.default('start_limit',0)
@@ -40,7 +41,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         result.textfield("Start Row (0)", "start_limit")
         result.textfield("End Row (0 - no limit)", "end_limit")
         result.checkbox("Include extra files","include_extra_files","Include files such as inodes in the exported bundle")
-
+        result.checkbox("Explain Inodes", "explain_inodes","Explain All inodes")
         return query.has_key("filename")
 
     def render_tools(self, query, result):
@@ -59,10 +60,13 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             os.makedirs(directory)
         
         outfd = open(output_file_name, 'w')
-        while 1:
-            data = infd.read(1024*1024)
-            if not data: break
-            outfd.write(data)
+        try:
+            while 1:
+                data = infd.read(1024*1024)
+                if not data: break
+                outfd.write(data)
+        except IOError:
+            pass
 
         outfd.close()
 
@@ -359,7 +363,11 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         m = Magic.MagicResolver()
 
         ## Use the magic in the file:
-        type, content_type = m.find_inode_magic(self.case, inode_id)
+        try:
+            type, content_type = m.find_inode_magic(self.case, inode_id)
+        except:
+            content_type = "plain/text"
+            
 
         for k,v in {"jpeg": ".jpg",
                     "gif": ".gif",
@@ -417,7 +425,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             tag = BundleResolvingHTMLTag(table_renderer = self,
                                          visited =visited,
                                          inode_id = inode_id)
-            self.add_file_from_string(filename, tag.css_filter(data).encode("utf8"))
+            self.add_file_from_string(filename, tag.css_filter(data))
         elif not self.inodes_in_archive(inode_id):
             self.add_file(filename, fd)
 
@@ -561,7 +569,7 @@ class Export(Farm.Task):
         filename = "inodes/%s_explain.html" % inode_id
         
         result.decoration='naked'
-        fd.explain(None, result, fd=fd)
+        fd.explain(None, result)
         
         table_renderer.add_file_from_string(filename, result.display())
 
@@ -583,9 +591,10 @@ def render_html(self, inode_id, table_renderer):
         result += "<a href='%s'><img src=images/browse.png /></a>" % (filename,)
     except AttributeError: pass
 
+    if table_renderer.explain_inodes:
     ## Add a link to the explaination page:
-    filename = "inodes/%s_explain.html" % inode_id
-    result+="<a href='%s'><img src=images/question.png /></a>" %(filename,)
+        filename = "inodes/%s_explain.html" % inode_id
+        result+="<a href='%s'><img src=images/question.png /></a>" %(filename,)
 
     return result
 

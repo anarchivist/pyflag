@@ -338,7 +338,7 @@ class PCAPFS(DBFS):
                 
         ## Create a new reassembler with this callback
         processor = reassembler.Reassembler(packet_callback = Callback)
-        return processor
+        return cookie, processor
 
     def load(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
@@ -356,7 +356,7 @@ class PCAPFS(DBFS):
 
         pcap_dbh.execute("select max(id) as m from pcap")
         max_id = pcap_dbh.fetch()['m'] or 0
-        processor = self.make_processor(iosource_name, scanners)
+        cookie, processor = self.make_processor(iosource_name, scanners)
 
         ## Process the file with it:
         while 1:
