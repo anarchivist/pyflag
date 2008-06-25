@@ -342,7 +342,10 @@ def get_url(inode_id, case):
         dbh = DB.DBO(case)
         dbh.execute("select url from http where inode_id=%r limit 1", inode_id)
         row = dbh.fetch()
-
+        if not row:
+            dbh.execute("select url from http_sundry where id=%r limit 1", inode_id)
+            row = dbh.fetch()
+            
         if row:
             url = row['url']
         else:
@@ -436,7 +439,9 @@ class ResolvingHTMLTag(SanitizingTag):
 #        reference = reference.replace(" ","%20")
         reference = decode_entity(reference)
         dbh = DB.DBO(self.case)
-        dbh.execute("select status,inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
+        dbh.execute("select http.status,http.inode_id from http join inode on "\
+                    "inode.inode_id=http.inode_id where url=%r and not "\
+                    "isnull(http.inode_id) and size > 0 limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
             ## This is needed to stop dbh leaks due to the highly

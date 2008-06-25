@@ -38,7 +38,7 @@
     The base Image class provides the 
 
 """
-import iosubsys
+#import iosubsys
 import pexpect
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type

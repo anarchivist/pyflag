@@ -30,7 +30,7 @@ class Remote(Images.Advanced):
 
         return io
     
-import os, unittest,iosubsys,time
+import os, unittest,time
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflagsh as pyflagsh

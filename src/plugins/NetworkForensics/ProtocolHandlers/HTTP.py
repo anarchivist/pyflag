@@ -689,6 +689,8 @@ class BrowseHTTPRequests(Reports.report):
             )
 
 import plugins.Core as Core
+import pyflag.FileSystem as FileSystem
+
 class HTTPFile(Core.OffsetFile):
     """ A HTTP Object
 
@@ -696,6 +698,29 @@ class HTTPFile(Core.OffsetFile):
     The format is offset:length:inode_id
     """
     specifier = 'H'
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        self.offset = int(tmp[0])
+        self.readptr=0
+
+        ## Seek our parent file to its initial position
+        self.fd.seek(self.offset)
+
+        try:
+            self.size=int(tmp[1])
+        except IndexError:
+            self.size=sys.maxint
+
+        # crop size if it overflows IOsource
+        # some iosources report size as 0 though, we must check or size will
+        # always be zero
+        if fd.size != 0 and self.size + self.offset > fd.size:
+            self.size = fd.size - self.offset
+
     def make_tabs(self):
         names, cbs = Core.OffsetFile.make_tabs(self)
         names.extend( ["HTTP"])
