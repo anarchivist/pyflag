@@ -40,7 +40,8 @@ class HTML(Magic.Magic):
     
     literal_rules = [
         ( "<html", (0,500)),
-        ( "<div", (0,500))
+        ( "<div", (0,500)),
+        ( "<title", (0,500))
         ]
 
     samples = [ (60, """<html>

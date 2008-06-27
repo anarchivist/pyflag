@@ -107,23 +107,26 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         form = cgi.FieldStorage(fp=self.rfile,headers = None, environ=env)
         query=FlagFramework.query_type(query_list, base=rest,user=user, passwd=passwd)
 
-        for key in form.keys():
-            ## See if key has a filename, if so we store it ala php:
-            try:
-                if form[key].filename:
-                    query["%s_filename" % key] = form[key].filename
-            except AttributeError:
-                pass
-            
-            try:
-                value = form[key].value
-                ## We only accept non-empty args
-                if len(value)>0 and value!='None':
-                    query[key]= value
-            except AttributeError:
-                for value in form[key]:
-                    query[key]=value.value
+        try:
+            for key in form.keys():
+                ## See if key has a filename, if so we store it ala php:
+                try:
+                    if form[key].filename:
+                        query["%s_filename" % key] = form[key].filename
+                except AttributeError:
+                    pass
 
+                try:
+                    value = form[key].value
+                    ## We only accept non-empty args
+                    if len(value)>0 and value!='None':
+                        query[key]= value
+                except AttributeError:
+                    for value in form[key]:
+                        query[key]=value.value
+        except TypeError:
+            query['_value'] = form.value
+            
         ## This handles the case where the entire query is submitted
         ## in a single parameter called pseudo_post_query. This is
         ## done for stupid browsers like IE which refuse to handle
