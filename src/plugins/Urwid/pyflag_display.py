@@ -271,7 +271,7 @@ function load_web_display(){
 function set_status( status ){
 	var s = document.getElementById('status');
 	var t = document.createTextNode(status);
-	s.replaceChild(t, s.firstChild);
+	if(s) s.replaceChild(t, s.firstChild);
 }
 
 function make_span(s, fg, bg){
@@ -572,8 +572,6 @@ _html_page = [
 <pre>The quick brown fox jumps over the lazy dog.<span id="testchar">X</span>
 <span id="testchar2">Y</span></pre>
 </div>
-<b>Hexeditor""","""</b> -
-Status: <span id="status">Set up</span>
 <script type="text/javascript">
 //<![CDATA[
 """ + _js_code +"""

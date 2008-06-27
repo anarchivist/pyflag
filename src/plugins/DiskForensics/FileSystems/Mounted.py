@@ -218,6 +218,9 @@ class MountedFS_file(File):
         path = path[len(mount_point):]
         path=basepath+'/'+path+"/"+row['name']
         self.fd = open(path,'r')
+
+        s = os.stat(path)
+        self.size = s.st_size
     
     def close(self):
         self.fd.close()
