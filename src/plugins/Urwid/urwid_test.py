@@ -2,6 +2,7 @@
 incorporated into PyFlag
 """
 import pyflag.Reports as Reports
+import cStringIO
 
 try:
     import urwid
@@ -20,6 +21,8 @@ class GUI:
         self.mark = 0
         self.end_mark = -1
         self.focus_column = 1
+        self.screen_cache = None
+        self.screen_offset = -1
 
     def run(self):
         self.ui = Screen()
@@ -37,6 +40,14 @@ class GUI:
         self.ui.start()
         return self.urwid_run()
 
+    def cache_screen(self, offset, length):
+        if self.screen_offset != offset:
+            self.fd.seek(max(0,self.file_offset))
+            self.screen_cache = cStringIO.StringIO(self.fd.read(length))
+            self.screen_offset = offset
+
+        self.screen_cache.seek(0)
+            
     def refresh_screen(self):
         """ Redraws the whole screen with the current channel window
         set to channel
@@ -52,11 +63,11 @@ class GUI:
         hexarea = []
         chars = []
 
-        self.fd.seek(max(0,self.file_offset))
+        self.cache_screen(self.file_offset, width * height)
         offset = self.file_offset
         row_count = 1
         while 1:
-            data = self.fd.read(x)
+            data = self.screen_cache.read(x)
             if len(data)==0: break
 
             ## Write the offset:
@@ -117,7 +128,6 @@ class GUI:
 
             ## We are a generator and we are ready for more input
             keys = self.ui.get_input((yield "Ready"))
-            print keys
             if "f8" in keys:
                 return
             
@@ -218,8 +228,6 @@ class UrwidTest(Reports.report):
         def urwid_cb(query, result):
             result.decoration = "raw"
             if query.has_key("_value"):
-                print "Got value %s" % query['_value']
-                
                 ## Look for key input. Note we are not allowed to send
                 ## a screen update in response to key input? This
                 ## seems a bit inefficient.
