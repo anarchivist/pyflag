@@ -20,7 +20,8 @@
 # Urwid web site: http://excess.org/urwid/
 
 """
-Urwid web application display module
+Urwid web application display module - adapted to run within the
+PyFlag framework.
 """
 import os
 import sys
@@ -172,7 +173,8 @@ function handle_recv() {
 	   // keys waiting
 	   do_send(); 
 	}
-	//set_status("Polling");
+
+	set_status("Connected");
 	
 	if( conn.responseText == "" ){
 		if(update_method=="polling"){
@@ -252,10 +254,10 @@ function load_web_display(){
 		document_location = document.location;
 	}
 
-	document_location += "&jscb=1"
 	document.onkeypress = body_keypress;
 	document.onkeydown = body_keydown;
 	document.onresize = body_resize;
+	document.onclick = mouse_click;
 	
 	body_resize();
 	send_queue_out = send_queue_in; // don't queue the first resize
@@ -280,6 +282,31 @@ function make_span(s, fg, bg){
 	
 	return d;
 }
+
+function mouse_click(e) {
+   var posx = 0;
+   var posy = 0;
+   if (!e) var e = window.event;
+
+   text = document.getElementById('urwid_text');
+   var r= getAbsolutePosition(text);
+   
+   if (e.pageX || e.pageY) {
+       posx = e.pageX;
+       posy = e.pageY;
+   }
+   
+    else if (e.clientX || e.clientY) {
+        posx = e.clientX + text.scrollLeft + document.documentElement.scrollLeft;
+	posy = e.clientY + text.scrollTop + document.documentElement.scrollTop;
+    };
+
+    posx = Math.floor((posx - r.x)/char_width);
+    posy = Math.floor((posy - r.y)/char_height);
+    
+    send_key("mouse_press 1 "+posx+" "+posy);
+    stop_key_event(e);
+};
 
 function body_keydown(e){
 	if (conn == null){
@@ -535,7 +562,6 @@ _html_page = [
  "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
-<title>Urwid Web Display - ""","""</title>
 <style type="text/css">
 """ + _css_style + """
 </style>
@@ -546,14 +572,17 @@ _html_page = [
 <pre>The quick brown fox jumps over the lazy dog.<span id="testchar">X</span>
 <span id="testchar2">Y</span></pre>
 </div>
-Urwid Web Display - <b>""","""</b> -
+<b>Hexeditor""","""</b> -
 Status: <span id="status">Set up</span>
 <script type="text/javascript">
 //<![CDATA[
 """ + _js_code +"""
 //]]>
 </script>
+<script src="javascript/functions.js"></script>
+<div id="urwid_text">
 <pre id="text"></pre>
+</div>
 </body>
 </html>
 """]
@@ -749,6 +778,17 @@ class Screen:
 				y = int(y)
 				self._set_screen_size(x, y)
 				resized = True
+			elif k.startswith("mouse"):
+				try:
+					event,button, col, row = k.split()
+					event = event.replace("_"," ")
+					button = int(button)
+					col = int(col)
+					row = int(row)
+					l.append((event, button, col, row))
+				except:
+					print "Unrecognised mouse command"
+					continue
 			else:
 				l.append(k)
 		if resized:
