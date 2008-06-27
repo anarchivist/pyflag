@@ -38,7 +38,7 @@ class Hexeditor:
 
     def cache_screen(self, offset, length):
         if self.screen_offset != offset:
-            self.fd.seek(max(0,self.file_offset))
+            self.fd.seek(max(0, offset))
             self.screen_cache = cStringIO.StringIO(self.fd.read(length))
             self.screen_offset = offset
 
@@ -50,11 +50,12 @@ class Hexeditor:
         """
         width, height = self.ui.get_cols_rows()
 
-        offset_length = max(4,len("%X" % (self.file_offset))+1)
+        offset_length = max(10, len("%X" % (self.file_offset))+1)
         ## We work out how much space is available for the hex edit area:
         ## This is the formula:
         ## width = offset_length + 3 * x + x (where x is the number of chars per line)
-        x = (width - offset_length-1)/4
+        x = (width - offset_length - 1)/4
+        self.row_size = x
         offsets = []
         hexarea = []
         chars = []
@@ -87,7 +88,6 @@ class Hexeditor:
             offset += len(data)
             
             if row_count > height-1:
-                self.row_size = x 
                 break
             
         self.offsets = urwid.ListBox([urwid.Text("\n".join(offsets))])
@@ -104,6 +104,13 @@ class Hexeditor:
         
         self.status_bar = urwid.Text('')
         self.top = urwid.Frame(top, footer=urwid.AttrWrap(self.status_bar, 'header'))
+
+    def update_status_bar(self):
+        self.status_bar.set_text(
+            "Hex Edit: %u/%u (0x%X/0x%X)" % (self.mark,
+                                             self.size-1,
+                                             self.mark,
+                                             self.size-1))
         
     def urwid_run(self):
         self.refresh_screen()
@@ -113,12 +120,7 @@ class Hexeditor:
             self.hex.set_edit_pos((self.mark - self.file_offset)*3)
             self.chars.set_edit_pos(self.mark - self.file_offset)
             self.columns.set_focus_column(self.focus_column)
-            self.status_bar.set_text(
-                "Hex Edit: %u/%u (0x%X/0x%X)" % (self.file_offset + self.mark,
-                                                 self.size,
-                                                 self.file_offset + self.mark,
-                                                 self.size))
-            
+            self.update_status_bar()
             pagesize = self.row_size * (height - 5)
             self.draw_screen( (width, height) )
 
@@ -137,11 +139,9 @@ class Hexeditor:
                     if self.file_offset + pagesize < self.size:
                         self.file_offset += pagesize
                         self.mark += pagesize
-                    self.refresh_screen()
                 elif k=='page up':
                     self.file_offset = max(0, self.file_offset - pagesize)
                     self.mark = max(0, self.mark - pagesize)
-                    self.refresh_screen()
                 elif k=='right':
                     if self.mark +1 < self.size:
                         self.mark += 1
@@ -151,13 +151,10 @@ class Hexeditor:
                     self.mark = max(0,self.mark - self.row_size)
                     if self.mark < self.file_offset:
                         self.file_offset = max(0, self.file_offset -pagesize)
-                        self.refresh_screen()
                 elif k == 'window resize' or k=='ctrl l':
                     width, height = self.ui.get_cols_rows()
-                    self.refresh_screen()
                 elif k=='down':
-                    if self.mark + self.row_size < self.size:
-                        self.mark += self.row_size
+                    self.mark += self.row_size
                 elif k=='tab':
                     if self.focus_column==1:
                         self.focus_column = 2
@@ -165,23 +162,23 @@ class Hexeditor:
                 elif k=='<' or k=='home' or k=='meta <':
                     self.mark = 0
                     self.file_offset =0
-                    self.refresh_screen()
                 elif k=='>' or k=='end' or k=='meta >':
                     self.file_offset = self.size - (self.size % self.row_size)
                     self.mark = self.file_offset
-                    self.refresh_screen()
-#                else:
-#                    print k
-                    
+
+                ## Make sure we dont go past end of file
+                if self.mark > self.size-1:
+                    self.mark = self.size-1
+
+                ## Do we need to go to the next page?
                 if self.mark > self.file_offset + pagesize:
                     self.file_offset += pagesize
-                    self.refresh_screen()
-                        
-                    
+
+            self.update_status_bar()
+            self.refresh_screen()                    
             ## Other keys are just passed into the edit box
             ##    self.top.keypress( (width, height), k )
 
-            
     def draw_screen(self, size):
         ## Refresh the screen:
         canvas = self.top.render( size, focus=True )
@@ -198,7 +195,8 @@ class Hexeditor:
                 total_width += widths[i]
 
             x = col - total_width                
-            if i==0:                self.mark = self.file_offset + self.row_size * row
+            if i==0:
+                self.mark = self.file_offset + self.row_size * row
             elif i==1:
                 self.mark = self.file_offset + self.row_size * (row) + x/3
                 self.focus_column = 1
