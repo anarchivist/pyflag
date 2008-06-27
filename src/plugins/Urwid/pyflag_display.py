@@ -650,7 +650,7 @@ class Screen:
 			assert self.buffer.startswith("window resize "),self.buffer
 			ignore1,ignore2,x,y = self.buffer.split(" ",3)
 		except AssertionError:
-			x,y = 80,25
+			x,y = 120,25
 
 		x = int(x)
 		y = int(y)

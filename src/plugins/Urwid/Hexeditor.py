@@ -1,5 +1,5 @@
 """ This is an implementation of the hexeditor using urwid """
-import cStringIO
+import cStringIO, re
 
 class Hexeditor:
     row_size = 25
@@ -19,7 +19,11 @@ class Hexeditor:
         self.focus_column = 1
         self.screen_cache = None
         self.screen_offset = -1
-
+        self.search_mode_state = False
+        self.status_bar = urwid.Text('')
+        self.message = ''
+        self.previous_search = ''
+        
     def run(self):
         self.ui = Screen()
         self.ui.set_mouse_tracking()
@@ -50,11 +54,11 @@ class Hexeditor:
         """
         width, height = self.ui.get_cols_rows()
 
-        offset_length = max(10, len("%X" % (self.file_offset))+1)
+        self.offset_length = max(4, len("%X" % (self.file_offset))+1)
         ## We work out how much space is available for the hex edit area:
         ## This is the formula:
         ## width = offset_length + 3 * x + x (where x is the number of chars per line)
-        x = (width - offset_length - 1)/4
+        x = (width - self.offset_length - 1)/4
         self.row_size = x
         offsets = []
         hexarea = []
@@ -68,7 +72,7 @@ class Hexeditor:
             if len(data)==0: break
 
             ## Write the offset:
-            offsets.append(("%%0%uX" % offset_length) % offset)
+            offsets.append(("%%0%uX" % self.offset_length) % offset)
 
             ## Now write the hex area:
             hex_text = ''.join(["%02X " % ord(c) for c in data])
@@ -95,23 +99,61 @@ class Hexeditor:
         self.chars   = urwid.Edit('',''.join(chars), wrap='any', multiline=True)
         hex          = urwid.ListBox([urwid.AttrWrap(self.hex ,'editbx', 'editfc')])
         chars        = urwid.ListBox([urwid.AttrWrap(self.chars,'editbx','editfc')])
-        self.columns = urwid.Columns([('fixed', offset_length+1, self.offsets),
+        self.columns = urwid.Columns([('fixed', self.offset_length+1, self.offsets),
                                       ('fixed', 3*x, hex), 
                                       ('fixed', x, chars),
                                       ],0,min_width = 11, focus_column=self.focus_column)
 
         top = urwid.AttrWrap(self.columns, 'body')
         
-        self.status_bar = urwid.Text('')
-        self.top = urwid.Frame(top, footer=urwid.AttrWrap(self.status_bar, 'header'))
+        #self.status_bar = urwid.Text('')
+        args = dict(footer=urwid.AttrWrap(self.status_bar, 'header'))
+        try:
+            if self.status_bar.focus: args['focus_part']='footer'
+        except AttributeError: pass
+        
+        self.top = urwid.Frame(top, **args)
 
     def update_status_bar(self):
         self.status_bar.set_text(
-            "Hex Edit: %u/%u (0x%X/0x%X)" % (self.mark,
-                                             self.size-1,
-                                             self.mark,
-                                             self.size-1))
-        
+            "Hex Edit: %u/%u (0x%X/0x%X) %s" % (self.mark,
+                                                self.size-1,
+                                                self.mark,
+                                                self.size-1, self.message))
+
+    def search_mode(self, start=True):
+        if start:
+            print "New word"
+            self.search_mode_state = True
+            self.status_bar = urwid.Edit("Search: ", self.previous_search,
+                                         wrap='any', multiline=False)
+            self.status_bar.focus = True
+        else:
+            ## Leave search mode
+            expression = self.status_bar.edit_text
+            start_pos = self.mark
+            self.previous_search = expression
+            
+            self.fd.seek(start_pos)
+            while 1:
+                data = self.fd.read(1024 * 1024)
+                if len(data)==0:
+                    self.message = "%s Not found" % expression
+                    break
+                
+                m = re.search(expression, data, re.I | re.M | re.S)
+                if m:
+                    ## Found it
+                    self.mark = start_pos + m.start()
+                    self.message = "Found %s for expression %s" % (m.group(0), expression)
+                    break
+
+                start_pos += len(data)
+            
+            self.search_mode_state = False
+            self.status_bar = urwid.Text('')
+            self.update_status_bar()
+
     def urwid_run(self):
         self.refresh_screen()
         width, height = self.ui.get_cols_rows()
@@ -130,7 +172,13 @@ class Hexeditor:
                 return
             
             for k in keys:
-                if urwid.is_mouse_event(k):
+                if self.search_mode_state:
+                    if k=='enter':
+                        self.search_mode(False)
+                    else:
+                        self.status_bar.keypress( (width, ), k)
+                    
+                elif urwid.is_mouse_event(k):
                     event, button, col, row = k
                     self.process_mouse_event(width, height, event, button, col, row)
 #                    self.top.mouse_event( (width,height), event, 
@@ -165,6 +213,8 @@ class Hexeditor:
                 elif k=='>' or k=='end' or k=='meta >':
                     self.file_offset = self.size - (self.size % self.row_size)
                     self.mark = self.file_offset
+                elif k=='/':
+                    self.search_mode(True)
 
                 ## Make sure we dont go past end of file
                 if self.mark > self.size-1:
@@ -189,12 +239,14 @@ class Hexeditor:
             widths = self.columns.column_widths((width,height))
             total_width = 0
             for i in range(0,len(widths)):
-                if col >= total_width and col < widths[i]:
+                ## Does col fall between all the widths of columns so
+                ## far and the next column?
+                if col >= total_width and col < total_width + widths[i]:
                     break
 
                 total_width += widths[i]
 
-            x = col - total_width                
+            x = col - total_width
             if i==0:
                 self.mark = self.file_offset + self.row_size * row
             elif i==1:
