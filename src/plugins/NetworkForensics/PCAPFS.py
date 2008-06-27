@@ -179,9 +179,10 @@ class PCAPFS(DBFS):
         ## incremental_loader is used because small files may be
         ## processed.
         pdbh = DB.DBO()
+        cookie = int(time.time())
+
         if scanners:
             scanner_string = ','.join(scanners)
-            cookie = int(time.time())
 
         def Callback(mode, packet, connection):
             """ This callback is called for each packet with the following modes:
