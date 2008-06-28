@@ -1,11 +1,201 @@
 """ This is an implementation of the hexeditor using urwid """
 import cStringIO, re
+import pyflag.Indexing as Indexing
+import pyflag.FlagFramework as FlagFramework
+
+PALETTE = [
+    ('editfc','white', 'dark blue', 'bold'),
+    ('editbx','light gray', 'light blue'),
+    ('editcp','black','light gray', 'standout'),
+    ('header', 'black', 'dark cyan', 'standout'),
+    ('body','black','light gray', 'standout'),
+    ('default', 'default', 'default', 'bold'),
+    ('self', 'default', 'default'),
+    ('help', 'yellow', 'default'),
+    ]
+
+class Action:
+    """ An action handler base class """
+    state = None
+    ## This controls our order in the Action stack
+    order = 0
+    def handle_key(self, ui, key):
+        """ This is called to process keys as the come in.
+
+        If we return True - no further processing of the key will be
+        performed."""
+        return False
+
+    def draw(self, ui):
+        """ This is called when we wish to draw the screen. If we
+        return False we allow the ui to draw the screen, otherwise we
+        get to.
+        """
+        return False
+
+    def help(self):
+        """ Return a helpful message about this module - should
+        probably list all the key bindings
+        """
+        return ''
+    
+class SearchAction(Action):
+    """ A state machine which takes care of the search functionality """
+    previous_search = ''
+
+    def handle_key(self, ui, key):
+        """ This gets called when we become active """
+        if self.state == None and key != '/':
+            return False
+        
+        if self.state ==None:
+            self.state = 'prompt'
+            ui.status_bar = urwid.Edit("Search: ", self.previous_search,
+                                         wrap='any', multiline=False)
+            ui.status_bar.focus = True
+        elif self.state == 'prompt':
+            if key=='enter':
+                self.state = 'waiting'
+                ui.status_bar = urwid.Text('')
+                ui.message = 'Waiting for Indexer'
+            else:
+            ## Pass key strokes to the text box:
+                ui.status_bar.keypress( (ui.width, ), key)
+            
+        elif self.state == 'waiting':
+            ## Check if the inode is up to date:
+            if Indexing.inode_upto_date(ui.case, ui.inode_id):
+                print "Going to next hit"
+                ui.message =''
+                self.state = None
+        else:
+            print "Unknown search mode %s" % self.state
+
+        return True
+
+    def help(self):
+        return "/  - Search this file (uses the Indexer)"
+
+class Goto(Action):
+    """ This allows us to jump to a fixed offset """
+    previous_location = ''
+
+    def help(self):
+        return  'g                        Goto an offset (can be specified using sectors, k, m. 0x prefix means hex)'
+    
+    def handle_key(self, ui ,key):
+        print self.state
+        if self.state == None and key != 'g':
+            return False
+
+        if self.state == None:
+            self.state = 'prompt'
+            ui.status_bar = urwid.Edit("Goto: ", self.previous_location)
+            ui.status_bar.focus = True
+
+        elif self.state == 'prompt':
+            if key=='enter':
+                self.state = None
+                offset = ui.status_bar.get_edit_text()
+                ui.status_bar = urwid.Text('')
+                try:
+                    offset = FlagFramework.calculate_offset_suffix(offset)
+                except Exception,e:
+                    ui.message = "Cant parse %s as offset" % offset
+                    return True
+                ui.mark = offset
+            else:
+            ## Pass key strokes to the text box:
+                ui.status_bar.keypress( (ui.width, ), key)
+                
+        return True
+    
+class Navigate(Action):
+    """ This allows us to navigate around the hex editor GUI """
+    def handle_key(self, ui, k):
+        if k=='page down':
+            ui.mark += ui.pagesize
+        elif k=='page up':
+            ui.mark = ui.mark - ui.pagesize
+        elif k=='right':
+            ui.mark += 1
+        elif k=='left':
+            ui.mark -= 1
+        elif k=='up':
+            ui.mark -= ui.row_size
+        elif k=='down':
+            ui.mark += ui.row_size
+        elif k == 'window resize' or k=='ctrl l':
+            ui.width, ui.height = ui.ui.get_cols_rows()
+        elif k=='tab':
+            if ui.focus_column == 1:
+                ui.focus_column = 2
+            else:
+                ui.focus_column = 1
+                
+        elif k=='<' or k=='home' or k=='meta <':
+            ui.mark = 0
+        elif k=='>' or k=='end' or k=='meta >':
+            ui.mark = ui.size
+        else:
+            return False
+
+        return True
+
+    def help(self):
+        return [('header','\n\nNavigation:\n'), ('body',
+        'page down/up             Skip full pages\n'
+        'right, left, up, down    Move around\n'
+        'tab                      Switch between hex and char view\n'
+        '<, >                     Jump to start or end of file\n'
+                                             )]
+
+class Help(Action):
+    def help(self):
+        return 'h,?                      print this help\n'
+    
+    def handle_key(self, ui, key):
+        if self.state == None and (key != 'h' and key !='?'):
+            return False
+
+        if self.state == None:
+            self.state = 'help'
+            result = [('header','Help (press q to go back)\n')]
+            for action in ui.actions:
+                tmp = action.help()
+                if type(tmp)==type(str):
+                    result.append(('help', tmp + "\n"))
+                else:
+                    result.extend(tmp)
+                    
+            ui.top = urwid.Frame(
+                urwid.ListBox([urwid.Text(result)])
+                )
+            ui.draw_screen( (ui.width, ui.height) )
+        else:
+            self.state = None
+            ui.refresh_screen()
+            
+        return True
+
+    def draw(self, ui):
+        if self.state:
+            return True
 
 class Hexeditor:
     row_size = 25
     
-    def __init__(self, fd):
+    def __init__(self, fd, highlights = None):
+        """ An interactive Hex editor based on the Urwid library.
+        
+        fd: The file descriptor to dump.
+        highlights: a list of offset, length, type tuples of possible highlights.
+
+        type is an integer refering to the palette in PALETTE
+        """
         self.fd = fd
+        self.case = fd.case
+        self.inode_id = fd.lookup_id()
         fd.seek(0)
         try:
             self.size = fd.size
@@ -15,93 +205,132 @@ class Hexeditor:
             
         self.file_offset = 0
         self.mark = 0
-        self.end_mark = -1
         self.focus_column = 1
+
+        ## Cache the fd into data which is currently displayed - this
+        ## avoids us having to re-read the fd all the time.
         self.screen_cache = None
         self.screen_offset = -1
-        self.search_mode_state = False
+
+        ## These are the actions hooked to this gui
+        self.actions = [Help(), SearchAction(), Navigate(), Goto()]
         self.status_bar = urwid.Text('')
+
+        ## This shows a useful message
         self.message = ''
         self.previous_search = ''
+
+        ## Constant highlights.
+        self.highlights = highlights
         
     def run(self):
         self.ui = Screen()
         self.ui.set_mouse_tracking()
-        self.ui.register_palette([
-            ('header', 'black', 'dark cyan', 'standout'),
-            ('body','black','light gray', 'standout'),
-            ('editcp','black','light gray', 'standout'),
-            ('default', 'default', 'default', 'bold'),
-            ('editfc','white', 'dark blue', 'bold'),
-            ('editbx','light gray', 'dark blue'),
-            ('self', 'default', 'default'),
-            ('help', 'yellow', 'default'),
-            ])
+        self.ui.register_palette(PALETTE)
         self.ui.start()
         return self.urwid_run()
 
+    ## These call backs are used to alter the current hilighting
+    ## overlay - this allows us to highlight various bits of text for
+    ## different purposes.
+    def constant_highlighter(self, offset, length, fresh=False):
+        """ This callback is used to handle highlighting of contant
+        strings which have been passed in the constructor.
+
+        offset and length represent the current view port into the
+        file.  The fresh flag indicates if the current overlay is
+        brand new. We can skip updating it if its not brand new.
+        """
+        if not fresh: return
+        
+        if self.highlights:
+            for file_offset, hilight_length, type in self.highlights:
+                if file_offset > offset and file_offset < offset + length:
+                    self.overlay[file_offset - offset: \
+                                 file_offset - offset + hilight_length] = \
+                                 [type,] * hilight_length
+
+    highlighter_cbs = [ constant_highlighter, ]
+
     def cache_screen(self, offset, length):
+        ## This flag indicates if the cache was refreshed - this
+        ## allows highlighters to skip updating the overlay if their
+        ## highlights were not likely to have changed.
+        refreshed = False
         if self.screen_offset != offset:
             self.fd.seek(max(0, offset))
             self.screen_cache = cStringIO.StringIO(self.fd.read(length))
+            self.overlay = [0,] * length
             self.screen_offset = offset
-
-        self.screen_cache.seek(0)
+            refreshed = True
             
+        ## Call all the highlighters to update the overlay
+        for fn in self.highlighter_cbs:
+            fn(self, self.screen_offset, length, refreshed)
+
+    def format_urwid_markup(self, hex_view=True):
+        """ returns an urwid compatible markup from the overlay and
+        screen_cache.
+        """
+        self.screen_cache.seek(0)
+        last = self.overlay[0]
+        result = []
+        chars = ''
+
+        x=0
+        while 1:
+            c = self.screen_cache.read(1)
+            if not c: break
+
+            if hex_view:
+                chars += "%02X " % ord(c)
+            else:
+                if c.isalnum() or c in "!@#$%^&*()_ +-=[]\{}|;':\",./<>?":
+                    chars += c
+                else:
+                    chars += '.'
+
+            tag_id = self.overlay[x]
+            if tag_id != last:
+                result.append((PALETTE[last][0], chars))
+                chars = ''
+                last = tag_id
+                
+            x+=1
+            
+        result.append((PALETTE[tag_id][0], chars))
+        return result
+
     def refresh_screen(self):
         """ Redraws the whole screen with the current channel window
         set to channel
         """
-        width, height = self.ui.get_cols_rows()
+        self.width, self.height = self.ui.get_cols_rows()
 
         self.offset_length = max(4, len("%X" % (self.file_offset))+1)
-        ## We work out how much space is available for the hex edit area:
-        ## This is the formula:
-        ## width = offset_length + 3 * x + x (where x is the number of chars per line)
-        x = (width - self.offset_length - 1)/4
-        self.row_size = x
-        offsets = []
-        hexarea = []
-        chars = []
+        ## We work out how much space is available for the hex edit
+        ## area (i.e. number of hex bytes per line).
+        
+        ## This is the formula: width = offset_length + 3 * x + x
+        ## (where x is the number of chars per line)
+        self.row_size = (self.width - self.offset_length - 1)/4
 
-        self.cache_screen(self.file_offset, width * height)
-        offset = self.file_offset
-        row_count = 1
-        while 1:
-            data = self.screen_cache.read(x)
-            if len(data)==0: break
-
-            ## Write the offset:
-            offsets.append(("%%0%uX" % self.offset_length) % offset)
-
-            ## Now write the hex area:
-            hex_text = ''.join(["%02X " % ord(c) for c in data])
-            hexarea.append(hex_text)
-
-            ## Now write the chars:
-            result = []
-            for c in data:
-                if c.isalnum() or c in "!@#$%^&*()_ +-=[]\{}|;':\",./<>?":
-                    result.append(c)
-                else:
-                    result.append(".")
-                    
-            chars.append(''.join(result))
-
-            row_count +=1
-            offset += len(data)
-            
-            if row_count > height-1:
-                break
-            
+        ## Fill in the offsets
+        offsets = [ ("%%0%uX" % self.offset_length) % offset for offset in \
+                    range(self.file_offset,
+                          self.file_offset + self.height * self.row_size,
+                          self.row_size) ]
+        
+        self.cache_screen(self.file_offset, self.width * self.height)
+        
         self.offsets = urwid.ListBox([urwid.Text("\n".join(offsets))])
-        self.hex     = urwid.Edit('',"".join(hexarea), wrap='any', multiline=True)
-        self.chars   = urwid.Edit('',''.join(chars), wrap='any', multiline=True)
-        hex          = urwid.ListBox([urwid.AttrWrap(self.hex ,'editbx', 'editfc')])
-        chars        = urwid.ListBox([urwid.AttrWrap(self.chars,'editbx','editfc')])
+        self.hex     = OverlayEdit(self.format_urwid_markup(hex_view=True))
+        self.chars   = OverlayEdit(self.format_urwid_markup(hex_view=False))
+        hex          = urwid.ListBox([self.hex])
+        chars        = urwid.ListBox([self.chars])
         self.columns = urwid.Columns([('fixed', self.offset_length+1, self.offsets),
-                                      ('fixed', 3*x, hex), 
-                                      ('fixed', x, chars),
+                                      ('fixed', 3*self.row_size, hex), 
+                                      ('fixed', self.row_size, chars),
                                       ],0,min_width = 11, focus_column=self.focus_column)
 
         top = urwid.AttrWrap(self.columns, 'body')
@@ -116,118 +345,62 @@ class Hexeditor:
 
     def update_status_bar(self):
         self.status_bar.set_text(
-            "Hex Edit: %u/%u (0x%X/0x%X) %s" % (self.mark,
-                                                self.size-1,
-                                                self.mark,
-                                                self.size-1, self.message))
+            "0x%X/0x%X %s" % (self.mark,
+                              self.size-1, self.message))
 
-    def search_mode(self, start=True):
-        if start:
-            print "New word"
-            self.search_mode_state = True
-            self.status_bar = urwid.Edit("Search: ", self.previous_search,
-                                         wrap='any', multiline=False)
-            self.status_bar.focus = True
-        else:
-            ## Leave search mode
-            expression = self.status_bar.edit_text
-            start_pos = self.mark
-            self.previous_search = expression
-            
-            self.fd.seek(start_pos)
-            while 1:
-                data = self.fd.read(1024 * 1024)
-                if len(data)==0:
-                    self.message = "%s Not found" % expression
-                    break
-                
-                m = re.search(expression, data, re.I | re.M | re.S)
-                if m:
-                    ## Found it
-                    self.mark = start_pos + m.start()
-                    self.message = "Found %s for expression %s" % (m.group(0), expression)
-                    break
-
-                start_pos += len(data)
-            
-            self.search_mode_state = False
-            self.status_bar = urwid.Text('')
-            self.update_status_bar()
-
+    def goto_next_search_hit(self):
+        ## Issue the indexing request
+        pass
+        
     def urwid_run(self):
         self.refresh_screen()
-        width, height = self.ui.get_cols_rows()
-
+        action = None
         while 1:
-            self.hex.set_edit_pos((self.mark - self.file_offset)*3)
-            self.chars.set_edit_pos(self.mark - self.file_offset)
-            self.columns.set_focus_column(self.focus_column)
-            self.update_status_bar()
-            pagesize = self.row_size * (height - 5)
-            self.draw_screen( (width, height) )
+            self.pagesize = self.row_size * (self.height - 5)
+
+            if not action or not action.draw(self):
+                try:
+                    self.hex.set_edit_pos((self.mark - self.file_offset)*3)
+                    self.chars.set_edit_pos(self.mark - self.file_offset)
+                    self.columns.set_focus_column(self.focus_column)
+                except AssertionError:
+                    print "Error in widgets mark is at %s, file offset %s" % (self.mark,
+                                                                              self.file_offset)
+                    raise
+
+                self.draw_screen( (self.width, self.height) )
+                self.update_status_bar()
+                self.refresh_screen()                    
 
             ## We are a generator and we are ready for more input
             keys = self.ui.get_input((yield "Ready"))
-            if "f8" in keys:
-                return
-            
-            for k in keys:
-                if self.search_mode_state:
-                    if k=='enter':
-                        self.search_mode(False)
-                    else:
-                        self.status_bar.keypress( (width, ), k)
+
+            for key in keys:
+                for action in self.actions:
+                    ## Does the handle take the key?
+                    if action.handle_key(self, key):
+                        break
+
+                if urwid.is_mouse_event(key):
+                    event, button, col, row = key
+                    self.process_mouse_event(self.width, self.height,
+                                             event, button, col, row)
                     
-                elif urwid.is_mouse_event(k):
-                    event, button, col, row = k
-                    self.process_mouse_event(width, height, event, button, col, row)
-#                    self.top.mouse_event( (width,height), event, 
-#                                           button, col, row, focus=True )
-                elif k=='page down':
-                    if self.file_offset + pagesize < self.size:
-                        self.file_offset += pagesize
-                        self.mark += pagesize
-                elif k=='page up':
-                    self.file_offset = max(0, self.file_offset - pagesize)
-                    self.mark = max(0, self.mark - pagesize)
-                elif k=='right':
-                    if self.mark +1 < self.size:
-                        self.mark += 1
-                elif k=='left':
-                    self.mark = max(0,self.mark-1)
-                elif k=='up':
-                    self.mark = max(0,self.mark - self.row_size)
-                    if self.mark < self.file_offset:
-                        self.file_offset = max(0, self.file_offset -pagesize)
-                elif k == 'window resize' or k=='ctrl l':
-                    width, height = self.ui.get_cols_rows()
-                elif k=='down':
-                    self.mark += self.row_size
-                elif k=='tab':
-                    if self.focus_column==1:
-                        self.focus_column = 2
-                    else: self.focus_column =1
-                elif k=='<' or k=='home' or k=='meta <':
-                    self.mark = 0
-                    self.file_offset =0
-                elif k=='>' or k=='end' or k=='meta >':
-                    self.file_offset = self.size - (self.size % self.row_size)
-                    self.mark = self.file_offset
-                elif k=='/':
-                    self.search_mode(True)
+            ## Make sure we dont go past end of file
+            if self.mark > self.size-1:
+                self.mark = self.size-1
 
-                ## Make sure we dont go past end of file
-                if self.mark > self.size-1:
-                    self.mark = self.size-1
+            if self.mark < 0:
+                self.mark = 0
 
-                ## Do we need to go to the next page?
-                if self.mark > self.file_offset + pagesize:
-                    self.file_offset += pagesize
+            ## Do we need to go to the next page?
+            if self.mark < self.file_offset or \
+                   self.mark > self.file_offset + self.pagesize:
+                self.file_offset = (self.mark / self.pagesize) * self.pagesize
 
-            self.update_status_bar()
-            self.refresh_screen()                    
-            ## Other keys are just passed into the edit box
-            ##    self.top.keypress( (width, height), k )
+            if not action.draw(self):                
+                self.update_status_bar()
+                self.refresh_screen()                    
 
     def draw_screen(self, size):
         ## Refresh the screen:
@@ -270,7 +443,6 @@ def hexedit(self, query, result):
             generator.send(query.get('_value',''))
 
             ## Refresh the screen
-            screen.refresh_screen()
             result.content_type = "text/plain"
             result.result = screen.ui.buffer
         else:
@@ -299,4 +471,18 @@ try:
 except ImportError:
     disabled = True
 
+class OverlayEdit(urwid.Edit):
+    """ A specialised edit box which supports highlighting of the
+    edited text
+    """
+    def __init__(self, text):
+        urwid.Edit.__init__(self, multiline = True, wrap = 'any')
+        self.set_edit_text(text)
 
+    def set_edit_text(self, text):
+        self.edit_text, self.attrib = urwid.decompose_tagmarkup(text)
+        if self.edit_pos > len(self.edit_text):
+            self.edit_pos = len(self.edit_text)
+            
+        self._invalidate()
+        

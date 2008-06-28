@@ -542,15 +542,12 @@ UI.TableRenderer = TableRenderer
 ## This is a global index we use for workers
 INDEX = None
 INDEX_VERSION = 0
+
 def reindex():
-    global INDEX
+    global INDEX, INDEX_VERSION
     print "Rebuilding index"
     dbh = DB.DBO()
-    dbh.execute("select max(id) as max from dictionary")
-    row = dbh.fetch()
-    if row:
-        INDEX_VERSION = row['max']
-    
+    INDEX_VERSION = dbh.get_meta('dict_version') or 1
     dbh.execute("select word,id,type from dictionary")
     INDEX = index.Index(unique=1)
     for row in dbh:
@@ -569,8 +566,6 @@ def reindex():
             except UnicodeDecodeError:
                 pass
 
-
-    print INDEX
 ## This is how we can add new words to the dictionary and facilitate scanning:
 class AddWords(Reports.report):
     """ Add a new word to the indexing dictionary """
@@ -660,11 +655,18 @@ class Index(Farm.Task):
         global INDEX
         if not INDEX: reindex()
 
-        print "Indexing inode_id %s %s" % (inode_id, INDEX)
+        print "Indexing inode_id %s %s (version %s)" % (inode_id, INDEX, INDEX_VERSION)
         fsfd = FileSystem.DBFS(case)
         fd = fsfd.open(inode_id=inode_id)
         buff_offset = 0
         dbh = DB.DBO(case)
+
+        ## Clear old hits:
+        dbh.check_index("LogicalIndexOffsets", "inode_id")
+        dbh.delete("LogicalIndexOffsets", where=DB.expand("inode_id = %r",
+                                                          inode_id))
+
+        ## Get ready for scan
         dbh.mass_insert_start("LogicalIndexOffsets")
 
         while 1:
@@ -681,6 +683,12 @@ class Index(Farm.Task):
                         version = INDEX_VERSION)
 
             buff_offset += len(data)
+
+        ## Update the version
+        dbh.update("inode",
+                   where = DB.expand('inode_id = %r', inode_id),
+                   version = INDEX_VERSION)
+        
     
 ## Unit tests
 import unittest

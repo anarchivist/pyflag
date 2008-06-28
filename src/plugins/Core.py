@@ -502,6 +502,7 @@ class InodeTable(FlagFramework.CaseTable):
                 [ BigIntegerType, dict(name = 'Size', column='size')],
                 ## The dictionary version used on this inode:
                 [ IntegerType, dict(name = "Index Version", column='version')],
+                [ IntegerType, dict(name = 'Desired Version', column='desired_version')],
                 ]
     
     def __init__(self):

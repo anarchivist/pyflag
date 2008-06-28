@@ -103,32 +103,12 @@ class Advanced(IO.Image):
         tmp.row(tmp2,"Enter partition offset:")
         result.textfield(tmp,offset)
 
-    def calculate_offset_suffix(self, offset):
-        m=re.match("(\d+)([sSkKgGmM]?)", offset)
-        if not m:
-            raise IOError("I cant understand offset should be an int followed by s,k,m,g")
-
-        suffix=m.group(2).lower()
-        multiplier = 1
-
-        if not suffix: multiplier=1
-        elif suffix=='k':
-            multiplier = 1024
-        elif suffix=='m':
-            multiplier = 1024**2
-        elif suffix=='g':
-            multiplier = 1024**3
-        elif suffix=='s':
-            multiplier = 512
-
-        return int(m.group(1))* multiplier
-
     def form(self, query, result):
         result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename", vfs=False)
         self.calculate_partition_offset(query, result)
 
     def make_iosource_args(self, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
         
         args = [['subsys', self.subsys],
                 ['offset', offset]]
@@ -292,7 +272,7 @@ class Standard(Advanced):
         self.calculate_partition_offset(query, result)
         
     def create(self, name, case, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
         filename = query['filename']
         return OffsettedFile(filename, offset)
 
@@ -370,7 +350,7 @@ class EWF(Standard):
         return result
 
     def create(self, name, case, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
         filenames = self.glob_filenames(query.getarray('filename'))
         print "Openning ewf file %s" % (filenames,)
         fd = pyewf.open(filenames)            
@@ -381,7 +361,7 @@ class AFF(Standard):
     evidence """
 
     def create(self, name, case, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
         filename = query['filename']
         fd = pyaff.open(filename)
         return OffsettedFDFile(fd, offset)

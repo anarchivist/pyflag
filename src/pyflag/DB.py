@@ -813,21 +813,16 @@ class DBO:
                      (table,property))
         row = self.fetch()
 
-        if row != None:
-            return row['value']
-
-        return None
+        return row and row.get('value')
 
     def set_meta(self, property,value, table='meta',force_create=False, **args):
         """ Sets the value in meta table
         """
         prevvalue = self.get_meta(property, table, **args)
         if (prevvalue != None) and (not force_create):
-            self.invalidate(table)
             self.execute("update `%s` set property=%r,value=%r where property=%r",
                          (table, property,value, property))
         else:
-            self.invalidate(table)
             self.execute("insert into `%s` set property=%r,value=%r", (table, property,value))
 
     def MakeSQLSafe(self,string):

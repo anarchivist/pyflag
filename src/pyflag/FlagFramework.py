@@ -1051,3 +1051,30 @@ def iri_to_uri(iri):
         return iri
     return urllib.quote(smart_str(iri), safe='/#%[]=:;$&()+,!?*')
 
+def calculate_offset_suffix(offset):
+    base = 10
+    if offset.startswith("0x"):
+        base = 16
+        offset = offset[2:]
+    elif offset.startswith("\0"):
+        base = 8
+        offset = offset[2:]
+        
+    m=re.match("(\d+)([sSkKgGmM]?)", offset)
+    if not m:
+        raise IOError("I cant understand offset should be an int followed by s,k,m,g")
+
+    suffix=m.group(2).lower()
+    multiplier = 1
+
+    if not suffix: multiplier=1
+    elif suffix=='k':
+        multiplier = 1024
+    elif suffix=='m':
+        multiplier = 1024**2
+    elif suffix=='g':
+        multiplier = 1024**3
+    elif suffix=='s':
+        multiplier = 512
+
+    return int(m.group(1), base)* multiplier
