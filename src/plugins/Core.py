@@ -49,6 +49,14 @@ from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameT
 config.add_option("SCHEMA_VERSION", default=3, absolute=True,
                   help="Current schema version")
 
+class NullFile(FileSystem.File):
+    """ A VFS Driver to represent a non-existent file, used with orphaned
+    directory entries """
+    specifier = "0"
+
+    def read(self, length=None):
+        return ""
+
 class CachedFile(FileSystem.File):
     """ A VFS Driver to open cached files """
     specifier = "x"
@@ -253,6 +261,10 @@ class CaseDBInit(FlagFramework.EventHandler):
         ## Create all CaseTables:
         for t in Registry.CASE_TABLES.classes:
             t().create(case_dbh)
+
+        ## add a (dummy) inode to link orphaned directory entries to
+        case_dbh.execute("insert into inode set inode=0, status='deleted', size=0")
+        case_dbh.execute("insert into file set inode_id=1, inode='00', status='deleted', path='', name=''")
 
         case_dbh.execute("""Create table if not exists meta(
         `time` timestamp NOT NULL,

@@ -123,14 +123,11 @@ class Sleuthkit(DBFS):
         #dbh_inode.mass_insert_start("inode")
         dbh_block.mass_insert_start("block")
 
-        def insert(inode, type, path, name):
+        #def insert(inode, type, path, name):
             # insert inode record
-            inode_id = None;
-            if inode.alloc == 1:
-                inode_id = insert_inode(inode)
-
+            #inode_id = insert_inode(inode)
             # insert the file record
-            insert_file(inode_id, inode, type, path, name)
+            #insert_file(inode_id, inode, type, path, name)
 
         def insert_file(inode_id, inode, type, path, name):
             path = path.decode("utf8","ignore")
@@ -199,9 +196,11 @@ class Sleuthkit(DBFS):
             """ Inserts inode into database and returns new inode_id and a
             stat object for the newly inserted inode """
             inode_id = None
-            # dont do anything for realloc inodes
-            if inode.alloc == 2:
-                return None
+
+            # dont do anything for realloc inodes or those with an invalid
+            # inode number. inode_id 1 is the default (dummy) entry
+            if inode.alloc == 2 or str(inode) == "0-0-0":
+                return 1
 
             inodestr = "I%s|K%s" % (iosource_name, inode)
 
@@ -262,16 +261,36 @@ class Sleuthkit(DBFS):
         else:
             root_dir = '/'
 
+        # insert deleted inodes
+        deleted_inodes = {}
+        if root_dir=='/':
+            # find any unlinked inodes here. Note that in some filesystems, a
+            # 'deleted' directory may have been found and added in the walk above.
+            for s in fs.iwalk():
+                deleted_inodes["%s" % s] = (insert_inode(s),s)
+
         # walk the directory tree
         for root, dirs, files in fs.walk(root_dir, unalloc=True, inodes=True):
             dbh_file.mass_insert(inode = '', mode = 'd/d',
                                  status = 'alloc', path=FlagFramework.normpath(mount_point+root[1].decode("utf8")),
                                  name = '')
             for d in dirs:
-                #insert_file(d[0], 'd/d', root[1], d[1])
-                insert(d[0], 'd/d', root[1], d[1])
+                inum = str(d[0])
+                if inum in deleted_inodes:
+                    inode_id = deleted_inodes[inum][0]
+                    del deleted_inodes[inum]
+                else:
+                    inode_id = insert_inode(d[0])
+                insert_file(inode_id, d[0], 'd/d', root[1], d[1])
+
             for f in files:
-                insert(f[0], 'r/r', root[1], f[1])
+            	inum = str(f[0])
+                if inum in deleted_inodes:
+                    inode_id = deleted_inodes[inum][0]
+                    del deleted_inodes[inum]
+                else:
+                    inode_id = insert_inode(f[0])
+                insert_file(inode_id, f[0], 'r/r', root[1], f[1])
                 
             if directory and root != root_dir:
                 break
@@ -287,12 +306,10 @@ class Sleuthkit(DBFS):
                 dbh_block.execute("drop index block on block")
             except DB.DBError: pass
             
-            # find any unlinked inodes here. Note that in some filesystems, a
-            # 'deleted' directory may have been found and added in the walk above.
+            # add any remaining (unlinked) deleted inodes
             insert_file(None, sk.skinode(0, 0, 0, 1), 'd/d', '/', '_deleted_')
-            for s in fs.iwalk():
-                inode_id = insert_inode(s)
-                insert_file(inode_id, s, '-/-', '/_deleted_', "%s" % s)
+            for s in deleted_inodes:
+                insert_file(deleted_inodes[s][0], deleted_inodes[s][1], '-/-', '/_deleted_', "%s" % s)
 
             # add contiguous unallocated blocks here as 'unallocated' files.
             # the offset driver over the iosource should work for this
