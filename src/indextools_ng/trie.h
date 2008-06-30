@@ -17,6 +17,9 @@
 */
 #define MAX_MATCH_LENGTH 100
 
+// Some prototypes to shut up warnings
+struct trie_iter;
+
 /** These are the possible types that words may be supplied as **/
 enum word_types {
   // This is a literal

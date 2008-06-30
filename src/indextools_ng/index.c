@@ -81,13 +81,27 @@ static PyObject *trie_index_reject(trie_index *self, PyObject *args) {
 };
 
 static PyObject *name;
-static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args) {
+static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args, PyObject *kwds) {
   PyObject *data;
   PyObject *result;
+  int unique=0;
+  static char *kwlist[] = {"data","unique",NULL};
 
-  if(!PyArg_ParseTuple(args, "O", &data)) 
+  if(kwds && !PyArg_ParseTupleAndKeywords(args, kwds, "Oi", kwlist,
+					  &data, &unique)) 
     return NULL;
   
+  printf("Indexing not uniquely %u\n", unique);
+  if(unique) {
+    if(!self->set) 
+      self->set = PySet_New(NULL);
+  } else {    
+    if(self->set) {
+      Py_DECREF(self->set);
+      self->set = NULL;
+    };
+  };
+
   result = PyObject_CallMethodObjArgs(g_index_module, name,
 				    data, self, NULL);
 

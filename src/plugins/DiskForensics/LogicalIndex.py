@@ -549,7 +549,7 @@ def reindex():
     dbh = DB.DBO()
     INDEX_VERSION = dbh.get_meta('dict_version') or 1
     dbh.execute("select word,id,type from dictionary")
-    INDEX = index.Index(unique=1)
+    INDEX = index.Index()
     for row in dbh:
         t = row['type']
         if t == 'literal':
@@ -655,7 +655,15 @@ class Index(Farm.Task):
         global INDEX
         if not INDEX: reindex()
 
-        print "Indexing inode_id %s %s (version %s)" % (inode_id, INDEX, INDEX_VERSION)
+        try:
+            desired_version = args[0]
+        except:
+            desired_version = INDEX_VERSION
+
+        ## Did they want a detailed index or a unique index?
+        unique = desired_version < 2**30            
+
+        print "Indexing inode_id %s %s (version %s)" % (inode_id, INDEX, desired_version)
         fsfd = FileSystem.DBFS(case)
         fd = fsfd.open(inode_id=inode_id)
         buff_offset = 0
@@ -673,21 +681,21 @@ class Index(Farm.Task):
             data = fd.read(1024*1024)
             if len(data)==0: break
 
-            for offset, matches in INDEX.index_buffer(data):
+            print "unique is %s" % unique
+            for offset, matches in INDEX.index_buffer(data, unique = unique):
                 for id, length in matches:
                     dbh.mass_insert(
                         inode_id = inode_id,
                         word_id = id,
                         offset = offset + buff_offset,
-                        length = length,
-                        version = INDEX_VERSION)
+                        length = length)
 
             buff_offset += len(data)
 
         ## Update the version
         dbh.update("inode",
                    where = DB.expand('inode_id = %r', inode_id),
-                   version = INDEX_VERSION)
+                   version = desired_version)
         
     
 ## Unit tests
