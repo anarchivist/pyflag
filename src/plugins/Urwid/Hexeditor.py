@@ -13,13 +13,15 @@ PALETTE = [
     ('self', 'default', 'default'),
     ('help', 'yellow', 'default'),
     ('hit', 'yellow', 'black'),
+    ('slack','light cyan', 'dark red',),
+    ('overread','black', 'dark blue',),
     ]
 
 class Action:
     """ An action handler base class """
+    ## This is the order we will be called when highlighting
+    order = 10
     state = None
-    ## This controls our order in the Action stack
-    order = 0
     ## This is the name of the mode the top level GUI will be in when
     ## we fire. This needs to be unique between all actions
     mode = ''
@@ -30,24 +32,24 @@ class Action:
         ui.set_event(self.event, self.mode)
     
     def handle_key(self, ui, key):
-        """ This is called to process keys as the come in.
-
-        If we return True - no further processing of the key will be
-        performed."""
+        """ This is called to process keys as the come in.  Note that
+        keys will only arrive here if the ui's mode is set to
+        self.mode.
+        """
         return False
 
     def draw(self, ui):
-        """ This is called when we wish to draw the screen. If we
-        return False we allow the ui to draw the screen, otherwise we
-        get to.
+        """ This is called when we wish to draw the screen. 
+        By default we draw the hexeditor screen.
         """
         try:
             ui.hex.set_edit_pos((ui.mark - ui.file_offset)*3)
             ui.chars.set_edit_pos(ui.mark - ui.file_offset)
             ui.columns.set_focus_column(ui.focus_column)
         except AssertionError:
-            print "Error in widgets mark is at %s, file offset %s" % (ui.mark,
-                                                                      ui.file_offset)
+            print "Error in widgets mark is at %s, file offset %s %s" % (ui.mark,
+                                                                         ui.file_offset,
+                                                                         ui.size)
             raise
 
         ui.refresh_screen()                    
@@ -265,15 +267,12 @@ class IncrementalSearch(Action):
     def help(self):
         return  "ctrl-s                   Incremental Regular Expression search (press ctrl-s again to go to the next hit)"
 
-    def mark_highlights(self, ui):
-        ## Make sure the cache is hot:
-        ui.cache_screen()
+    def highlight(self, ui, offset, length, refreshed):
+        if not self.state: return
 
         try:
             expr = re.compile(self.previous_search)
         except: return
-
-        ui.clear_overlay()
 
         for m in expr.finditer(ui.screen_cache.getvalue()):
             ui.overlay[m.start():m.end()] = [8,] * (m.end() - m.start())
@@ -297,18 +296,18 @@ class IncrementalSearch(Action):
             ui.fd.seek(ui.mark)
         while 1:
             ## Search for hit in the current file offset
-            read_data = ui.fd.read(64 * 1024)
-            if not read_data:
+            data += ui.fd.read(64 * 1024)
+            print "%r" % data[:10], ui.mark
+            if not data:
                 ui.status_bar.set_edit_text("Not found")
+                print len(data)
                 return
-            
-            data += read_data
+
             m = expr.search(data)
             if m:
                 ## Found it
                 ui.mark = offset + m.start()
                 ui.status_bar.set_edit_text("%s" % self.previous_search)
-                self.mark_highlights(ui)
                 return
 
             ## Provide some overlap margin
@@ -346,9 +345,32 @@ class IncrementalSearch(Action):
                 ui.message = ''
                 ui.actions[None].handle_key(ui, key)
 
-    def draw(self, ui):
-        self.mark_highlights(ui)
-        Action.draw(self, ui)
+class SlackAction(Action):
+    order = 1
+
+    ## This action is only here for its highlighting
+    def __init__(self, ui):
+        pass
+
+    def highlight(self, ui, offset, length, refreshed):
+        print "SlackAction"
+        try:
+            file_size = ui.fd.size
+            blocksize = ui.fd.block_size
+            slacksize = blocksize - file_size % blocksize
+
+            if offset + length > file_size:
+                for i in range(file_size, file_size + slacksize):
+                    try:
+                        ui.overlay[i-offset] = 9
+                    except: break
+
+                for i in range(file_size + slacksize, file_size + slacksize + blocksize):
+                    try:
+                        ui.overlay[i - offset] = 10
+                    except: break
+        except AttributeError:
+            pass
         
 class Hexeditor:
     row_size = 25
@@ -365,11 +387,16 @@ class Hexeditor:
         self.case = fd.case
         self.inode_id = fd.lookup_id()
         fd.seek(0)
+        ## We try to set the size to the maximum we can have:
         try:
-            self.size = fd.size
+            filesize = fd.size
+            blocksize = fd.block_size
+            slack = blocksize - filesize % blocksize
+            self.fd.overread = blocksize
+            self.fd.slack = True
+            self.size = filesize + slack + blocksize
         except AttributeError:
-            fd.seek(0,2)
-            self.size = fd.tell()
+            self.size = fd.size
             
         self.file_offset = 0
         self.mark = 0
@@ -382,7 +409,7 @@ class Hexeditor:
 
         ## These are the actions hooked to this gui
         self.actions = {None: Navigate()}
-        for action in [Help, SearchAction, Goto, IncrementalSearch]:
+        for action in [Help, SearchAction, Goto, IncrementalSearch, SlackAction]:
             a = action(self)
             self.actions[a.mode] = a
 
@@ -442,6 +469,7 @@ class Hexeditor:
 
         if self.screen_offset != self.file_offset:
             self.fd.seek(max(0, self.file_offset))
+            #data = self.fd.read(min(length, self.size - self.file_offset))
             data = self.fd.read(length)
             self.screen_cache = cStringIO.StringIO(data)
             self.clear_overlay()
@@ -451,12 +479,19 @@ class Hexeditor:
             ## Sometimes our concept of the fd's size is incorrect because
             ## it can not be calculated. If we read some bytes off it - we
             ## can assume its a bit more than we have:
-            largest_offset = self.screen_offset + len(data)
-            if largest_offset > self.size:
-                self.size = largest_offset + 1
+            #largest_offset = self.screen_offset + len(data)
+            #if largest_offset > self.size:
+            #    self.size = largest_offset + 1
 
         ## Call all the highlighters to update the overlay
-        self.actions[self.mode].highlight(self, self.screen_offset, length, refreshed)
+        actions = self.actions.values()
+        def sort(x,y):
+            if x.order > y.order: return 1
+            return -1
+        actions.sort(cmp = sort)
+        
+        for action in actions:
+            action.highlight(self, self.screen_offset, length, refreshed)
 
     def format_urwid_markup(self, hex_view=True):
         """ returns an urwid compatible markup from the overlay and
@@ -466,6 +501,7 @@ class Hexeditor:
         last = self.overlay[0]
         result = []
         chars = ''
+        tag_id = 0
 
         x=0
         while 1:
@@ -491,12 +527,25 @@ class Hexeditor:
         result.append((PALETTE[tag_id][0], chars))
         return result
 
+    def adjust_mark(self):
+        """ Adjust the mark if it exceeds the current screen """
+        ## Make sure we dont go past end of file
+        if self.mark > self.size-1:
+            self.mark = self.size-1
+
+        if self.mark < 0:
+            self.mark = 0
+
+        ## Do we need to go to the next page?
+        if self.mark < self.file_offset or \
+               self.mark > self.file_offset + self.pagesize:
+            self.file_offset = (self.mark / self.pagesize) * self.pagesize
+        
     def refresh_screen(self):
         """ Redraws the whole screen with the current channel window
         set to channel
         """
         self.width, self.height = self.ui.get_cols_rows()
-
         self.offset_length = max(4, len("%X" % (self.file_offset))+1)
         ## We work out how much space is available for the hex edit
         ## area (i.e. number of hex bytes per line).
@@ -504,14 +553,15 @@ class Hexeditor:
         ## This is the formula: width = offset_length + 3 * x + x
         ## (where x is the number of chars per line)
         self.row_size = (self.width - self.offset_length - 1)/4
+        self.pagesize = self.row_size * (self.height - 5)
+        self.adjust_mark()
+        self.cache_screen()
 
         ## Fill in the offsets
         offsets = [ ("%%0%uX" % self.offset_length) % offset for offset in \
                     range(self.file_offset,
                           self.file_offset + self.height * self.row_size,
                           self.row_size) ]
-        
-        self.cache_screen()
         
         self.offsets = urwid.ListBox([urwid.Text("\n".join(offsets))])
         self.hex     = OverlayEdit(self.format_urwid_markup(hex_view=True),
@@ -536,8 +586,9 @@ class Hexeditor:
         self.top = urwid.Frame(top, **args)
 
     def update_status_bar(self):
+        self.adjust_mark()
         self.status_bar.set_text(
-            "%s/%s 0x%X/0x%X %s" % (self.mark,self.size-1,
+            "%s/%s 0x%X/0x%X %s" % (self.mark,self.fd.size-1,
                                     self.mark,
                                     self.size-1, self.message))
 
@@ -548,8 +599,6 @@ class Hexeditor:
     def urwid_run(self):
         self.refresh_screen()
         while 1:
-            self.pagesize = self.row_size * (self.height - 5)
-
             ## We are a generator and we are ready for more input
             keys = self.ui.get_input((yield "Ready"))
 
@@ -560,19 +609,7 @@ class Hexeditor:
                     event, button, col, row = key
                     self.process_mouse_event(self.width, self.height,
                                              event, button, col, row)
-                    
-            ## Make sure we dont go past end of file
-            if self.mark > self.size-1:
-                self.mark = self.size-1
-
-            if self.mark < 0:
-                self.mark = 0
-
-            ## Do we need to go to the next page?
-            if self.mark < self.file_offset or \
-                   self.mark > self.file_offset + self.pagesize:
-                self.file_offset = (self.mark / self.pagesize) * self.pagesize
-                
+                                    
             self.actions[self.mode].draw(self)
             self.draw_screen()
 
@@ -655,6 +692,9 @@ class OverlayEdit(urwid.Edit):
         urwid.Edit.__init__(self, multiline = True, wrap = 'any')
         self.set_edit_text(text)
         self.set_edit_pos(edit_pos)
+
+    def set_edit_pos(self, pos):
+        self.edit_pos = min(pos, len(self.edit_text))
 
     def set_edit_text(self, text):
         self.edit_text, self.attrib = urwid.decompose_tagmarkup(text)

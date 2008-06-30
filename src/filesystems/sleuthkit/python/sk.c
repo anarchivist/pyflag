@@ -1347,35 +1347,50 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
             written = tsk_fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
 
     /* perform overread if necessary have to use direct block IO for this */
-    if(slack && overread) {
+    if(slack && overread && written < readlen) {
         TSK_DADDR_T last_block = 0;
         struct block *b;
         TSK_DATA_BUF *blockbuf;
         int len;
+	int to_read = readlen - written;
+	TSK_DADDR_T start;
+	int count = 0;
+
+	if(to_read > overread) to_read = overread;
 
         list_for_each_entry(b, &self->blocks->list, list) {
             last_block = b->addr;
+	    count ++;
         }
 
         /* increment to get the next block after the file */
         last_block++;
 
+	start = last_block * fs->block_size;
+
+	// If the readptr actually points past the end of the file, we
+	// may need to start reading a bit ahead.
+	if(self->readptr > count * fs->block_size)
+	  start += (self->readptr - count * fs->block_size);
+
         /* do a direct block read from the filesystem */
-        blockbuf = tsk_data_buf_alloc(fs->block_size);
-        len = tsk_fs_read_block(fs, blockbuf, fs->block_size, last_block);
-        if(len > readlen-written) {
-            memcpy(buf+written, blockbuf->data, readlen-written);
-            written = readlen;
+        blockbuf = tsk_data_buf_alloc(overread);
+        len = tsk_fs_read_random(fs, blockbuf->data, to_read, start);
+        if(len > 0) {
+            memcpy(buf+written, blockbuf->data, len);
+	    written += len;
         }
         tsk_data_buf_free(blockbuf);
     }
 
+    /*
     if(readlen != written) {
         talloc_free(buf);
         return PyErr_Format(PyExc_IOError, "Failed to read all data: wanted %d, got %d", readlen, written);
-    }
+	}
+    */
 
-    retdata = PyString_FromStringAndSize(buf, readlen);
+    retdata = PyString_FromStringAndSize(buf, written);
     talloc_free(buf);
 
     self->readptr += readlen;

@@ -601,6 +601,8 @@ class File:
     ## These can be overridden by the caller if they want to add stats to the ViewFile report
     #stat_cbs = None
     #stat_names = None
+
+    overread = False
     
     def __init__(self, case, fd, inode):
         """ The constructor for this object.
@@ -727,7 +729,12 @@ class File:
         else:
             self.readptr = offset
 
-        if(self.size>0 and self.readptr > self.size):
+        ## This only happens when overread is not selected. Overread
+        ## tells us that we should read past the end of file (say into
+        ## the slack space). It follows that we should also be able to
+        ## seek past the end of file.
+        if(not self.overread and self.size>0 and
+           self.readptr > self.size):
             self.readptr = self.size
 
         if self.readptr<0:
