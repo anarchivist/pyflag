@@ -297,10 +297,8 @@ class IncrementalSearch(Action):
         while 1:
             ## Search for hit in the current file offset
             data += ui.fd.read(64 * 1024)
-            print "%r" % data[:10], ui.mark
             if not data:
                 ui.status_bar.set_edit_text("Not found")
-                print len(data)
                 return
 
             m = expr.search(data)
@@ -337,6 +335,9 @@ class IncrementalSearch(Action):
             elif key=='backspace':
                 self.previous_search = self.previous_search[:-1]
                 self.find_next_hit(ui)
+            elif key=='tab':
+                ## We accept tab but do not break from search mode
+                ui.actions[None].handle_key(ui, key)
             else:
                 ## Any other key exits from this mode
                 self.state = None
@@ -353,7 +354,6 @@ class SlackAction(Action):
         pass
 
     def highlight(self, ui, offset, length, refreshed):
-        print "SlackAction"
         try:
             file_size = ui.fd.size
             blocksize = ui.fd.block_size
@@ -489,7 +489,8 @@ class Hexeditor:
             if x.order > y.order: return 1
             return -1
         actions.sort(cmp = sort)
-        
+
+        self.clear_overlay()
         for action in actions:
             action.highlight(self, self.screen_offset, length, refreshed)
 
@@ -603,12 +604,15 @@ class Hexeditor:
             keys = self.ui.get_input((yield "Ready"))
 
             for key in keys:
-                self.actions[self.mode].handle_key(self, key)
-
+                ## These are just screen update requests
+                if key=='eh?': continue
+                
                 if urwid.is_mouse_event(key):
                     event, button, col, row = key
                     self.process_mouse_event(self.width, self.height,
                                              event, button, col, row)
+                else:
+                    self.actions[self.mode].handle_key(self, key)
                                     
             self.actions[self.mode].draw(self)
             self.draw_screen()

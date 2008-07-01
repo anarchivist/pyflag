@@ -404,8 +404,10 @@ fs_read_file_int(TSK_FS_INFO * fs, TSK_FS_INODE * fsi, uint32_t type,
     FS_READ_FILE lf;
     int flags = flagsBase;
 
-    if (offset > fsi->size) {
-        return 0;
+    // If callers wanted slack its perfectly reasonable for them to
+    // read past the end of the file.
+    if (!(flagsBase & TSK_FS_FILE_FLAG_SLACK) && offset > fsi->size) {
+      return 0;
     }
 
     if (fsi->flags & TSK_FS_INODE_FLAG_UNALLOC) {
