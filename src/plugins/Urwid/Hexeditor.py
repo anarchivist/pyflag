@@ -2,6 +2,8 @@
 import cStringIO, re
 import pyflag.Indexing as Indexing
 import pyflag.FlagFramework as FlagFramework
+import pyflag.DB as DB
+import pyflag.FileSystem as FileSystem
 
 PALETTE = [
     ('editfc','white', 'dark blue', 'bold'),
@@ -15,6 +17,8 @@ PALETTE = [
     ('hit', 'yellow', 'black'),
     ('slack','light cyan', 'dark red',),
     ('overread','black', 'dark blue',),
+    ('buttn','black','dark cyan'),
+    ('buttnf','white','dark blue','bold'),
     ]
 
 class Action:
@@ -371,7 +375,76 @@ class SlackAction(Action):
                     except: break
         except AttributeError:
             pass
-        
+
+class AnnotateOffset(Action):
+    mode = 'annotate'
+    event = 'a'
+
+    previous_description = ''
+
+    def help(self):
+        return  "a                        Add annotation to this offset (Creates a new inode)"
+
+    def handle_key(self, ui, key):
+        if self.state == None:
+            self.state = 'pending'
+            self.top = None
+        elif self.state == 'pending':
+            ## Pass the key stroke to the underlying form
+            print "Sending %s" % key
+            ui.top.keypress( (ui.width,ui.height) , key)
+
+    def do_button(self, button, (ui, press)):
+        if press == "Yes":
+            print "Will do it"
+            self.previous_description = self.description.get_edit_text()
+            dbh = DB.DBO(ui.case)
+            fsfd = FileSystem.DBFS(ui.case)
+            inode_id = fsfd.VFSCreate(ui.fd.inode, "o%s" % ui.mark,
+                                      "_Note_")
+            dbh.insert("annotate",
+                       inode_id = inode_id,
+                       note = self.previous_description)
+        else:
+            print "Canceled"
+
+        self.state = None
+        ui.mode = None
+
+    def draw(self, ui):
+        if not self.top:
+            self.length = urwid.AttrWrap(urwid.Edit(),'editbx', 'editfc' )
+            self.description = urwid.AttrWrap(PowerEdit('',self.previous_description,
+                                                        multiline = True),
+                                              'editbx', 'editfc' )
+            ui.top = urwid.Padding(
+              urwid.ListBox(
+                urwid.SimpleListWalker([
+                    urwid.Divider(),
+                    urwid.Text(('hit','Creating Inode %s|o%s' % (ui.fd.inode, ui.mark))),
+                    urwid.Divider(),
+#                    urwid.Text("Length"),
+#                    urwid.Padding(
+#                         self.length, 'left', 10, 10),
+#                    urwid.Divider(),
+                    urwid.Text("Description"),
+                    self.description,
+                    urwid.Divider(),
+                    urwid.GridFlow([
+                       urwid.AttrWrap(urwid.Button("Yes",self.do_button,
+                                                   (ui, "Yes")),'buttn','buttnf'),
+                       urwid.AttrWrap(urwid.Button("No",self.do_button,
+                                                   (ui, "No")),'buttn','buttnf'),
+                       ], 13,3,1, 'left')
+                    ])
+                )
+              , 'left', ('relative', 50), 80)
+            ui.top = urwid.AttrWrap(ui.top, 'body')
+            header = urwid.AttrWrap(
+                urwid.Text("Set annotation on current offset location.  "), 'header')
+            ui.top = urwid.Frame(ui.top , header = header)
+            self.top = ui.top
+            
 class Hexeditor:
     row_size = 25
     
@@ -409,7 +482,8 @@ class Hexeditor:
 
         ## These are the actions hooked to this gui
         self.actions = {None: Navigate()}
-        for action in [Help, SearchAction, Goto, IncrementalSearch, SlackAction]:
+        for action in [Help, SearchAction, Goto, IncrementalSearch,
+                       SlackAction, AnnotateOffset]:
             a = action(self)
             self.actions[a.mode] = a
 

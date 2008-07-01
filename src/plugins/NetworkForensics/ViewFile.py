@@ -63,15 +63,16 @@ class ViewFile(Reports.report):
         self.case = query['case']
 
         fsfd = FileSystem.DBFS( self.case)
-        if query.has_key('inode'):
-            fd = fsfd.open(inode=query['inode'])
-            inode_id = fd.lookup_id()
+        if query.has_key('inode_id'):
+            fd = fsfd.open(inode_id=query['inode_id'])
+            inode = fd.inode
+            inode_id = query['inode_id']
         elif query.has_key("sundry_id"):
             fd = FileSystem.File(query['case'], None, "HTTP%s" % query['sundry_id'])
             inode_id = -1
         else:
-            fd = fsfd.open(inode_id=query['inode_id'])
-            inode_id = query['inode_id']
+            fd = fsfd.open(inode=query['inode'])
+            inode_id = fd.lookup_id()
 
         content_type = self.guess_content_type(fd, query, inode_id)
         result.generator.content_type = content_type

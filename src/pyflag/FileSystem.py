@@ -767,7 +767,7 @@ class File:
                 return data
 
         except AttributeError,e:
-            raise IOError("No cached file: (%s)" % e )
+            raise IOError("(%s) No cached file: (%s)" % (self.inode, e ))
 
     def stat(self):
         """ Returns a dict of statistics about the content of the file. """
@@ -860,7 +860,7 @@ class File:
         new_query = FlagFramework.query_type(family ="Network Forensics",
                                              report ="ViewFile",
                                              case   =query['case'],
-                                             inode  =self.inode)
+                                             inode_id  =self.inode_id)
         
         result.result = "<iframe height='100%%' width='100%%' src='f?%s'></iframe>" % new_query
         

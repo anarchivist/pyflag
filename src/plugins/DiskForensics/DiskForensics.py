@@ -208,11 +208,12 @@ class ViewFile(Reports.report):
 
         fsfd = FileSystem.DBFS( query["case"])
         ## If this is a directory, only show the stats
-        if query.has_key('inode'):
-            fd = fsfd.open(inode=query['inode'])
-        else:
+        if query.has_key('inode_id'):
             fd = fsfd.open(inode_id=query['inode_id'])
+            fd.inode_id = query['inode_id']
             query['inode'] = fd.inode
+        else:
+            fd = fsfd.open(inode=query['inode'])
 
         if not fd: return
         image = Graph.Thumbnailer(fd,300)

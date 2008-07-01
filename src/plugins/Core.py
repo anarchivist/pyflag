@@ -128,6 +128,12 @@ class OffsetFile(FileSystem.File):
     def __init__(self, case, fd, inode):
         FileSystem.File.__init__(self, case, fd, inode)
 
+        ## By default we want to overread if possible
+        try:
+            fd.overread = fd.block_size
+            fd.slack = True
+        except AttributeError: pass
+        
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]
         tmp = tmp[1:].split(":")
@@ -166,9 +172,9 @@ class OffsetFile(FileSystem.File):
         available = self.size - self.readptr
         if length==None:
             length=available
-        else:
-            if length > available:
-                length = available
+        #else:
+            #if length > available:
+            #    length = available
 
         if(length<0): return ''
 
@@ -180,9 +186,16 @@ class OffsetFile(FileSystem.File):
     def explain(self, query, result):
         self.fd.explain(query,result)
 
-        result.row("Offset","Extract %s bytes from %s starting at byte %s" % (self.size,
-                                                                              self.fd.inode,
-                                                                              self.offset))
+        print self.offset, self.size
+
+        if self.size > 0:
+            extract = "Extract %s bytes starting at byte %s" % (self.size - self.offset,
+                                                                self.offset)
+        else:
+            extract = 'Extract %s bytes after end of file'\
+                      % (self.offset - self.fd.size)
+
+        result.row("Offset",extract)
 
 class Help(Reports.report):
     """ This facility displays helpful messages """

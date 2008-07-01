@@ -194,7 +194,11 @@ class less(ls):
         
         def execute(self):
             args=self.args
-            for arg in self.glob_files(args):
+            glob_files=self.glob_files(args)
+            if not glob_files:
+                yield "Error: No such file"
+                
+            for arg in glob_files:
                 fd=self.environment._FS.open(arg)
                 pipe=os.popen("less","w")
                 while 1:
