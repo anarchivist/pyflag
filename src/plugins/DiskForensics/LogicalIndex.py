@@ -38,6 +38,7 @@ import pyflag.DB as DB
 import pyflag.UI as UI
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType
 import pyflag.parser as parser
+import pyflag.Indexing as Indexing
 
 config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
@@ -55,8 +56,7 @@ class IndexStatsTables(FlagFramework.EventHandler):
         `inode_id` INT NOT NULL,
         `word_id` INT NOT NULL ,
         `offset` BIGINT NOT NULL,
-        `length` smallint not null,
-        `version` int not null
+        `length` smallint not null
         )""")
 
         dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
@@ -196,7 +196,7 @@ class IndexScan(GenScanFactory):
             
         def process_buffer(self,buff):
             # Store indexing results in the dbase
-            for offset, matches in self.outer.index.index_buffer(buff):
+            for offset, matches in self.outer.index.index_buffer(buff, unique=1):
                 # skip matches not starting in this file
                 if self.size > 0 and offset+self.offset > self.size:
                     #print "skipping a match in %s" % self.inode_id
@@ -382,10 +382,12 @@ class WordColumn(ColumnType):
     symbols = { '=': 'hit'}
     inactive = False
     
-    def __init__(self, name = 'Word', case=None):
+    def __init__(self, name = 'Word', case=None, filter='', where = '1'):
         self.case = case
+        self.filter = ''
+        self.table_where_clause = where
         ColumnType.__init__(self, column = 'word_id', name = name,
-                            table='LogicalIndexOffsets')
+                            table='LogicalIndexOffsets', case=case)
 
     def plain_display_hook(self, value, row, result):
         dbh = DB.DBO()
@@ -400,55 +402,87 @@ class WordColumn(ColumnType):
             result.text(word.decode("utf8"))
 
     display_hooks = [ plain_display_hook, ColumnType.link_display_hook ]
-    
+
+    def outstanding_inodes(self, new_word=False):
+        ## Remove any references to the LogicalIndexOffsets table
+        ## - this will allow us to count how many inodes are
+        ## involved in the re-indexing without making references
+        ## to this column type.
+        elements = [ e for e in self.elements if e.table != "LogicalIndexOffsets" ]
+
+        ## Calculate the new filter string
+        try:
+            new_filter_string = self.ui.defaults[self.filter]
+            sql = parser.parse_to_sql(new_filter_string,
+                                      elements, None)
+        except KeyError:
+            sql = '1'
+
+        tables = UI._make_join_clause(elements)
+        if new_word:
+            dbh=DB.DBO(self.case)
+            dbh.execute("select count(*) as c, sum(inode.size) as s %s "\
+                        "where (%s) and (%s)", (tables, sql,
+                                                self.table_where_clause))
+            row = dbh.fetch()
+            count , total = row['c'] , row['s']
+        else:
+            final_sql = "select inode.inode_id %s where (%s) and (%s)" % (tables, sql,
+                                                                          self.table_where_clause)
+            count, total = Indexing.count_outdated_inodes(self.case, final_sql)
+
+        return count, total, tables, sql
+            
     def operator_hit(self, column, operator, arg):
         """ Search for a hit in the dictionary """
+        ## Try to work out if we need to reindex:
+        reindex = False
         dbh = DB.DBO()
         dbh.execute("select id from dictionary where word = %r limit 1", arg)
         row = dbh.fetch()
-        if not row:
-            ## If there is nowhere to report the error - fall back to
-            ## a noop
-            #if not self.ui:
-            #    return "1"
 
-            ## Allow the user to reindex the currently selected set of
-            ## inodes with a new dictionary based on the new word
-            self.ui.heading("Word %r not found in dictionary" % arg)
-                
-            ## Remove any references to the LogicalIndexOffsets table
-            ## - this will allow us to count how many inodes are
-            ## involved in the re-indexing without making references
-            ## to this column type.
-            elements = [ e for e in self.elements if e.table != "LogicalIndexOffsets" ]
+        if self.ui:
+            ## If the word is not in the dictionary, we definitely want to reindex
+            if not row:
+                count, total, tables, sql = self.outstanding_inodes(new_word=True)
 
-            ## Calculate the new filter string
-            sql = parser.parse_to_sql(self.ui.defaults['filter'],
-                                      elements, None)
+            ## If the word is in the dictionary we want to know how may
+            ## inodes are outdated
+            else:
+                count, total, tables, sql = self.outstanding_inodes(new_word=False)
 
-            tables = UI._make_join_clause(elements)
-            final_sql = "%s where %s" % (tables, sql)
-            cdbh = DB.DBO(self.case)
-            cdbh.execute("select count(*) as c %s" % final_sql)
-            count = cdbh.fetch()['c']
-            cdbh.execute("select sum(inode.size) as s %s" % final_sql)
-            total = cdbh.fetch()['s']
+            ## Any inodes to process?
+            if count > 0:
+                reindex = True
 
-            self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))
-
-            ## Make up the link for the use:
-            link = FlagFramework.query_type(report = "Add Word", family = "Keyword Indexing",
-                                            case = self.case, tables = tables,
-                                            inode_sql = sql, word = arg)
+        ## We do not need to reindex - just do it
+        if not reindex:
+            return "(%s = %s)" % (self.escape_column_name(self.column),
+                                  row.get('id',0))
             
-            self.ui.link("Click here to scan these inodes", link,
-                         pane = 'self')
+        ## Allow the user to reindex the currently selected set of
+        ## inodes with a new dictionary based on the new word
+        self.ui.heading("Word %r not found in dictionary" % arg)
+        self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))
 
-            ## Ok - Show the error to the user:
-            raise self.ui
+        ## Make up the link for the use:
+        context = FlagFramework.STORE.put(dict(tables = tables,
+                                               inode_sql = sql,
+                                               previous_query = self.ui.defaults,
+                                               target = 'parent_pane',
+                                               where = self.table_where_clause
+                                               ))
 
-        return "(%s = %s)" % (self.escape_column_name(self.column),
-                              row['id'])
+        link = FlagFramework.query_type(report = "Add Word", family = "Keyword Indexing",
+                                        case = self.case,
+                                        context = context,
+                                        word = arg)
+
+        self.ui.link("Click here to scan these inodes", link,
+                     pane = 'self')
+
+        ## Ok - Show the error to the user:
+        raise self.ui
         
 class ClassColumn(WordColumn):
     """ This shows the class of the dictionary word """
@@ -511,29 +545,82 @@ class TableRenderer(UI.TableRenderer):
         original_render_tools(self, query, result)
         self.indexing_button(query, result)
 
+    def set_filter(self, query,result):        
+        ## If we get here - the word is ok
+        filter_expression = "Word = '%s'" % query['indexing_word']
+        try:
+            query.set(self.filter, "%s and %s" % (query[self.filter],
+                                                  filter_expression))
+        except KeyError:
+            query.set(self.filter, filter_expression)
+
+        ## Check that we can filter on the word as all:
+        print "where %s" % self.where
+        element = WordColumn(case = query['case'], filter=self.filter,
+                             where = self.where)
+        element.ui = result
+        element.elements = self.elements
+        element.operator_hit("Word", "=", query['indexing_word'])
+
     ## Install our toolbar button in the main Table renderer:
     def indexing_button(self, query, result):
         """ This adds a new column for the keyword hits """
-        new_query = query.clone()
-        if query.has_key("indexing_column"):
-            del new_query["indexing_column"]
+        ## This only makes sense when one of the columns is an inodeID table:
+        found = False
+        for e in self.elements:
+            if isinstance(e, InodeIDType):
+                found = True
+                break
 
+        if not found: return
+        
+        new_query = query.clone()
+        if query.has_key("indexing_word"):
+            new_query.clear("indexing_word")
+            new_query.clear(self.filter)
+            
             result.toolbar(link = new_query, icon="nosearch.png",
-                           tooltip = "Hide Index hits", pane = 'self')
+                           tooltip = "Hide Index hits", pane = 'pane')
 
         else:
-            new_query['indexing_column'] = 1            
-            result.toolbar(link = new_query, icon="search.png",
-                           tooltip = "Show Index hits", pane = 'self')
+            def index_word(query, result):
+                if query.has_key("indexing_word"):
+                    self.set_filter(query, result)
+                    result.refresh(0, query, 'parent_pane')
+                    return
+                
+                new_query = query.clone()
+                new_query.set('__target__','indexing_word')
+                
+                result.start_form(query, pane='self')
+                result.textfield("Keyword","indexing_word")
+                result.table(
+                    case = None,
+                    table = 'dictionary',
+                    elements = [ StringType('Word','word', link=new_query),
+                                 StringType('Class','class'),
+                                 StringType('Type','type') ],
+                    )
+                result.end_table()
+                result.end_form()
+
+            result.toolbar(cb=index_word, icon="search.png",
+                           tooltip = "Show Index hits", pane = 'popup')
 
     def render(self, query,result):
-        if query.has_key("indexing_column"):
-            print "Will add the indexing column"
-            self.elements.append(WordColumn(name='Word',
-                                            case = query['case']))
+        ## This essentially forces us to filter on word. Otherwise we
+        ## can not display the Preview (The queiry is likely to be
+        ## huge). FIXME: This is not a very good test (wont work if
+        ## Word is somewhere else in the filter string).
+        if query.has_key("indexing_word") and \
+               'Word' in query.get(self.filter,''):
+            
+            self.elements.append(WordColumn(name='Word', filter=self.filter,
+                                            case = query['case'],))
+            
             self.elements.append(DataPreview(name='Preview',
                                              case = query['case']))
-
+            
         original_render(self, query, result)
         
 ## Install the new updated table renderer:
@@ -576,8 +663,7 @@ class AddWords(Reports.report):
     parameters = { "word": "any", "case":"any",
                    "class": "any",
                    "type": "any",
-                   "inode_sql": "any",
-                   "tables": "any" }
+                   'cookie': 'any'}
 
     def form(self, query,result):
         result.textfield("Word to add", "word")
@@ -585,62 +671,70 @@ class AddWords(Reports.report):
         result.textfield('(Or create a new class:)','class_override')
         result.const_selector('Type:','type',('word','literal','regex'),('Word','Literal','RegEx'))
 
-        result.para("Will search for %s" % query['inode_sql'])
+        result.hidden("cookie", time.time(), exclusive=True)
         if query.has_key("class_override"):
             query['class'] = query['class_override']
             result.refresh(0, query)
 
+    def get_context(self,query):
+        try:
+            context_key = query['context']
+            try:
+                context = FlagFramework.STORE.get(query['context'])
+            except KeyError:
+                # context was provided but is not in store
+                raise ReportError("Context not valid - Is the session expired")
+
+        except KeyError:
+            ## Context was not provided
+            context = {}
+
+        return context
+
     def analyse(self, query):
-        pdbh = DB.DBO()
-
-        ## Insert the new word into the dictionary:
-        word_class = query.get('class_override', query['class'])
-        pdbh.insert('dictionary', **{
-            'word' : query['word'],
-            'class':  word_class,
-            'type':  query['type']})
-
-        ## Send a broadcast to tell all workers to rebuild their indexes:
-        pdbh.insert('jobs',
-                    command = "ReIndex",
-                    state = "broadcast",
-                    _fast = True
-                    )
-
-        ## Now schedule all their indexing tasks:
-        pdbh.mass_insert_start("jobs")
-        reindex()
+        context = self.get_context(query)
         
-        sql = "select inode.inode_id %s where %s and inode.version > %s" % (query['tables'],query['inode_sql'], INDEX_VERSION)
+        word_id = Indexing.insert_dictionary_word(query['word'], query['type'])
+        pdbh = DB.DBO()
+        sql = "select inode.inode_id as `inode_id` "\
+              "%s where (%s) and (%s)" % (context.get('tables',''),
+                                          context.get('inode_sql','1'),
+                                          context.get('where','1'))
 
-        dbh = DB.DBO(query['case'])
-        dbh.execute(sql)
-
-        cookie = int(time.time())
-        for row in dbh:
-            pdbh.mass_insert(
-                cookie = cookie,
-                command = "Index",
-                arg1 = query['case'],
-                arg2 = row['inode_id'])
-
-        pdbh.mass_insert_commit()
-        Farm.wake_workers()
-
+        Indexing.schedule_inode_index_sql(query['case'],
+                                          sql, word_id, query['cookie'])
+        
         ## Now wait here until everyone is finished:
         while 1:
-            pdbh.execute("select count(*) as c from jobs where cookie=%r", cookie)
+            pdbh.execute("select count(*) as c from jobs where cookie=%r",
+                         query['cookie'])
             row = pdbh.fetch()
+            self.rows_left = row['c']
             if row['c']==0: break
 
             time.sleep(1)
             
         return 1
 
+    def progress(self, query, result):
+        result.heading("Indexing Keywords")
+        pdbh = DB.DBO()
+        pdbh.execute("select count(*) as c from jobs where cookie=%r",
+                     query['cookie'])
+        row = pdbh.fetch()
+
+        result.para("There are %s inodes left" % row['c'])
+
     def display(self, query, result):
+        self.rows_left = 0
+        
         ## Make sure this report is not cached now so we can reissue
         ## the same query again:
         self.clear_cache(query)
+
+        context = self.get_context(query)
+        if context.has_key("previous_query"):
+            result.refresh(0, context['previous_query'], context['target'])
             
 import pyflag.Farm as Farm
 
@@ -680,8 +774,7 @@ class Index(Farm.Task):
         while 1:
             data = fd.read(1024*1024)
             if len(data)==0: break
-
-            print "unique is %s" % unique
+            
             for offset, matches in INDEX.index_buffer(data, unique = unique):
                 for id, length in matches:
                     dbh.mass_insert(

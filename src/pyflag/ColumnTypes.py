@@ -163,7 +163,7 @@ class ColumnType:
                  column=None, link='',
                  callback=None, link_pane='self',
                  regex = r"[^\s]+",
-                 boundary = r'\s+', case=None,
+                 boundary = r'\s+', case=None, default=None,
                  wrap=True, table=None, **kwargs
                  ):
         
@@ -182,6 +182,7 @@ class ColumnType:
         self.wrap = wrap
         self.table = table
         self.case = case
+        self.default = default
         
     ## These are the symbols which will be treated literally
     symbols = {
@@ -480,7 +481,10 @@ class IntegerType(ColumnType, LogParserMixin):
         return lambda row: int(row[self.column]) == integer
 
     def create(self):
-        return "`%s` int(11)" % self.column
+        if self.default!=None:
+            return "`%s` int(11) not null default %s" % (self.column, self.default)
+        else:
+            return "`%s` int(11)" % self.column
 
 class BigIntegerType(IntegerType):
     def create(self):

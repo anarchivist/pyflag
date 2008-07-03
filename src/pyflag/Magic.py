@@ -68,7 +68,7 @@ class MagicResolver:
                 max_score = [ scores[cls], cls]
                 
         ## Index the data using the indexer:
-        for offset, matches in self.indexer.index_buffer(data, unique=1):
+        for offset, matches in self.indexer.index_buffer(data, unique=0):
             for match in matches:
                 ## match is (rule_id, offset, length)
                 ## Thats the rule that matched:
