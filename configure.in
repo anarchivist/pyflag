@@ -120,18 +120,6 @@ AC_C_BIGENDIAN()
 # Large file support
 AC_SYS_LARGEFILE
 
-## Tell the use what we found:
-AC_MSG_NOTICE([])
-AC_MSG_NOTICE([*****************************************])
-AC_MSG_NOTICE([PyFlag ${PACKAGE} ${VERSION} configuration])
-AC_MSG_NOTICE([EWF Support:             $have_libewf ])
-AC_MSG_NOTICE([AFF Support:             $have_libafflib ])
-AC_MSG_NOTICE([MaxMind GeoIP:           $have_geoip ])
-AC_MSG_NOTICE([Advanced JpegCarving:    $have_libjpeg ])
-AC_MSG_NOTICE([*****************************************])
-AC_MSG_NOTICE([])
-
-
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 
@@ -164,3 +152,16 @@ AC_OUTPUT([
 	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/fs/Makefile
 	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/hashdb/Makefile
 	])
+
+## Tell the use what we found:
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([*****************************************])
+AC_MSG_NOTICE([PyFlag ${PACKAGE} ${VERSION} configuration])
+AC_MSG_NOTICE([EWF Support:             $have_libewf ])
+AC_MSG_NOTICE([AFF Support:             $have_libafflib ])
+AC_MSG_NOTICE([MaxMind GeoIP:           $have_geoip ])
+AC_MSG_NOTICE([Advanced JpegCarving:    $have_libjpeg ])
+AC_MSG_NOTICE([*****************************************])
+AC_MSG_NOTICE([])
+
+

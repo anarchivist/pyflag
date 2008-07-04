@@ -3,21 +3,38 @@
 #include "network.h"
 #include "pypacket.h"
 
-/** If we do not see anything from a stream within this many packets
+// This is the reassembler configuration space.
+struct reassembler_configuration_t
+{
+   /** If we do not see anything from a stream within this many packets
     we determine it to be dead. 
-*/
-#define MAX_PACKETS_EXPIRED 10000
+    */
+   int max_packets_expired;
 
-/** This limits the total number of simulatneous streams we are
+   /** This limits the total number of simulatneous streams we are
     tracking.
-
+    * 
     If the number of streams is exceeded, old ones are
     purged. Whenever a stream is touched, it is considered new, but
     only if it has at least MINIMUM_STREAM_SIZE in it. (Otherwise we
     would be purged by portscans etc).
-*/
-#define MAX_NUMBER_OF_STREAMS 1000
-#define MINIMUM_STREAM_SIZE 100
+    */
+   int max_number_of_streams;
+   int minimum_stream_size;
+
+   // This is the total number of packets we are willing to hold
+   // onto. Any more and we need to expire packets
+   int max_outstanding_skbuffs;
+   
+   // The following are global counters which are maintained in order
+   // to keep memory usage under control
+   int total_streams;
+   int total_outstanding_skbuffs;
+
+  // This is used to collect stats about the number of python
+  // connection objects allocated
+  long int stream_connection_objects;
+} reassembler_configuration;
 
 struct tuple4
 {

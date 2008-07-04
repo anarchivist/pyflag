@@ -91,7 +91,7 @@ static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args, PyObj
 					  &data, &unique)) 
     return NULL;
   
-  //printf("Indexing not uniquely %u\n", unique);
+  printf("Indexing not uniquely %u\n", unique);
   if(unique) {
     if(!self->set) 
       self->set = PySet_New(NULL);

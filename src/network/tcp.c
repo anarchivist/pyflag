@@ -7,11 +7,21 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/** 
-    We keep count of the total number of streams we are currenrtly
-    keeping track of.
-*/
-static int _total_streams=0;
+
+struct reassembler_configuration_t reassembler_configuration = {
+   .max_packets_expired  = 10000,
+   .max_number_of_streams=  1000,
+   .minimum_stream_size  =   100,
+   .max_outstanding_skbuffs = 100000,
+
+   // The below are global accounting
+   .total_outstanding_skbuffs=0,
+   .total_streams=0,
+
+   // This is used to collect stats about the number of python
+   // connection objects allocated
+   .stream_connection_objects=0
+};
 
 TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr, int con_id) {
   memcpy(&self->addr, addr, sizeof(*addr));
@@ -20,7 +30,7 @@ TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr, int con_id) {
   con_id++;
 
   INIT_LIST_HEAD(&(self->queue.list));
-  _total_streams++;
+  reassembler_configuration.total_streams++;
 
   return self;
 };
@@ -77,7 +87,7 @@ void pad_to_first_packet(TCPStream self) {
 */
 int destroy_object(void *buff) {
   struct skbuff *new = (struct skbuff *)buff;
-
+  reassembler_configuration.total_outstanding_skbuffs--;
   Py_DECREF(new->packet);
   return 0;
 };
@@ -106,7 +116,8 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
   }
 
   new = talloc(self, struct skbuff);
-
+  reassembler_configuration.total_outstanding_skbuffs++;
+   
   /** This is the location after which we insert the new structure */
   candidate = &(self->queue.list);
 
@@ -226,7 +237,7 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
 	packet is further than window ahead of the first packet in the
 	list.
     */
-    if(self->state == PYTCP_DATA){
+    if(self->state == PYTCP_DATA || self->state == PYTCP_RETRANSMISSION){
       struct skbuff *first,*last;
       /** This is the last packet stored */
       TCP tcp_last,tcp;
@@ -303,7 +314,7 @@ int TCPStream_flush(void *this) {
   list_del(&(self->reverse->global_list));
 
   // Keep count of our streams
-  _total_streams-=2;
+  reassembler_configuration.total_streams-=2;
 
   return 0;
 };
@@ -385,12 +396,12 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
 	  list and put it at the top of the list - this keeps the list
 	  ordered wrt the last seen time 
       */
-      if(1 || i->total_size > MINIMUM_STREAM_SIZE) {
+      if(1 || i->total_size > reassembler_configuration.minimum_stream_size) {
 	list_del(&(i->global_list));
 	list_add(&(i->global_list), &(self->sorted->global_list));
       };
 
-      if(1 || i->reverse->total_size > MINIMUM_STREAM_SIZE) {
+      if(1 || i->reverse->total_size > reassembler_configuration.minimum_stream_size) {
 	list_del(&(i->reverse->global_list));
 	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
       };
@@ -409,12 +420,12 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   list_for_each_entry(i, &(self->table[reverse_hash]->list), list) {
     if(!memcmp(&(i->addr),&reverse, sizeof(reverse))) {
       /** Readjust the order of the global list */
-      if(1 || i->total_size > MINIMUM_STREAM_SIZE) {
+      if(1 || i->total_size > reassembler_configuration.minimum_stream_size) {
 	list_del(&(i->global_list));
 	list_add(&(i->global_list), &(self->sorted->global_list));
       };
 
-      if(1 || i->reverse->total_size > MINIMUM_STREAM_SIZE) {
+      if(1 || i->reverse->total_size > reassembler_configuration.minimum_stream_size) {
 	list_del(&(i->reverse->global_list));
 	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
 	return i->reverse;
@@ -462,7 +473,7 @@ static void check_for_expired_packets(TCPHashTable self, int id) {
   for(k=0; k<TCP_STREAM_TABLE_SIZE; k++) {
     list_for_each_entry(i, &(self->table[k]->list),list) {
       if(i->direction == TCP_FORWARD && 
-	 i->max_packet_id + MAX_PACKETS_EXPIRED < id) {
+	 i->max_packet_id + reassembler_configuration.max_packets_expired < id) {
 	talloc_free(i);
 	break;
       };
@@ -484,6 +495,23 @@ static void TCPHashTable_flush(TCPHashTable self) {
       };
     };
   };
+};
+
+// Expires the older stream
+static void expire_oldest_stream(TCPHashTable self) 
+{
+   TCPStream x;
+   
+   list_for_each_entry_prev(x, &(self->sorted->global_list), global_list) {
+      if(x->direction == TCP_FORWARD) {
+	//printf("Total streams exceeded %u - proceesing %u, freeing %u\n", 
+	//       _total_streams, i->con_id, x->con_id);
+    	talloc_free(x);
+	 // Freeing the above will remove at least 2 streams from the
+	 // list, which means its no longer safe to recurse over it!!!
+	return;
+      };
+   };   
 };
 
 int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
@@ -530,23 +558,13 @@ int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
   /** If we are keeping track of too many streams we need to expire
       them:
   **/
-  if(_total_streams > MAX_NUMBER_OF_STREAMS) {
-    TCPStream x;
-
-    list_for_each_entry_prev(x, &(self->sorted->global_list), global_list) {
-      if(x->direction == TCP_FORWARD) {
-	//printf("Total streams exceeded %u - proceesing %u, freeing %u\n", 
-	//       _total_streams, i->con_id, x->con_id);
-    	talloc_free(x);
-	// Freeing the above will remove at least 2 streams from the
-	// list, which means its no longer safe to recurse over it!!!
-	break;
-      };
-    };
+   if(reassembler_configuration.total_streams > reassembler_configuration.max_number_of_streams ||
+     reassembler_configuration.total_outstanding_skbuffs > reassembler_configuration.max_outstanding_skbuffs) {
+     expire_oldest_stream(self);
   };
 
   self->packets_processed++;
-  if(self->packets_processed > 2*MAX_PACKETS_EXPIRED) {
+  if(self->packets_processed > 2*reassembler_configuration.max_packets_expired) {
     check_for_expired_packets(self,ip->id);
     self->packets_processed=0;
   };

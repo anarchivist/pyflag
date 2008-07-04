@@ -36,6 +36,7 @@ static void callback(TCPStream self, PyPacket *dissected) {
       self->stream_object = PyDict_New();
       self->reverse->stream_object = PyDict_New();
 
+      reassembler_configuration.stream_connection_objects++;
       PyDict_SetItemString(self->stream_object, "reverse", self->reverse->stream_object);
       PyDict_SetItemString(self->reverse->stream_object, "reverse", self->stream_object);
     };
@@ -93,7 +94,8 @@ static void callback(TCPStream self, PyPacket *dissected) {
     if(self->stream_object) {
       PyDict_Clear(self->stream_object);
       PyDict_Clear(self->reverse->stream_object);
-
+      
+      reassembler_configuration.stream_connection_objects--;
       Py_DECREF(self->stream_object);
       Py_DECREF(self->reverse->stream_object);
       self->stream_object = NULL;
