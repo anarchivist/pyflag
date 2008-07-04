@@ -268,7 +268,7 @@ class DBFS(FileSystem):
         ## Basically this is how this function works - if root_inode
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Creating new VFS node %s at %s" % (inode, new_filename))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, DB.expand("Creating new VFS node %s at %s", (inode, new_filename)))
         if root_inode:
             try:
                 path, root_inode, tmp_inode_id = self.lookup(inode = root_inode)

@@ -172,9 +172,9 @@ class OffsetFile(FileSystem.File):
         available = self.size - self.readptr
         if length==None:
             length=available
-        #else:
-            #if length > available:
-            #    length = available
+        elif not self.overread:
+            if length > available:
+                length = available
 
         if(length<0): return ''
 

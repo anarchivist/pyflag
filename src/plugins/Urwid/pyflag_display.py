@@ -27,8 +27,13 @@ import os
 import sys
 import signal
 import random
-import urwid.util
 import glob
+
+try:
+	import urwid.util
+except ImportError:
+	pass
+
 
 _js_code = r"""
 // Urwid web (CGI/Asynchronous Javascript) display module

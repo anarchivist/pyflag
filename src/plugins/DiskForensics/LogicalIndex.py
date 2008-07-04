@@ -281,7 +281,8 @@ class BuildDictionary(Reports.report):
                     
             elif query['action']=='delete':
                 dbh.delete("dictionary", _fast = True,
-                           where="word=%r and type=%r" % (query['word'],query['type']))
+                           where=DB.expand("word=%r and type=%r",
+                                           (query['word'],query['type'])))
                                 
         except KeyError:
             pass
@@ -350,10 +351,11 @@ class DataPreview(ColumnType):
         self.width =width
 
     def select(self):
-        return "concat(%s,',', %s,',', %s)" % (self.escape_column_name("offset"),
-                                       self.escape_column_name("inode_id"),
-                                       self.escape_column_name("length"))
-    
+        return DB.expand("concat(%s,',', %s,',', %s)",
+                         (self.escape_column_name("offset"),
+                          self.escape_column_name("inode_id"),
+                          self.escape_column_name("length")))
+                         
     def display(self, value, row, result):
         ## We expect ints from the DB - do nothing otherwise
         try:
@@ -427,8 +429,9 @@ class WordColumn(ColumnType):
             row = dbh.fetch()
             count , total = row['c'] , row['s']
         else:
-            final_sql = "select inode.inode_id %s where (%s) and (%s)" % (tables, sql,
-                                                                          self.table_where_clause)
+            final_sql = DB.expand("select inode.inode_id %s where (%s) and (%s)",
+                                  (tables, sql,
+                                   self.table_where_clause))
             count, total = Indexing.count_outdated_inodes(self.case, final_sql)
 
         return count, total, tables, sql
@@ -457,8 +460,9 @@ class WordColumn(ColumnType):
 
         ## We do not need to reindex - just do it
         if not reindex:
-            return "(%s = %s)" % (self.escape_column_name(self.column),
-                                  row.get('id',0))
+            return DB.expand("(%s = %s)",
+                             (self.escape_column_name(self.column),
+                              row.get('id',0)))
             
         ## Allow the user to reindex the currently selected set of
         ## inodes with a new dictionary based on the new word
@@ -492,7 +496,8 @@ class ClassColumn(WordColumn):
         self.dict_column = 'class'
 
     def where(self):
-        return "(substring((select class from `%s`.dictionary where id=`%s`),1,1)!='_')" % (config.FLAGDB, self.column)
+        return DB.expand("(substring((select class from `%s`.dictionary "
+                         "where id=`%s`),1,1)!='_')",(config.FLAGDB, self.column))
 
 class SearchIndex(Reports.report):
     """ Search for indexed keywords """
@@ -547,7 +552,7 @@ class TableRenderer(UI.TableRenderer):
 
     def set_filter(self, query,result):        
         ## If we get here - the word is ok
-        filter_expression = "Word = '%s'" % query['indexing_word']
+        filter_expression = DB.expand("Word = '%s'", (query['indexing_word']))
         try:
             query.set(self.filter, "%s and %s" % (query[self.filter],
                                                   filter_expression))
@@ -659,6 +664,7 @@ class AddWords(Reports.report):
     family = 'Keyword Indexing'
     name = "Add Word"
     description = "Add a new word to the dictionary and scan selected inodes "
+    hidden = True
     
     parameters = { "word": "any", "case":"any",
                    "class": "any",
@@ -696,10 +702,10 @@ class AddWords(Reports.report):
         
         word_id = Indexing.insert_dictionary_word(query['word'], query['type'])
         pdbh = DB.DBO()
-        sql = "select inode.inode_id as `inode_id` "\
-              "%s where (%s) and (%s)" % (context.get('tables',''),
-                                          context.get('inode_sql','1'),
-                                          context.get('where','1'))
+        sql = DB.expand("select inode.inode_id as `inode_id` "\
+                        "%s where (%s) and (%s)", (context.get('tables',''),
+                                                   context.get('inode_sql','1'),
+                                                   context.get('where','1')))
 
         Indexing.schedule_inode_index_sql(query['case'],
                                           sql, word_id, query['cookie'])
@@ -902,7 +908,8 @@ class LogicalIndexTests(unittest.TestCase):
             for id , length in matches:
                 word = dictionary[id]
                 matched = data[offset:offset+length]
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "word: %r matched %r" % (word,matched))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, DB.expand("word: %r matched %r",
+                                                                 (word,matched)))
                 try:
                     del expected[id][expected[id].index(matched)]
                 except ValueError:
