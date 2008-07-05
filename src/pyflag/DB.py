@@ -95,6 +95,8 @@ conv = MySQLdb.converters.conversions.copy()
 ## Remove those conversions which we do not want:
 del conv[FIELD_TYPE.TIMESTAMP]
 del conv[FIELD_TYPE.DATETIME]
+del conv[FIELD_TYPE.DECIMAL]
+del conv[FIELD_TYPE.NEWDECIMAL]
 del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]

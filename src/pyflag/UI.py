@@ -603,8 +603,8 @@ class TableRenderer:
                 del new_query[self.filter]
 
                 # Make it reset the limit
-                if new_query.has_key(self.limit_context):
-                    del new_query[self.limit_context]
+                new_query.clear(self.limit_context)
+                new_query.clear('indexing_word')
 
                 result.toolbar(link=new_query, icon='clear_filter.png', 
                                tooltip='Click here to clear the filter',

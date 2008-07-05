@@ -18,9 +18,10 @@ any time, without affecting previous indexes. This is achieved through
 the concept of dictionary versioning.
 
 When a new word is added to the dictionary, the dictionary version is
-incremented. When an inode is indexed, the inode table maintains
-versioning information within the version column. This keeps a current
-view of the level of indexing applied to the inode.
+incremented - and the version is assigned for this word. When an inode
+is indexed, the inode table maintains versioning information within
+the version column. This keeps a current view of the level of indexing
+applied to the inode.
 
 The version number is an unsigned int (32 bits). Bit 30 (MSB) is 0 if
 the index is unique and 1 if a detailed index was performed on the
@@ -63,41 +64,50 @@ def inode_upto_date_sql(case, sql, unique = False):
     try:
         dbh.execute("select version, desired_version from inode where %s limit 1" ,sql)
     except DB.DBError:
+        ## Check for older schemas
         dbh.execute("alter table inode add column desired_version int")
 
     row = dbh.fetch()
-
-    print row
+    
     return row['version'] >= row['desired_version']
 
-def get_dict_version():
+def get_dict_version(word_id = None):
     pdbh = DB.DBO()
-    try:
-        dict_version = int(pdbh.get_meta('dict_version'))
-    except:
-        dict_version = 1
+    if word_id == None:
+        try:
+            pdbh.execute("select max(id) as version from dictionary")
+            row = pdbh.fetch()
+            return row['version'] or 1
+        except:
+            return 1
+    else:
+        return word_id
+    
+def is_word_in_dict(word):
+    pdbh = DB.DBO()
+    pdbh.execute("select * from dictionary where word=%r", word)
+    row = pdbh.fetch()
+    return row
 
-    return dict_version
-
-def insert_dictionary_word(word, word_type):
-    dict_version = get_dict_version()
+def insert_dictionary_word(word, word_type, classification=''):
     pdbh = DB.DBO()
     ## Is the word in the dictionary?
     pdbh.execute("select * from dictionary where word = %r and type = %r",
                  word, word_type)
     row = pdbh.fetch()
     if not row:
-        ## The word is not in the dictionary - add it
+        dict_version = get_dict_version()
+
+        ## The word is not in the dictionary - add it and increment
+        ## the dictionary version
         pdbh.insert('dictionary',
-                    word = word,
-                    type = word_type,
-                    )
+                    **{'word': word,
+                       'type': word_type,
+                       'version': dict_version+1,
+                       'class': classification
+                       })
 
         word_id = pdbh.autoincrement()
-        ## Increment the dictionary version
-        dict_version += 1
-        pdbh.set_meta('dict_version', dict_version)
-
         ## Tell all workers the dictionary has changed
         pdbh.insert('jobs',
                     command = "ReIndex",
@@ -106,6 +116,7 @@ def insert_dictionary_word(word, word_type):
                     )
     else:
         word_id = row['id']
+        dict_version = row['version']
         
     return word_id, dict_version
 
@@ -132,23 +143,44 @@ def schedule_index(case, inode_ids, word, word_type, unique=True):
     ## Wake the workers:
     Farm.wake_workers()
 
-def count_outdated_inodes(case, sql, unique=True):
-    dict_version = get_dict_version()
+def count_outdated_inodes(case, sql, word_id=None, unique=True):
+    """ This function counts the number of inodes outstanding to be scanned.
 
-    ## If we want detailed scan we want to set bit 30 of the dict_version
-    if not unique:
-        desired_version = dict_version | 2**30
-    else:
-        desired_version = dict_version
+    sql is a subquery which is expected to return a list of inode_ids.
 
-    ## Now check the inode to see if its out dated
-    dbh = DB.DBO(case)
-    dbh.execute("select count(*) as c, sum(inode.size) as s from inode where (version < %r or "
-                " (version & (pow(2,30) -1)) < %r ) "
-                " and (inode.inode_id in (%s))" ,
-                dict_version, desired_version, sql)
+    word_id is the word which we count the outdated inodes with
+    respect to. If word_id is None, or omitted we simply count all
+    inodes in the sql provided.
     
+    unique is the type of index (a unique index of a detailed index).
+    """
+    dbh = DB.DBO(case)
+
+    print "Checking word_id %s,%s" % (word_id,sql)
+
+    if word_id==None:
+        dbh.execute("select count(*) as c, sum(inode.size) as s %s",sql)
+    else:
+        ## The dict_version is relative to the word searched (i.e. the
+        ## version the dictionary was in at the time the word was added).
+        dict_version = get_dict_version(word_id)
+
+        ## If we want detailed scan we want to set bit 30 of the dict_version
+        if not unique:
+            desired_version = dict_version | 2**30
+        else:
+            desired_version = dict_version
+
+        ## Now check the inode to see if its out dated
+        dbh.execute("select count(*) as c, sum(inode.size) as s "
+                    " from inode where (version < %r or "
+                    " (version & (pow(2,30) -1)) < %r ) "
+                    " and (inode.inode_id in (select inode.inode_id %s))" ,
+                    dict_version, desired_version, sql)
+
     row=dbh.fetch()
+    print row
+    
     return row['c'], row['s']
 
 def schedule_inode_index_sql(case, sql, word_id, cookie='', unique=True):
@@ -164,11 +196,12 @@ def schedule_inode_index_sql(case, sql, word_id, cookie='', unique=True):
     dbh = DB.DBO(case)
     dbh2 = DB.DBO(case)
     pdbh = DB.DBO()
-    dbh.execute("select inode_id from inode where (version < %r or "
+    dbh.execute("select inode_id from "
+                " inode where (version < %r or "
                 " (version & (pow(2,30) -1)) < %r ) "
                 " and (inode_id in (%s))" ,
                 dict_version, desired_version, sql)
-
+    
     for row in dbh:
         dbh2.update('inode',
                    where = "inode_id = %s" % row['inode_id'],
@@ -185,7 +218,7 @@ def schedule_inode_index_sql(case, sql, word_id, cookie='', unique=True):
                                             # want to be in
     ## Wake the workers:
     Farm.wake_workers()
-    
+
 def list_hits(case, inode_id, word, start=None, end=None):
     """ Returns a generator of hits of the word within the inode
     between offset start and end (these are inode offsets."""

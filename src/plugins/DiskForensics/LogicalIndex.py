@@ -77,18 +77,12 @@ class IndexScan(GenScanFactory):
         name = "General Forensics"
         contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
         default = True
-
-    def check_version(self):
-        pydbh = DB.DBO()
-        pydbh.execute("select max(id) as version from dictionary")
-        row = pydbh.fetch()
-        return row['version']
-    
+        
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
         self.index = index.Index(unique=1)
-        self.version = self.check_version()
+        self.version = Indexing.get_dict_version()
         
         pydbh = DB.DBO(None)
         #Do word index (literal) prep
@@ -168,7 +162,7 @@ class IndexScan(GenScanFactory):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
             ## Check we are operating with the correct dictionary version
-            if self.outer.version != self.outer.check_version():
+            if self.outer.version != Indexing.get_dict_version():
                 self.outer.prepare()
 
             ## Make sure the index is fresh:
@@ -237,6 +231,7 @@ class IndexEventHandler(FlagFramework.EventHandler):
         `class` VARCHAR( 50 ) NOT NULL ,
         `encoding` SET( 'all', 'ascii', 'ucs16' ) DEFAULT 'all' NOT NULL,
         `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
+        `version` int not null default 0,
         PRIMARY KEY  (`id`))""")
         
  
@@ -261,34 +256,41 @@ class BuildDictionary(Reports.report):
         except KeyError:
             pass
 
+        status = ''
         ## Do we need to add a new entry:
         try:
             if len(query['word'])<3:
                 raise DB.DBError("Word is too short to index, minimum of 3 letter words")
             
             if query['action']=='insert':
-                if len(query['class'])<3:
-                    raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
-                ## We only insert into the dictionary if the word is
-                ## not in there already:
-                dbh.execute("select * from dictionary where word=%r limit 1",(query['word']))
-                row = dbh.fetch()
-                if not row:
-                    dbh.insert("dictionary",
-                               **{'word': query['word'],
-                                  'class': query['class'],
-                                  'type': query['type']})
-                    
+                try:
+                    if len(query['class'])<3:
+                        raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
+                except KeyError:
+                    status = "Classification missing or too short"
+                    raise
+                
+                Indexing.insert_dictionary_word(query['word'], query['type'],
+                                                query['class'])
+                status = "Added word %s to dictionary" % query['word']
+                   
             elif query['action']=='delete':
-                dbh.delete("dictionary", _fast = True,
+                ## FIXME: Handle deletion properly
+                dbh.delete("dictionary", 
                            where=DB.expand("word=%r and type=%r",
                                            (query['word'],query['type'])))
-                                
-        except KeyError:
+                status = "Deleted word %s from dictionary" % query['word']
+                
+        except KeyError,e:
             pass
+        
         except DB.DBError,e:
             result.text("Error: %s" % e,style='red')
             result.text("",style='black')
+
+        if status:
+            result.text(status, style='red')
+            result.text("", style='black')
             
         result.heading("Building Dictionary")
 
@@ -386,7 +388,7 @@ class WordColumn(ColumnType):
     
     def __init__(self, name = 'Word', case=None, filter='', where = '1'):
         self.case = case
-        self.filter = ''
+        self.filter = filter
         self.table_where_clause = where
         ColumnType.__init__(self, column = 'word_id', name = name,
                             table='LogicalIndexOffsets', case=case)
@@ -405,7 +407,7 @@ class WordColumn(ColumnType):
 
     display_hooks = [ plain_display_hook, ColumnType.link_display_hook ]
 
-    def outstanding_inodes(self, new_word=False):
+    def outstanding_inodes(self, word_id=None):
         ## Remove any references to the LogicalIndexOffsets table
         ## - this will allow us to count how many inodes are
         ## involved in the re-indexing without making references
@@ -421,18 +423,10 @@ class WordColumn(ColumnType):
             sql = '1'
 
         tables = UI._make_join_clause(elements)
-        if new_word:
-            dbh=DB.DBO(self.case)
-            dbh.execute("select count(*) as c, sum(inode.size) as s %s "\
-                        "where (%s) and (%s)", (tables, sql,
-                                                self.table_where_clause))
-            row = dbh.fetch()
-            count , total = row['c'] , row['s']
-        else:
-            final_sql = DB.expand("select inode.inode_id %s where (%s) and (%s)",
-                                  (tables, sql,
-                                   self.table_where_clause))
-            count, total = Indexing.count_outdated_inodes(self.case, final_sql)
+        final_sql = DB.expand("%s where (%s) and (%s)",
+                              (tables, sql,
+                               self.table_where_clause))
+        count, total = Indexing.count_outdated_inodes(self.case, final_sql, word_id=word_id)
 
         return count, total, tables, sql
             
@@ -447,12 +441,14 @@ class WordColumn(ColumnType):
         if self.ui:
             ## If the word is not in the dictionary, we definitely want to reindex
             if not row:
-                count, total, tables, sql = self.outstanding_inodes(new_word=True)
-
+                count, total, tables, sql = self.outstanding_inodes()
+                message = "Word %s is not in the dictionary" % arg
+                
             ## If the word is in the dictionary we want to know how may
             ## inodes are outdated
             else:
-                count, total, tables, sql = self.outstanding_inodes(new_word=False)
+                count, total, tables, sql = self.outstanding_inodes(word_id = row['id'])
+                message = "There are some inodes which are not up to date"
 
             ## Any inodes to process?
             if count > 0:
@@ -466,7 +462,7 @@ class WordColumn(ColumnType):
             
         ## Allow the user to reindex the currently selected set of
         ## inodes with a new dictionary based on the new word
-        self.ui.heading("Word %r not found in dictionary" % arg)
+        self.ui.heading(message)
         self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))
 
         ## Make up the link for the use:
@@ -560,9 +556,9 @@ class TableRenderer(UI.TableRenderer):
             query.set(self.filter, filter_expression)
 
         ## Check that we can filter on the word as all:
-        print "where %s" % self.where
         element = WordColumn(case = query['case'], filter=self.filter,
                              where = self.where)
+
         element.ui = result
         element.elements = self.elements
         element.operator_hit("Word", "=", query['indexing_word'])
@@ -614,12 +610,12 @@ class TableRenderer(UI.TableRenderer):
 
     def render(self, query,result):
         ## This essentially forces us to filter on word. Otherwise we
-        ## can not display the Preview (The queiry is likely to be
+        ## can not display the Preview (The query is likely to be
         ## huge). FIXME: This is not a very good test (wont work if
         ## Word is somewhere else in the filter string).
         if query.has_key("indexing_word") and \
                'Word' in query.get(self.filter,''):
-            
+
             self.elements.append(WordColumn(name='Word', filter=self.filter,
                                             case = query['case'],))
             
@@ -639,7 +635,7 @@ def reindex():
     global INDEX, INDEX_VERSION
     print "Rebuilding index"
     dbh = DB.DBO()
-    INDEX_VERSION = dbh.get_meta('dict_version') or 1
+    INDEX_VERSION = Indexing.get_dict_version()
     dbh.execute("select word,id,type from dictionary")
     INDEX = index.Index()
     for row in dbh:
@@ -672,6 +668,16 @@ class AddWords(Reports.report):
                    'cookie': 'any'}
 
     def form(self, query,result):
+        ## If the new word is already in the dictionary just analyse
+        ## it
+        try:
+            if Indexing.is_word_in_dict(query['word']):
+                query['cookie'] = time.time()
+                query.default('class', "English")
+                query.default('type', "word")
+                result.refresh(0, query)
+        except KeyError: pass
+        
         result.textfield("Word to add", "word")
         result.selector('Classification:','class','select class as `key`,class as `value` from dictionary group by class order by class',())
         result.textfield('(Or create a new class:)','class_override')
@@ -680,6 +686,7 @@ class AddWords(Reports.report):
         result.hidden("cookie", time.time(), exclusive=True)
         if query.has_key("class_override"):
             query['class'] = query['class_override']
+            ## Refresh ourselves to update to the new class name
             result.refresh(0, query)
 
     def get_context(self,query):
@@ -708,7 +715,7 @@ class AddWords(Reports.report):
                                                    context.get('where','1')))
 
         Indexing.schedule_inode_index_sql(query['case'],
-                                          sql, word_id, query['cookie'])
+                                          sql, word_id, query['cookie'], unique=True)
         
         ## Now wait here until everyone is finished:
         while 1:
@@ -756,7 +763,7 @@ class Index(Farm.Task):
         if not INDEX: reindex()
 
         try:
-            desired_version = args[0]
+            desired_version = int(args[0])
         except:
             desired_version = INDEX_VERSION
 
@@ -780,7 +787,7 @@ class Index(Farm.Task):
         while 1:
             data = fd.read(1024*1024)
             if len(data)==0: break
-            
+
             for offset, matches in INDEX.index_buffer(data, unique = unique):
                 for id, length in matches:
                     dbh.mass_insert(
@@ -1037,3 +1044,12 @@ class HashTrieIndexTests(unittest.TestCase):
                         count+=1
 
             print "Indexed file in %s seconds (%s hits)" % (time.time() - new_t, count)
+
+## This code checks for fields in the dictionary table which were not
+## present in previous schemas - we try to upgrade the schema then.
+pdbh = DB.DBO()
+try:
+    pdbh.execute("select version from dictionary limit 1")
+    row = pdbh.fetch()
+except:
+    pdbh.execute("alter table dictionary add version int not null default 0")
