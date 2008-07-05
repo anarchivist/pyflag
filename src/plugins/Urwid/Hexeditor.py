@@ -233,6 +233,17 @@ class Navigate(Action):
         ui.update_status_bar()
         Action.draw(self, ui)
 
+    def highlight(self, ui, offset, length, refreshed):
+        """ This callback is used to handle highlighting of constant
+        strings which have been passed in the constructor.
+        """
+        if ui.highlights:
+            for file_offset, hilight_length, type in ui.highlights:
+                if file_offset > offset and file_offset < offset + length:
+                    ui.overlay[file_offset - offset: \
+                               file_offset - offset + hilight_length] = \
+                               [type,] * hilight_length
+
 class Help(Action):
     mode = 'help'
     event = 'h'
@@ -512,28 +523,6 @@ class Hexeditor:
         """ Sets the mode which will be fired when key is pressed. """
         self.actions[None].events[key] = mode
 
-    ## These call backs are used to alter the current hilighting
-    ## overlay - this allows us to highlight various bits of text for
-    ## different purposes.
-    def constant_highlighter(self, offset, length, fresh=False):
-        """ This callback is used to handle highlighting of contant
-        strings which have been passed in the constructor.
-
-        offset and length represent the current view port into the
-        file.  The fresh flag indicates if the current overlay is
-        brand new. We can skip updating it if its not brand new.
-        """
-        if not fresh: return
-        
-        if self.highlights:
-            for file_offset, hilight_length, type in self.highlights:
-                if file_offset > offset and file_offset < offset + length:
-                    self.overlay[file_offset - offset: \
-                                 file_offset - offset + hilight_length] = \
-                                 [type,] * hilight_length
-
-    highlighter_cbs = [ constant_highlighter, ]
-
     def cache_screen(self):
         ## This flag indicates if the cache was refreshed - this
         ## allows highlighters to skip updating the overlay if their
@@ -724,6 +713,14 @@ def hexedit(self, query, result):
     screen = Hexeditor(self)
     generator = screen.run()
     generator.next()
+
+    ## We need to set the initial offset
+    screen.mark = int(query.get('offset',0))
+
+    ## And any highlights required
+    h = query.getarray('highlight')
+    l = query.getarray('highlight_length')
+    screen.highlights = [ (int(h[i]), int(l[i]), 8) for i in range(len(h)) ] 
 
     def urwid_cb(query, result):
         result.decoration = "raw"

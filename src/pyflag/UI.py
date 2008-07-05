@@ -720,7 +720,7 @@ class TableRenderer:
         query_str += "where (%s and (%s)) " % (" and ".join(w), filter_str)
 
         if self.groupby:
-            query_str += "group by `%s` " % self.groupby
+            query_str += "group by %s " % DB.escape_column_name(self.groupby)
         elif self._groupby:
             query_str += "group by %s " % self.groupby
             

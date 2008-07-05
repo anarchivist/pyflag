@@ -88,9 +88,10 @@ class TypeChecker:
 
     def numeric(self,field,query):
         """ Tests input for numeric values """
-        string = query[field]
-
-        if not string.isdigit():
+        try:
+            print int(query[field])
+            return True
+        except:
             raise ReportInvalidParamter,"Not numeric input"
 
     def any(self,field,query):

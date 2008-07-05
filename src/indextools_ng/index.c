@@ -55,8 +55,7 @@ static PyObject *trie_index_add_word(trie_index *self, PyObject *args) {
 static PyObject *trie_index_clear_set(trie_index *self, PyObject *args) {
   if(self->set) {
     PySet_Clear(self->set);
-  } else 
-    return PyErr_Format(PyExc_SystemError, "Indexer not running in unique mode");
+  };
 
   Py_RETURN_NONE;
 };

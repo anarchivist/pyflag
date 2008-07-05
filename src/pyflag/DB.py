@@ -917,3 +917,9 @@ class DBO:
             pass
     #        raise IOError("MySQL client exited with an error")
 
+def escape_column_name(name):
+    """ This is a handy utility to properly escape column names taking
+    into account possible table names.
+    """
+    names = name.split(".")
+    return '.'.join(["`%s`" % x for x in names])

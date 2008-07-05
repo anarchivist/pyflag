@@ -44,12 +44,6 @@ config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
                   "dictionary through for indexing")
 
-##class IndexTable(FlagFramework.CaseTable):
-##    name = 'LogicalIndexOffsets'
-##    columns = [ [ InodeIDType, dict(case = None) ],
-##                [ IntegerType, dict(name='Word ID',column='word_id'), True ],
-##                ]
-
 class IndexStatsTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists `LogicalIndexOffsets` (
@@ -320,23 +314,31 @@ class OffsetType(IntegerType):
     hidden = True
     LogCompatible = False
     
-    def __init__(self, name='', column='', table=None,fsfd=None):
-        self.fsfd = fsfd
-        IntegerType.__init__(self, name,column, table=table)
-        
-    def display(self, offset, row, result):
-        result = result.__class__(result)
-        inode = row['Inode']
+    def __init__(self, case):
+        self.case = case
+        IntegerType.__init__(self, name='Offset',
+                             column='offset',
+                             table='LogicalIndexOffsets')
 
-        query = query_type(case=self.fsfd.case,
+    def select(self):
+        return "concat(%s, ',', %s)" % (self.escape_column_name('offset'),
+                                        self.escape_column_name('length'))
+
+        
+    def display(self, value, row, result):
+        offset, length = value.split(",")
+        inode = row['Inode']
+        query = query_type(case=self.case,
                            family="Disk Forensics",
                            report='ViewFile',
                            mode='HexDump',
                            inode_id=inode,
-                           hexlimit=max(offset-50,0),
-                           highlight=offset, length=row['Length'])
+                           offset = offset,
+                           hexlimit=max(int(offset)-50,0),
+                           highlight=offset,
+                           highlight_length=length)
         
-        result.link(offset, query)
+        result.link(offset, query, pane='new')
         return result
 
 ## This ColumnType is quite expensive - I guess its necessary though
@@ -393,17 +395,29 @@ class WordColumn(ColumnType):
         ColumnType.__init__(self, column = 'word_id', name = name,
                             table='LogicalIndexOffsets', case=case)
 
+    def select(self):
+        return "concat(%s,',',inode.inode_id)" % (self.escape_column_name(self.column))
+
     def plain_display_hook(self, value, row, result):
+        word_id, inode_id = value.split(',')
         dbh = DB.DBO()
-        dbh.execute("select word, type from dictionary where id=%r limit 1", value)
+        dbh.execute("select word, type from dictionary where id=%r limit 1", word_id)
         row = dbh.fetch()
-        word=row['word']
+        if not row: return "?"
         
         if row['type'] in ['literal','regex']:
-            result.text(word.decode("ascii", "ignore"))
+            word = row['word'].decode("ascii", "ignore")
         else:
             ## Force it to ascii for display
-            result.text(word.decode("utf8"))
+            word = row['word'].decode("utf8")
+
+        result.link(word,
+                    target = query_type(report="ViewInodeHits",
+                                        family="Keyword Indexing",
+                                        inode_id=inode_id,
+                                        word_id=word_id,
+                                        case = self.case),
+                    tooltip="View All Hits in Inode")
 
     display_hooks = [ plain_display_hook, ColumnType.link_display_hook ]
 
@@ -473,11 +487,11 @@ class WordColumn(ColumnType):
                                                where = self.table_where_clause
                                                ))
 
-        link = FlagFramework.query_type(report = "Add Word", family = "Keyword Indexing",
-                                        case = self.case,
-                                        context = context,
-                                        word = arg)
-
+        link = query_type(report = "Add Word", family = "Keyword Indexing",
+                          case = self.case,
+                          context = context,
+                          word = arg)
+        
         self.ui.link("Click here to scan these inodes", link,
                      pane = 'self')
 
@@ -495,44 +509,43 @@ class ClassColumn(WordColumn):
         return DB.expand("(substring((select class from `%s`.dictionary "
                          "where id=`%s`),1,1)!='_')",(config.FLAGDB, self.column))
 
-class SearchIndex(Reports.report):
-    """ Search for indexed keywords """
-    description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
-    name = "Search Indexed Keywords"
+class ViewInodeHits(Reports.report):
+    """ View all hits within a specified inode """
+    name = "View Inode Hits"
     family = "Keyword Indexing"
+    parameters = {'case': 'any',
+                  'inode_id': 'numeric',
+                  'word_id': 'numeric'}
+    hidden = True
+
+    def form(self, query, result):
+        result.textfield('Inode ID', 'inode_id')
+        result.textfield('Word ID', 'word_id')
+
+    def analyse(self, query):
+        ## Check to see if the inode is up to date
+        #count, size = Indexing.count_outdated_inodes(
+        #    query['case'],
+        #    "from inode where inode_id=%s" % query['inode_id'],
+        #    unique = False)
+
+        ## This indexing will be done in process (i.e. not
+        ## distributable) because its exactly one job:
+        task = Index()
+        task.run(query['case'], query['inode_id'], 2**30 + int(query['word_id']))
 
     def display(self,query,result):
-        case=query['case']
-        fsfd = FileSystem.DBFS(case)
-        groupby = query.get('groupby',None)
-        del result.defaults['groupby']
+        case = query['case']
         result.table(
             elements = [ InodeIDType(case=case),
-                         WordColumn(name='Word'),
-                         ClassColumn(),
-                         OffsetType(column='offset', name='Offset', fsfd=fsfd),
-                         IntegerType(column='length', name='Length'),
-                         DataPreview(column='length', name='Preview', fsfd=fsfd),
+                         OffsetType(case=case),
+                         DataPreview(name='Preview', case=case),
                          ],
             table = 'LogicalIndexOffsets',
-            groupby = groupby,
+            where = 'inode.inode_id = %s' % query['inode_id'],
             case =case,
             )
-
-
-class BrowseIndexKeywords(Reports.report):
-    """ Show a summary of the results of the index keywords search.  The search indexed keywords report can then be used to view the results."""
-    name = "Keyword Index Results Summary"
-    family = "Keyword Indexing"
-    description="This report summarises the results of the index scanning"
-
-    def display(self,query,result):
-        result.refresh(0, FlagFramework.query_type(report = "Search Indexed Keywords",
-                                                   family = query['family'],
-                                                   groupby = 'Word',
-                                                   case = query['case']
-                                                   ))
-
+        
 import pyflag.UI as UI
 
 ## This makes sure that we only add methods to the class
@@ -615,7 +628,9 @@ class TableRenderer(UI.TableRenderer):
         ## Word is somewhere else in the filter string).
         if query.has_key("indexing_word") and \
                'Word' in query.get(self.filter,''):
-
+            ## This forces us to group by the inode_id when looking at
+            ## keyword hits - so we only show a single hit per inode.
+            self.groupby = 'inode.inode_id'
             self.elements.append(WordColumn(name='Word', filter=self.filter,
                                             case = query['case'],))
             
@@ -768,9 +783,14 @@ class Index(Farm.Task):
             desired_version = INDEX_VERSION
 
         ## Did they want a detailed index or a unique index?
-        unique = desired_version < 2**30            
+        unique = desired_version < 2**30
+        
+        ## In unique mode we want to generate one hit per scan job per
+        ## word
+        if unique:
+            INDEX.clear_set()
 
-        print "Indexing inode_id %s %s (version %s)" % (inode_id, INDEX, desired_version)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Indexing inode_id %s (version %s)" % (inode_id, desired_version))
         fsfd = FileSystem.DBFS(case)
         fd = fsfd.open(inode_id=inode_id)
         buff_offset = 0
@@ -798,6 +818,8 @@ class Index(Farm.Task):
 
             buff_offset += len(data)
 
+        dbh.mass_insert_commit()
+        
         ## Update the version
         dbh.update("inode",
                    where = DB.expand('inode_id = %r', inode_id),
@@ -1045,11 +1067,3 @@ class HashTrieIndexTests(unittest.TestCase):
 
             print "Indexed file in %s seconds (%s hits)" % (time.time() - new_t, count)
 
-## This code checks for fields in the dictionary table which were not
-## present in previous schemas - we try to upgrade the schema then.
-pdbh = DB.DBO()
-try:
-    pdbh.execute("select version from dictionary limit 1")
-    row = pdbh.fetch()
-except:
-    pdbh.execute("alter table dictionary add version int not null default 0")

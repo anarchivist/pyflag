@@ -103,7 +103,6 @@ def insert_dictionary_word(word, word_type, classification=''):
         pdbh.insert('dictionary',
                     **{'word': word,
                        'type': word_type,
-                       'version': dict_version+1,
                        'class': classification
                        })
 
@@ -114,12 +113,8 @@ def insert_dictionary_word(word, word_type, classification=''):
                     state = "broadcast",
                     _fast = True
                     )
-    else:
-        word_id = row['id']
-        dict_version = row['version']
         
-    return word_id, dict_version
-
+    return word_id
 
 ## These are some useful facilities
 def schedule_index(case, inode_ids, word, word_type, unique=True):
@@ -132,7 +127,7 @@ def schedule_index(case, inode_ids, word, word_type, unique=True):
     (i.e. it only shows unique hits). If unique is False the indexer
     will generate offsets for all hits in this inode.
     """
-    word_id, dict_version = insert_dictionary_word(word, word_type)
+    word_id = insert_dictionary_word(word, word_type)
 
     if type(inode_ids)!=type(list):
         inode_ids = (inode_ids,)
@@ -173,8 +168,8 @@ def count_outdated_inodes(case, sql, word_id=None, unique=True):
 
         ## Now check the inode to see if its out dated
         dbh.execute("select count(*) as c, sum(inode.size) as s "
-                    " from inode where (version < %r or "
-                    " (version & (pow(2,30) -1)) < %r ) "
+                    " from inode where (inode.version < %r or "
+                    " (inode.version & (pow(2,30) -1)) < %r ) "
                     " and (inode.inode_id in (select inode.inode_id %s))" ,
                     dict_version, desired_version, sql)
 
@@ -197,8 +192,8 @@ def schedule_inode_index_sql(case, sql, word_id, cookie='', unique=True):
     dbh2 = DB.DBO(case)
     pdbh = DB.DBO()
     dbh.execute("select inode_id from "
-                " inode where (version < %r or "
-                " (version & (pow(2,30) -1)) < %r ) "
+                " inode where (inode.version < %r or "
+                " (inode.version & (pow(2,30) -1)) < %r ) "
                 " and (inode_id in (%s))" ,
                 dict_version, desired_version, sql)
     
