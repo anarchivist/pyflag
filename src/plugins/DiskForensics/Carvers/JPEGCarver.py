@@ -43,6 +43,7 @@ import plugins.FileFormats.BasicFormats as BasicFormats
 import plugins.FileFormats.DAFTFormats as DAFTFormats
 import pyflag.Indexing as Indexing
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Magic as Magic
 
 ## Carvers raise this exception
 class CarverError(RuntimeError):
@@ -127,6 +128,9 @@ class CarverScan(Scanner.BaseScanner):
         length = min(self.fd.size-offset, self.outer.length)
         return length
 
+    def make_filename(self,offset):
+        return "%s.%s" % (offset, self.outer.extension)
+    
     def add_inode(self, fd, offset):
         """ This is called to allow the Carver to add VFS inodes.
 
@@ -136,8 +140,7 @@ class CarverScan(Scanner.BaseScanner):
         length = self.get_length(fd,offset)
         new_inode = "%s|o%s:%s" % (self.fd.inode, offset, length)
         path, inode, inode_id = self.fsfd.lookup(inode_id = self.fd.inode_id)
-        name = DB.expand("%s/%s.%s",(path,offset, self.outer.extension))
-
+        name = DB.expand("%s/%s", (path, self.make_filename(offset)))
         ## By default we just add a VFS Inode for it.
         new_inode_id = self.fsfd.VFSCreate(None,
                                            new_inode,
@@ -148,6 +151,12 @@ class CarverScan(Scanner.BaseScanner):
         pyflaglog.log(pyflaglog.DEBUG, DB.expand("Added Carved inode %s (id %s) as %s",
                                                  (new_inode, new_inode_id,
                                                   name)))
+
+        self.add_type_info(new_inode_id)
+
+    def add_type_info(self, inode_id):
+        m = Magic.MagicResolver()
+        m.find_inode_magic(case = self.fd.case, inode_id = inode_id)
 
     def examine_hit(self, fd, offset, length):
         """ This function is called on each regex hit to examine
@@ -215,7 +224,6 @@ class JPEGCarver(Scanner.GenScanFactory):
 ensure_carver_signatures_in_dictionary(JPEGCarver)
 
 ## Unit tests:
-import unittest
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
 
