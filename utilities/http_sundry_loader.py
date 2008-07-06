@@ -144,18 +144,26 @@ if config.load:
     zfile = zipfile.ZipFile(config.args[0])
     namelist = zfile.namelist()
 
-    dbh.execute("select *  from http_sundry")
+    sundry = {}
+    dbh.execute("select * from http_sundry")
     for row in dbh:
-    	name = row['url'].encode("base64")
-        if name in namelist and row['present'] == 'no':
-            filename = make_filename(row['id'], config.case)
-            print "Writing %s into %s" % (row['url'], filename)
-            fd = open(filename, "w")
-            fd.write(zfile.read(name))
-            fd.close()
-            dbh2.update("http_sundry", where="id = %s" % row['id'],
+        sundry[row['url']] = row['id']
+
+    for name in zfile.namelist():
+    	url = name.decode("base64")
+    	if url in sundry:
+            filename = make_filename(sundry[url], config.case)
+            dbh2.update("http_sundry", where="id = %s" % sundry[url],
                        _fast = True,
                        present = 'yes')
+        else:
+            filename = make_filename(dbh2.autoincrement(), config.case)
+            dbh2.insert("http_sundry", url=url, present="yes")
+
+        print "Writing %s into %s" % (url, filename)
+        fd = open(filename, "w")
+        fd.write(zfile.read(name))
+        fd.close()
 
     zfile.close()
     sys.exit()
