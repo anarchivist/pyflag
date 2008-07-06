@@ -41,6 +41,12 @@ import pyflag.FileSystem as FileSystem
 import pyflag.format as format
 import plugins.FileFormats.BasicFormats as BasicFormats
 import plugins.FileFormats.DAFTFormats as DAFTFormats
+import pyflag.Indexing as Indexing
+import pyflag.pyflaglog as pyflaglog
+
+## Carvers raise this exception
+class CarverError(RuntimeError):
+    pass
 
 ## This is a basic file format which reads in jpeg files. Its mostly
 ## used to work out how long a jpeg is for the carver.
@@ -54,13 +60,13 @@ class JPEG(BasicFormats.SimpleStruct):
     def read(self):
         result = BasicFormats.SimpleStruct.read(self)
         while 1:
-            #print "0x%08X" % self.offset,
             marker = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
+            #print marker, self.offset
+
             self.offset += marker.size()
-            #print marker,
             
             if (0xFF00 & int(marker)) != 0xFF00:
-                #print  "Incorrect marker at %X, stopping prematurely\n" % self.offset
+                raise CarverError("Incorrect marker at %X, stopping prematurely" % self.offset)
                 self.error = True
                 break
 
@@ -87,9 +93,9 @@ class JPEG(BasicFormats.SimpleStruct):
                                                search="\xff", within=2000000,
                                                cmp = cmp)
                 self.offset+=marker.size()
+                #print "Found end marker at %s " % self.offset
             else:        
                 size = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
-                # print size
                 if int(size)<2:
                     #print "Section size is out of bounds"
                     self.error = True
@@ -101,82 +107,123 @@ class JPEG(BasicFormats.SimpleStruct):
 
     def size(self):
         return self.offset
-            
-class JpegCarver(Scanner.Carver):
-    regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
-    extension = 'jpg'        
 
+def ensure_carver_signatures_in_dictionary(carver):
+    for word in carver.regexs:
+        id = Indexing.insert_dictionary_word(word, word_type='regex',
+                                             classification='_Carver',
+                                             binary=True)
+        ## Make sure the carver knows about it
+        carver.ids.append(id)
+
+class CarverScan(Scanner.BaseScanner):
     def get_length(self, fd, offset):
-        """ Returns the length of the JPEG by reading the blocks.
-        Algorithm taken from Samuel Tardieu <sam@rfc1149.net>
-        * http://www.rfc1149.net/devel/recoverjpeg
+        """ Returns the length of the carved image from the inode
+        fd. We should use fd rather than self.fd in order to not
+        touch self.fd's readptr.
         """
-        buf = format.Buffer(fd=fd)[offset:]
-        j = JPEG(buf)
-        if j.error:
-            return Scanner.Carver.get_length(self, fd,offset)
-        else:
-            return j.size()
-    
-#class CarveScan(Scanner.GenScanFactory):
-class CarveScan:
-    """ Carve out files """
+        ## By default we just read a fixed number of bytes - Note
+        ## that its better to calculate the length properly.
+        length = min(self.fd.size-offset, self.outer.length)
+        return length
+
+    def add_inode(self, fd, offset):
+        """ This is called to allow the Carver to add VFS inodes.
+
+        Returns the new inode_id.
+        """
+        ## Calculate the length of the new file
+        length = self.get_length(fd,offset)
+        new_inode = "%s|o%s:%s" % (self.fd.inode, offset, length)
+        path, inode, inode_id = self.fsfd.lookup(inode_id = self.fd.inode_id)
+        name = DB.expand("%s/%s.%s",(path,offset, self.outer.extension))
+
+        ## By default we just add a VFS Inode for it.
+        new_inode_id = self.fsfd.VFSCreate(None,
+                                           new_inode,
+                                           name,
+                                           size = length,
+                                           )
+        
+        pyflaglog.log(pyflaglog.DEBUG, DB.expand("Added Carved inode %s (id %s) as %s",
+                                                 (new_inode, new_inode_id,
+                                                  name)))
+
+    def examine_hit(self, fd, offset, length):
+        """ This function is called on each regex hit to examine
+        it further. Here we need to decide if its a false positive
+        and ignore it - or else call add_inode() to add a new
+        inode.
+        """
+        ## Just call add_inode - here we would implement any
+        ## special checks to eliminate false positives.
+        self.add_inode(fd, offset)
+
+    def finish(self):
+        ## Open another fd
+        self.fsfd = FileSystem.DBFS(self.fd.case)
+        fd = self.fsfd.open(inode_id = self.fd.inode_id)
+
+        ## Work out our or clause:
+        or_claus = " or ".join(["id=%s" % x for x in self.outer.ids])
+
+        dbh=DB.DBO(self.fd.case)
+        ## Find the matches for our classes:
+        dbh.execute("select offset, length from LogicalIndexOffsets "
+                    "where offset>0 and offset<%r and inode_id = %r and "
+                    "word_id in (select id from `%s`.dictionary where "
+                    "class='_Carver' and (%s))",
+                    (self.fd.size, self.fd.inode_id, config.FLAGDB, or_claus))
+
+        for row in dbh:
+            ## Now examine each hit in detail to see if its valid:
+            self.examine_hit(fd, row['offset'], row['length'])
+
+
+class JPEGCarver(Scanner.GenScanFactory):
+    """ Carve out JPEG Image files """
     ## We must run after the Index scanner
     order = 300
     default = False
     depends = 'IndexScan'
+    group = 'Carvers'
+    regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
+    ## This will contain the ids of all our regexes
+    ids = []
+    extension = 'jpg'        
+    length = 600000
 
-    def __init__(self,fsfd):
-        Scanner.GenScanFactory.__init__(self, fsfd)
+    class Drawer(Scanner.Drawer):
+        description = "File Carvers"
+        group = 'Carvers'
+        default = False
 
-        dbh = DB.DBO()
-        self.ids = {}
-        self.case = fsfd.case
-        ## We need to ensure that the scanner regexs are in the
-        ## dictionary:
-        for c in Registry.CARVERS.classes:
-            for expression in c.regexs:
-                dbh.execute("select id from dictionary where word=%r limit 1", expression)
-                row = dbh.fetch()
-                if not row:
-                    dbh.insert("dictionary", **{'word': expression,
-                                                'class':'_Carver', 
-                                                'type':'regex' })
-                    id = dbh.autoincrement()
-                else:
-                    id = row['id']
+    class Scan(CarverScan):
+        def get_length(self, fd, offset):
+            """ Returns the length of the JPEG by reading the blocks.
+            Algorithm taken from Samuel Tardieu <sam@rfc1149.net>
+            * http://www.rfc1149.net/devel/recoverjpeg
+            """
+            try:
+                buf = format.Buffer(fd=fd)[offset:]
+                j = JPEG(buf)
+                return j.size()
+            except CarverError,e:
+                pyflaglog.log(pyflaglog.DEBUG, "Carver failed: %s" % e)
+                return  min(self.fd.size-offset, self.outer.length)
+            
+ensure_carver_signatures_in_dictionary(JPEGCarver)
 
-                self.ids[id] = c
-
-
-    class Scan(Scanner.BaseScanner):
-        def finish(self):
-            dbh=DB.DBO(self.fd.case)
-            ## Find the matches for our classes:
-            sql = " or ".join(["word_id = '%s'" % x for x in self.outer.ids.keys()])
-            dbh.execute("select word_id,offset from LogicalIndexOffsets where offset>0 and offset<%r and inode_id = %r and (%s)",
-                        (self.fd.size, self.fd.inode_id, sql))
-            for row in dbh:
-                ## Ignore matches which occur within the length of the
-                ## previously found file:
-                #if row['offset']<offset: continue
-                offset = row['offset']
-                ## Allow the carver to work with the offset:
-                fsfd = FileSystem.DBFS(self.case)
-                carver = self.outer.ids[row['word_id']](fsfd)
-                carver.add_inode(self.fd, offset, self.factories)
-                
-                
 ## Unit tests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
 
-class CarverTest(pyflag.tests.ScannerTest):
-    """ Carving Tests """
+class JPEGCarverTest(pyflag.tests.ScannerTest):
+    """ JPEG Carver tests """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.4.sgz"
-    subsystem = 'SGZip'
+    test_file = "pyflag_stdimage_0.4.e01"
+    subsystem = 'EWF'
     order = 30
     offset = "16128s"
     
@@ -184,7 +231,7 @@ class CarverTest(pyflag.tests.ScannerTest):
         """ Carving from Image """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'CarveScan', 'IndexScan','TypeScan'])
+                             argv=["*",'JPEGCarver'])
 
         ## See if we found the two images from within the word
         ## document:
@@ -203,3 +250,4 @@ if __name__ == '__main__':
     b = format.Buffer(fd=fd)
     h = JPEG(b)
     print "Size of jpeg is %s" % h.size()
+    

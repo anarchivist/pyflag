@@ -39,6 +39,7 @@ class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic). """
     order=5
     default=True
+    group = "FileScanners"
 
     def multiple_inode_reset(self,inode):
         Scanner.GenScanFactory.multiple_inode_reset(self, inode)
@@ -182,7 +183,7 @@ class MimeTypeStats(Stats.Handler):
                              StringType('Type', 'type', table='type'),
                              ],
                 table = 'type',
-                where = 'type.mime=%r ' % t,
+                where = DB.expand('type.mime=%r ', t),
                 case = self.case,
                 )
 
@@ -225,7 +226,7 @@ class TypeStats(Stats.Handler):
                              TimestampType('Timestamp','mtime', table='inode'),
                              StringType('Mime', 'mime', table='type')],
                 table = 'type',
-                where = 'type.type=%r ' % t,
+                where = DB.expand('type.type=%r ', t),
                 case = self.case,
                 )
                 

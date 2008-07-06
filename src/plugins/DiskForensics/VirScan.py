@@ -67,6 +67,8 @@ class VirusTable(FlagFramework.CaseTable):
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
+    group = "GeneralForensics"
+    
     def destroy(self):
         dbh=DB.DBO(self.case)
         dbh.check_index('virus','inode')

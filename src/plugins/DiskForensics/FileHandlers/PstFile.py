@@ -61,14 +61,11 @@ class PstScan(GenScanFactory):
     default = True
     order=99
     depends = ['TypeScan']
+    group = "FileScanners"
 
     class Drawer(Scanner.Drawer):
         description = "File Type Related Scanners"
-        name = "File Scanners"
-        contains = [ 'PstScan','IEIndex', 'IECarver', 'MozHistScan',
-                     'MozCacheScan', 'RegistryScan',
-                     'TypeScan', 'DLLScan', 'ExtractorScan', 'OLEScan',
-                     ]
+        group = "FileScanners"
         default = True
 
     class Scan(StoreAndScanType):

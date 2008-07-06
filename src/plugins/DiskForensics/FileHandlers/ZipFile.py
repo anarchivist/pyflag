@@ -49,6 +49,7 @@ class ZipScan(GenScanFactory):
     order=99
     default = True
     depends = 'TypeScan'
+    group = "CompressedFile"
     
     def destroy(self):
         pass
@@ -104,11 +105,12 @@ class ZipScan(GenScanFactory):
 
 class GZScan(ZipScan):
     """ Decompress Gzip files """
-
+    group = "CompressedFile"
+    
     class Drawer(Scanner.Drawer):
         description = "Compressed file support"
         name = "Compressed File"
-        contains = ['GZScan','TarScan','ZipScan']
+        group = "CompressedFile"
         default = False
         
     class Scan(ScanIfType):
@@ -160,6 +162,7 @@ class TarScan(GenScanFactory):
     order=99
     default = True
     depends = [ 'TypeScan' ]
+    group = 'CompressedFile'
 
     def destroy(self):
         pass

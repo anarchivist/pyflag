@@ -35,6 +35,7 @@ class OLEScan(Scanner.GenScanFactory):
     """ Scan OLE2 files """
     default = True
     depends = ['TypeScan']
+    group = "FileScanners"
 
     class Scan(Scanner.StoreAndScanType):
         types = (

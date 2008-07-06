@@ -57,6 +57,7 @@ class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
     default = True
     depends = ['TypeScan']
+    group = "FileScanners"
     
     def reset(self, inode):
         GenScanFactory.reset(self, inode)

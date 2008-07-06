@@ -157,6 +157,7 @@ def expand(sql, params):
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
+            #data = params[d['count']].decode("latin1")
             data = params[d['count']].decode("latin1")
             result = u"_binary'%s'" % escape(data,"'")
 
@@ -923,3 +924,21 @@ def escape_column_name(name):
     """
     names = name.split(".")
     return '.'.join(["`%s`" % x for x in names])
+
+
+## The following are utilitiy functions which can be used to manage
+## schema changes
+def convert_to_unicode(case, table):
+    """ This function checks to see if the table is utf8 and if not we
+    make it that. This is used to upgrade old tables in the pyflag db
+    which happen to not be unicode. New tables should be automatically
+    utf8.
+    """
+    dbh = DBO(case)
+    dbh.execute("show create table %s", table)
+    row = dbh.fetch()
+    statement = row['Create Table'].splitlines()
+    last_line = statement[-1]
+    m = re.search("CHARSET=([^ ]+)",last_line)
+    if m and m.group(1).lower() != "utf8":
+        dbh.execute("alter table %s convert to charset 'utf8'", table)

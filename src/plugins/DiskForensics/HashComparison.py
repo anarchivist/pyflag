@@ -71,7 +71,7 @@ class HashTables(FlagFramework.EventHandler):
             ndbh = DB.DBO(config.HASHDB)
             
             ndbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
-            `md5` varchar(16) NOT NULL default '',
+            `md5` binary(16) NOT NULL default '',
             `filename` varchar(60) NOT NULL default '',
             `productcode` int(11) NOT NULL default '0',
             `oscode` varchar(60) NOT NULL default ''
@@ -97,6 +97,7 @@ class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """
     default = True
     depends = ['TypeScan']
+    group = "GeneralForensics"
 
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)

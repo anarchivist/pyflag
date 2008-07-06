@@ -124,11 +124,19 @@ class GenScanFactory:
     """
     ## Should this scanner be on by default?
     default=False
+    
+    ## The default group - this will cause all scanners to go to this
+    ## scanner group by default.
+    group = 'GeneralForensics'
 
     ## This is a list of scanner names which we depend on. Depending
     ## on a scanner will force it to be enabled whenever we are
     ## enabled.
     depends = []
+
+    ## This is the name of the group which this scanner will render
+    ## under in the GUI:
+    group = ''
     
     def __init__(self,fsfd):
         """ Factory constructor.
@@ -515,18 +523,25 @@ class Drawer:
     This class should be declared as an inner class of the scanner.
     """
     description = "Description of main scanner"
-    name = "name of main scanner"
-    contains = []
+    group = "Name of group"
+    child_scanners = None
     default = True
 
+    def __init__(self):
+        ## Populate the classes of scanners which depend on us:
+        self.child_scanners = []
+        for c in Registry.SCANNERS.classes:
+            if c.group == self.group:
+                ## Its our scanner
+                self.child_scanners.append(c)
+
     def get_group_name(self):
-        return "scangroup_%s" % self.name
+        return "scangroup_%s" % self.group
 
     def get_parameters(self):
-        for i in self.contains:
+        for i in self.child_scanners:
             try:
-                scanner = Registry.SCANNERS.dispatch(i)
-                yield "scan_%s" % i,'onoff'
+                yield "scan_%s" % i.__name__,'onoff'
             except:
                 continue
 
@@ -539,19 +554,13 @@ class Drawer:
             scan_group_name = self.get_group_name()
 
             if src_query[scan_group_name]=='on':
-                for i in self.contains:
-                    try:
-                        cls = Registry.SCANNERS.dispatch(i)
-                    except:
-                        ## Ignore scanners in contains which do not exist
-                        continue
-                    
-                    scan_name = 'scan_%s' % i
+                for i in self.child_scanners:
+                    scan_name = 'scan_%s' % i.__name__
                     del dest_query[scan_name]
 
                     ## If i is not specified, we use the default for
                     ## this scanner:
-                    if not src_query.has_key('scan_%s' % i):
+                    if not src_query.has_key('scan_%s' % i.__name__):
                         if cls.default:
                             dest_query[scan_name]='on'
                         else:
@@ -575,16 +584,12 @@ class Drawer:
                 result.defaults[scan_group_name]='off'
 
         ## Add defaults for the scanners contained:
-        for i in self.contains:
-            try:
-                cls = Registry.SCANNERS.dispatch(i)
-                if not query.has_key('scan_%s' % i):
-                    if cls.default:
-                        result.hidden('scan_%s' % i,'on')
-                    else:
-                        result.hidden('scan_%s' % i,'off')
-            except ValueError:
-                pass
+        for cls in self.child_scanners:
+            if not query.has_key('scan_%s' % cls.__name__):
+                if cls.default:
+                    result.hidden('scan_%s' % cls.__name__,'on')
+                else:
+                    result.hidden('scan_%s' % cls.__name__,'off')
             
         def configure_cb(query,result):
             try:
@@ -602,23 +607,18 @@ class Drawer:
 
             self.add_defaults(query,query.clone())
 
-            for i in self.contains:
-                try:
-                    cls = Registry.SCANNERS.dispatch(i)
-                except:
-                    continue
-                
+            for cls in self.child_scanners:
                 scanner_desc = cls.__doc__.splitlines()[0]
-
+                
                 ## Add an enable/disable selector
-                result.const_selector(scanner_desc,"scan_%s" % i,[
+                result.const_selector(scanner_desc,"scan_%s" % cls.__name__,[
                     'on','off'],['Enabled','Disabled'] )
-
+                
             result.end_table()
             result.end_form()
 
         right=result.__class__(result)
-        right.popup(configure_cb,"Configure %s" % self.name,icon="spanner.png")
+        right.popup(configure_cb,"Configure %s" % self.group,icon="spanner.png")
         left.row(right,self.description)
         result.const_selector(left,
                            scan_group_name,
@@ -708,9 +708,10 @@ class Carver:
                             size = length,
                             )
 
+        ## Dont scan the remaining inodes because this may cause many false positives
         ## Scan the new inodes:
-        new_fd = self.fsfd.open(inode = new_inode)
+        #new_fd = self.fsfd.open(inode = new_inode)
 
         ## dont carve the resultant file (or we could get recursive carves)
-        factories = [ f for f in factories if "Carv" not in f.__class__.__name__]
-        scanfile(self.fsfd, new_fd, factories)
+        #factories = [ f for f in factories if "Carv" not in f.__class__.__name__]
+        #scanfile(self.fsfd, new_fd, factories)

@@ -132,6 +132,7 @@ class HotmailScanner(Scanner.GenScanFactory):
     """ Detects Live.com/Hotmail web mail sessions """
     default = True
     depends = ['TypeScan', 'HTTPScanner']
+    group = 'NetworkScanners'
 
     def multiple_inode_reset(self, inode_glob):
         Scanner.GenScanFactory.multiple_inode_reset(self, inode_glob)

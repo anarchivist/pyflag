@@ -922,6 +922,7 @@ def print_info():
                               ("Column Types", "COLUMN_TYPES"),
                               ("Case Tables", "CASE_TABLES"),
                               ("Magic Handlers", "MAGIC_HANDLERS"),
+                              ("Carvers", "CARVERS"),
                               ):
         result += "\n%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)
@@ -1060,7 +1061,7 @@ def calculate_offset_suffix(offset):
         base = 8
         offset = offset[2:]
         
-    m=re.match("(\d+)([sSkKgGmM]?)", offset)
+    m=re.match("([0-9A-Fa-f]+)([sSkKgGmM]?)", offset)
     if not m:
         raise IOError("I cant understand offset should be an int followed by s,k,m,g")
 

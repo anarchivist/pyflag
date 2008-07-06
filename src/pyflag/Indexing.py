@@ -89,19 +89,28 @@ def is_word_in_dict(word):
     row = pdbh.fetch()
     return row
 
-def insert_dictionary_word(word, word_type, classification=''):
+def insert_dictionary_word(word, word_type, classification='', binary=False):
     pdbh = DB.DBO()
     ## Is the word in the dictionary?
-    pdbh.execute("select * from dictionary where word = %r and type = %r",
+    if word_type == 'word':
+        sql = "select * from dictionary where word = %r and type = %r"
+        prefix =''
+        ## Other types are stored in binary:
+    else:
+        prefix = '__'
+        sql = "select * from dictionary where word = %b and type = %r"
+        
+    pdbh.execute(sql,
                  word, word_type)
     row = pdbh.fetch()
+    
     if not row:
         dict_version = get_dict_version()
 
         ## The word is not in the dictionary - add it and increment
         ## the dictionary version
         pdbh.insert('dictionary',
-                    **{'word': word,
+                    **{'__word': word,
                        'type': word_type,
                        'class': classification
                        })
@@ -113,6 +122,8 @@ def insert_dictionary_word(word, word_type, classification=''):
                     state = "broadcast",
                     _fast = True
                     )
+    else:
+        word_id = row['id']
         
     return word_id
 

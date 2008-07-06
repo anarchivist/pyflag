@@ -169,7 +169,7 @@ class URLEntry(SimpleStruct):
             [ 'directory_index', BYTE ],
             [ 'unknown', WORD ],
             [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
-            [ '0x00200001', LONG ],
+            [ '0x00200001', ULONG, ],
             [ 'content', PContent, dict(relative_offset = lambda x: x['type'].buffer.offset -4) ],
             ] 
 class IEHistoryFile:
@@ -219,9 +219,9 @@ class IEHistoryFile:
         if entry_type == 'URL ':
             entry=URLEntry(self.buffer[offset:])
             result['event']=entry
-            for key in ('type','modified_time','accessed_time','url','filename'):
+            for key in ('type','modified_time','accessed_time','url','filename','size'):
                 result[key]=entry[key]
-
+            result['offset'] = offset
             c=entry['content'].get_value()
             result['data']=c
             for key in ('content_type','data'):

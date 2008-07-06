@@ -5,6 +5,8 @@ from pyflag.Scanner import *
 import pyflag.Reports as Reports
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType
 
+active = False
+
 try:
     import extractor
 

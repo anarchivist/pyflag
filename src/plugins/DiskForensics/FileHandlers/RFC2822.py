@@ -37,6 +37,7 @@ class RFC2822(Scanner.GenScanFactory):
     """ Scan RFC2822 Mail messages and insert record into email table"""
     default = True
     depends = ['TypeScan']
+    group = 'FileScanners'
     
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self,fsfd)

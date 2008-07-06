@@ -1865,10 +1865,12 @@ class MSNTables(FlagFramework.EventHandler):
             PRIMARY KEY (`inode_id`,`session_id`,`user_data_type`,`nick`)
             )""")
 
+import re
+
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True
-    import re
+    group = 'NetworkScanners'
 
     def __init__(self,fsfd):
         StreamScannerFactory.__init__(self,fsfd)

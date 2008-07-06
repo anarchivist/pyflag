@@ -66,101 +66,24 @@ class IndexScan(GenScanFactory):
     default = True
     version = 0
 
+    group = "GeneralForensics"
+    
+    ##contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
+
     class Drawer(Scanner.Drawer):
         description = "General Forensics"
-        name = "General Forensics"
-        contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
+        group = "GeneralForensics"
         default = True
         
     def prepare(self):
-        ## Create new index trie - This takes a serious amount of time
-        ## for large dictionaries (about 2 sec for 70000 words):
-        self.index = index.Index(unique=1)
-        self.version = Indexing.get_dict_version()
-        
-        pydbh = DB.DBO(None)
-        #Do word index (literal) prep
-        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Building index trie")
-        start_time=time.time()
-        pydbh.execute("select word,id from dictionary where type='literal'")
-        for row in pydbh:
-            if len(row['word'])>3:
-                self.index.add_word(row['word'],row['id'], index.WORD_LITERAL)
+        if not INDEX: reindex()
 
-        pydbh.execute("select word,id from dictionary where type='regex'")
-        for row in pydbh:
-            if len(row['word'])>3:
-                self.index.add_word(row['word'],row['id'], index.WORD_EXTENDED)
-
-        # load words in a number of alternate character sets. The ones
-        # we care about atm are utf-8 and utf-16/UCS-2 which is used
-        # extensively in windows (e.g word documents). We can easily
-        # add more encodings here as necessary.
-        pydbh.execute("select word,id from dictionary where type='word'")
-        for row in pydbh:
-            try:
-                word = row['word'].decode("UTF-8").lower()
-                for e in config.INDEX_ENCODINGS:
-                    w = word.encode(e)
-                    if len(w)>3:
-                        self.index.add_word(w,row['id'], index.WORD_ENGLISH)
-            except UnicodeDecodeError:
-                pass
-
-        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
-
-    def reset_entire_path(self, path):
-        GenScanFactory.reset_entire_path(self, path)
-        dbh=DB.DBO(self.case)
-        dbh.execute("delete from `LogicalIndexOffsets`")
-        
-        ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
-        dbh.execute("delete from `LogicalIndexStats`")
-
-    def multiple_inode_reset(self, inode_glob):
-        GenScanFactory.multiple_inode_reset(self, inode_glob)
-
-        dbh = DB.DBO(self.case)
-        dbh.execute("delete from `LogicalIndexOffsets`")
-         
-        ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
-        dbh.execute("delete from `LogicalIndexStats`")
-
-    def reset(self, inode):
-        """ This deletes the index file and drops the LogicalIndex table.
-
-        Note: At present reseting the index scanner on _ANY_ inode
-        will cause it to be reset on all inodes. This is because it
-        would be too confusing if users scanned parts of the VFS using
-        different dictionaries.
-        """
-        
-        GenScanFactory.reset(self, inode)
-        dbh=DB.DBO(self.case)
-        dbh.execute("delete from `LogicalIndexOffsets`")
-        ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
-        dbh.execute("delete from `LogicalIndexStats`")
-
-    def destroy(self):
-        ## Destroy our index handle which will close the file and free memory
-        del self.index
-        
-        dbh=DB.DBO(self.case)
-        ## Ensure indexes are built on the offset table:
-        dbh.check_index("LogicalIndexOffsets","word_id")
-        
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
-            ## Check we are operating with the correct dictionary version
-            if self.outer.version != Indexing.get_dict_version():
-                self.outer.prepare()
 
             ## Make sure the index is fresh:
-            outer.index.clear_set()
+            INDEX.clear_set()
             
             self.dbh = DB.DBO(fd.case)
             self.dbh.mass_insert_start('LogicalIndexOffsets')
@@ -184,7 +107,7 @@ class IndexScan(GenScanFactory):
             
         def process_buffer(self,buff):
             # Store indexing results in the dbase
-            for offset, matches in self.outer.index.index_buffer(buff, unique=1):
+            for offset, matches in INDEX.index_buffer(buff, unique=1):
                 # skip matches not starting in this file
                 if self.size > 0 and offset+self.offset > self.size:
                     #print "skipping a match in %s" % self.inode_id
@@ -199,8 +122,7 @@ class IndexScan(GenScanFactory):
                         inode_id = self.inode_id,
                         word_id = id,
                         offset = offset+self.offset,
-                        length = length,
-                        version = self.outer.version
+                        length = length
                         )
 
         def slack(self,data,metadata=None):
@@ -223,18 +145,18 @@ class IndexEventHandler(FlagFramework.EventHandler):
         `id` int auto_increment,
         `word` VARCHAR( 250 ) binary NOT NULL ,
         `class` VARCHAR( 50 ) NOT NULL ,
-        `encoding` SET( 'all', 'ascii', 'ucs16' ) DEFAULT 'all' NOT NULL,
         `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
-        `version` int not null default 0,
         PRIMARY KEY  (`id`))""")
-        
- 
+
+## These check that the schema is up to date
+DB.convert_to_unicode(None, 'dictionary')
+
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
     """ Manipulate dictionary of search terms to index on """
     parameters = {}
-    name="Build Dictionary"
-    family="Keyword Indexing"
+    name="Build Indexing Dictionary"
+    family="Disk Forensics"
     description = "Builds a dictionary for indexing "
 
     def display(self,query,result):
@@ -269,9 +191,8 @@ class BuildDictionary(Reports.report):
                 status = "Added word %s to dictionary" % query['word']
                    
             elif query['action']=='delete':
-                ## FIXME: Handle deletion properly
                 dbh.delete("dictionary", 
-                           where=DB.expand("word=%r and type=%r",
+                           where=DB.expand("word=%b and type=%r",
                                            (query['word'],query['type'])))
                 status = "Deleted word %s from dictionary" % query['word']
                 
@@ -314,11 +235,11 @@ class OffsetType(IntegerType):
     hidden = True
     LogCompatible = False
     
-    def __init__(self, case):
+    def __init__(self, case, table='LogicalIndexOffsets'):
         self.case = case
         IntegerType.__init__(self, name='Offset',
                              column='offset',
-                             table='LogicalIndexOffsets')
+                             table=table)
 
     def select(self):
         return "concat(%s, ',', %s)" % (self.escape_column_name('offset'),
@@ -648,26 +569,40 @@ INDEX_VERSION = 0
 
 def reindex():
     global INDEX, INDEX_VERSION
-    print "Rebuilding index"
+    pyflaglog.log(pyflaglog.DEBUG,"Index manager: Building index trie")
+    start_time = time.time()
+    
     dbh = DB.DBO()
     INDEX_VERSION = Indexing.get_dict_version()
-    dbh.execute("select word,id,type from dictionary")
+    dbh.execute("select word,id,type,class from dictionary")
     INDEX = index.Index()
     for row in dbh:
+        ## Classes starting with _ are private classes and want to
+        ## return all hits.
+        if row['class'].startswith("_"):
+            id = row['id'] + 2**30
+        else:
+            id = row['id']
+
         t = row['type']
+        ## Literal and extended are encoded using latin
         if t == 'literal':
-            INDEX.add_word(row['word'],row['id'], index.WORD_LITERAL)
+            INDEX.add_word(row['word'].encode("latin"),id, index.WORD_LITERAL)
         elif t == 'regex':
-            INDEX.add_word(row['word'], row['id'] , index.WORD_EXTENDED)
+            INDEX.add_word(row['word'].encode("latin"),id, index.WORD_EXTENDED)
         elif t=='word':
             try:
                 word = row['word'].decode("UTF-8").lower()
                 for e in config.INDEX_ENCODINGS:
                     w = word.encode(e)
                     if len(w)>3:
-                        INDEX.add_word(w,row['id'], index.WORD_ENGLISH)
+                        INDEX.add_word(w,id, index.WORD_ENGLISH)
             except UnicodeDecodeError:
                 pass
+
+    pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
+
+
 
 ## This is how we can add new words to the dictionary and facilitate scanning:
 class AddWords(Reports.report):

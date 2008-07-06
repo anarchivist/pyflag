@@ -64,7 +64,8 @@ class DLLScan(Scanner.GenScanFactory):
     default = True
     depends = [ 'TypeScan', 'RegistryScan']
     order = 110
-
+    group = "FileScanners"
+    
     class Scan(Scanner.StoreAndScanType):
         types = [ 'application/x-dosexec',
                   'application/x-winnt-registry',]

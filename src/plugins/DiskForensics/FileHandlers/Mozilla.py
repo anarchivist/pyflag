@@ -32,6 +32,7 @@ import pyflag.Scanner as Scanner
 import FileFormats.MozHist as MozHist
 import FileFormats.MozCache as MozCache
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Registry as Registry
 
 class MozHistEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -88,9 +89,10 @@ class BrowserHistoryReport(Reports.report):
         def ie_history_cb(query,result):
             dbh=self.DBO(query['case'])
             dbh.check_index("ie_history" ,"url",10)
-            
+            OffsetType = Registry.COLUMN_TYPES.dispatch("OffsetType")
             result.table(
                 elements = [ InodeIDType(case=query['case']),
+                             OffsetType(case=query['case'], table='ie_history'),
                              StringType('Type','type'),
                              StringType('URL','url'),
                              TimestampType('Modified','modified'),
@@ -110,6 +112,7 @@ class MozHistScan(Scanner.GenScanFactory):
     """ Scan for Mozilla history files """
     default = True
     depends = ['TypeScan']
+    group = 'FileScanners'
     
     class Scan(Scanner.StringIOType):
         mork = None
@@ -222,6 +225,7 @@ class MozCacheScan(Scanner.GenScanFactory):
     """ Scan for Mozilla Cache files """
     default = True
     depends = []
+    group = "FileScanners"
     
     class Scan(Scanner.StoreAndScan):
         def boring(self, metadata, data=''):

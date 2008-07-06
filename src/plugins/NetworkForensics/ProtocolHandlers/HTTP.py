@@ -259,10 +259,11 @@ class HTTPScanner(StreamScannerFactory):
     """ Collect information about HTTP Transactions.
     """
     default = True
+    group = "NetworkScanners"
     
     class Drawer(Scanner.Drawer):
         description = "Network Scanners"
-        name = "NetworkScanners"
+        group = "NetworkScanners"
         contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
                      "SMTPScanner","RFC2822", "YahooScanner", "FTPScanner",
                      'HotmailScanner','GmailScanner' ]

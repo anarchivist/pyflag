@@ -428,10 +428,11 @@ DataNode DataNode_Con(DataNode self, int data) {
 int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, trie_iter *result) {
   DataNode this = (DataNode) self;
   PyObject *tmp;
-  PyObject *data = PyLong_FromLong(this->data);
+  PyObject *data = PyLong_FromLong(this->data & (UNIQUE_BIT_MASK-1));
 
-  // We check to see if we need to update the result:
-  if(result->trie->set) {
+  // We check to see if we need to update the result (Not that ids
+  // with bit 31 set must be index fully.
+  if((this->data & UNIQUE_BIT_MASK) == 0 && result->trie->set) {
     if(PySet_Contains(result->trie->set, data)) {
       Py_DECREF(data);
       return True;

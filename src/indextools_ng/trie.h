@@ -17,8 +17,12 @@
 */
 #define MAX_MATCH_LENGTH 100
 
+// Each word can be defined as non-unique if its ID has bit 30
+// set. This is the mask for that:
+#define UNIQUE_BIT_MASK 0x40000000
+
 // Some prototypes to shut up warnings
-struct trie_iter;
+typedef struct trie_iter;
 
 /** These are the possible types that words may be supplied as **/
 enum word_types {
