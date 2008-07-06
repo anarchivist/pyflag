@@ -384,14 +384,38 @@ function SelectMenuItem(url) {
   document.location = url + "&case=" + form.elements[0].value;
 };
 
+// This is an array of elements ids which need to be resized each time
+// the page is resized.
+var panes = new Array;
+
 // We would really like to specify the height of the PyFlagPage as
 // 100%-24px-32px. Is there a way to do this in css?
 function AdjustHeightToPageSize(element_id) {
+  if(element_id) {
+    panes.push(element_id);
+    window.onload = update_windows_sizes;
+    window.onresize = update_windows_sizes;
+  };
+}
+
+// This is the onload and onresize callback - it resizes all the panes
+// in this page.
+function update_windows_sizes(){
+    for(i=panes.length-1; i>=0; i--) {
+      AdjustElementSize(panes[i], panes[i+1]);
+    };
+}; 
+
+// This function adjusts element to take up all available space for
+// it. We also turn off the scrollbars of our previous element (the
+// one on top of us) to maximize the space available to us.
+function AdjustElementSize(element_id, previous_element_id){
   var element = document.getElementById(element_id);
+  var previous_element = document.getElementById(previous_element_id);
 
   if(!element) return;
 
-  var position = getAbsolutePosition(element);
+   var position = getAbsolutePosition(element);
 
   /** Try to determine the window height catering for IE
       braindeadness 
@@ -403,6 +427,7 @@ function AdjustHeightToPageSize(element_id) {
     //Non-IE
     myWidth = window.innerWidth;
     myHeight = window.innerHeight;
+    //remove_parent_scrollbars(element);
   } else if( document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
     //IE 6+ in 'standards compliant mode'
     myWidth = document.documentElement.clientWidth;
@@ -413,11 +438,14 @@ function AdjustHeightToPageSize(element_id) {
     myHeight = document.body.clientHeight;
   }
 
-  try {
-    element.style.height = myHeight - position.y -1 + "px";
-    element.style.width = myWidth - position.x -1 + "px";
-    element.style.overflowY = 'auto';
-  } catch(err) {};
+  element.style.height = myHeight - position.y + "px";
+  element.style.width = myWidth - position.x + "px";
+  element.style.overflow = 'auto';
+  // Turn off the scrollbars of the window on top of us to let us have
+  // all the space
+  if(previous_element) {
+    previous_element.style.overflow = 'hidden';
+  };
 }
 
 /** This searches the heirarchy of windows for a window of the given
@@ -475,4 +503,14 @@ function link_to_parent(url, name) {
 function bug_check() {
   if(!window.__pyflag_name) alert("You didnt set __pyflag_name");
   if(!window.__pyflag_parent) alert("You didnt set __pyflag_parent");
+};
+
+function remove_parent_scrollbars(element) {
+  while(element) {
+    var parent = element.parentNode;
+    if(!parent) break;
+    if(parent.style)
+      parent.style.overflow = 'none';
+    element = parent;
+  };
 };

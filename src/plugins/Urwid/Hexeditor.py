@@ -1,3 +1,24 @@
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+
 """ This is an implementation of the hexeditor using urwid """
 import cStringIO, re
 import pyflag.Indexing as Indexing
@@ -580,12 +601,14 @@ class Hexeditor:
                 else:
                     chars += '.'
 
-            tag_id = self.overlay[x+1]
-            if tag_id != last:
-                result.append((PALETTE[last][0], chars))
-                chars = ''
-                last = tag_id
-                
+            try:
+                tag_id = self.overlay[x+1]
+                if tag_id != last:
+                    result.append((PALETTE[last][0], chars))
+                    chars = ''
+                    last = tag_id
+            except IndexError:
+                break
             x+=1
             
         result.append((PALETTE[tag_id][0], chars))

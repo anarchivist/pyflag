@@ -398,8 +398,11 @@ class DBO:
         ## Ensure the tz is properly reset before handing out dbh:
         c = self.dbh.cursor()
         try:
-            c.execute('set time_zone = (select value from meta where property="TZ")')
-        except Exception:
+            c.execute("select value from meta where property ='TZ' limit 1")
+            row = c.fetchone()
+            if row:
+                c.execute(expand('set time_zone = %r', row['value']))
+        except Exception,e:
             pass
 
     def __init__(self,case=None):

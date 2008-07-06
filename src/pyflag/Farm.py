@@ -175,6 +175,7 @@ import pyflag.pyflaglog as pyflaglog
 import atexit,os,signal,time
 import pyflag.DB as DB
 import pyflag.Registry as Registry
+import pyflag.Store as Store
 
 ## This stores the pids of working threads - we kill those when the
 ## main thread exits
@@ -216,7 +217,7 @@ def start_workers():
 
     if config.WORKERS == 0:
         return
-    
+
     for i in range(config.WORKERS):
        pid = os.fork()
        ## Parents:
@@ -224,6 +225,17 @@ def start_workers():
          children.append(pid)
        else:   
          atexit.register(child_exist)
+
+         ## It is an error to fork with db connections
+         ## established... they can not be shared:
+         if DB.db_connections > 0:
+             ## We try to fix it by making the child get new
+             ## handlers. Note that the child still needs to hold the
+             ## handles or they will get closed on the parent as well
+             ## - this seems like a hack
+             DB.DBO.DBH_old = DB.DBO.DBH
+             DB.DBO.DBH = Store.Store(max_size=10)
+             DB.db_connections = 0
          
          ## Start the logging thread for each worker:
          pyflaglog.start_log_thread()

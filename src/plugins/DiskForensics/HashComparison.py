@@ -69,6 +69,13 @@ class HashTables(FlagFramework.EventHandler):
         try:
             dbh.execute("""CREATE database if not exists `%s`""", config.HASHDB)
             ndbh = DB.DBO(config.HASHDB)
+
+            ndbh.execute("""Create table if not exists meta(
+            `time` timestamp NOT NULL,
+            property varchar(50),
+            value text,
+            KEY property(property),
+            KEY joint(property,value(20)))""")
             
             ndbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
             `md5` binary(16) NOT NULL default '',
@@ -92,6 +99,15 @@ class HashTables(FlagFramework.EventHandler):
         except Exception,e:
             pass
 
+try:
+    dbh = DB.DBO(config.HASHDB)
+    dbh.execute("select * from meta limit 1")
+    dbh.fetch()
+except Exception,e:
+    print "Cant find nsrl database - creating it"
+    dbh = DB.DBO()
+    h = HashTables()
+    h.init_default_db(dbh, None)
 
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """

@@ -215,7 +215,7 @@ class BuildDictionary(Reports.report):
         form.start_table()
         form.const_selector("Action:",'action',('insert','delete'),('Add','Delete'))
         form.textfield('Word:','word')        
-        form.selector('Classification:','class','select class as `key`,class as `value` from dictionary group by class order by class',())
+        form.selector('Classification:','class','select class as `key`,class as `value` from dictionary where left(class,1) != \'_\' group by class order by class',())
         form.textfield('(Or create a new class:)','class_override')
         form.const_selector('Type:','type',('word','literal','regex'),('word','Literal','RegEx'))
         form.end_table()
@@ -227,6 +227,9 @@ class BuildDictionary(Reports.report):
                          StringType('Class','class'),
                          StringType('Type','type') ],
             table='dictionary',
+            ## Class names starting with _ are private and should not
+            ## be user selectable:
+            where="left(class,1) != '_' ",
             case=None,
             )
         result.row(table,form,valign='top')
@@ -463,7 +466,8 @@ class ViewInodeHits(Reports.report):
                          DataPreview(name='Preview', case=case),
                          ],
             table = 'LogicalIndexOffsets',
-            where = 'inode.inode_id = %s' % query['inode_id'],
+            where = DB.expand('inode.inode_id = %r and LogicalIndexOffsets.word_id= %r',
+                              (query['inode_id'],query['word_id'])),
             case =case,
             )
         
@@ -535,6 +539,9 @@ class TableRenderer(UI.TableRenderer):
                     elements = [ StringType('Word','word', link=new_query),
                                  StringType('Class','class'),
                                  StringType('Type','type') ],
+                    ## Class names starting with _ are private and should not
+                    ## be user selectable:
+                    where="left(class,1) != '_' ",
                     )
                 result.end_table()
                 result.end_form()
@@ -629,7 +636,7 @@ class AddWords(Reports.report):
         except KeyError: pass
         
         result.textfield("Word to add", "word")
-        result.selector('Classification:','class','select class as `key`,class as `value` from dictionary group by class order by class',())
+        result.selector('Classification:','class','select class as `key`,class as `value` from dictionary where left(class,1) != \'_\' group by class order by class',())
         result.textfield('(Or create a new class:)','class_override')
         result.const_selector('Type:','type',('word','literal','regex'),('Word','Literal','RegEx'))
 
@@ -646,7 +653,7 @@ class AddWords(Reports.report):
                 context = FlagFramework.STORE.get(query['context'])
             except KeyError:
                 # context was provided but is not in store
-                raise ReportError("Context not valid - Is the session expired")
+                raise Reports.ReportError("Context not valid - Is the session expired")
 
         except KeyError:
             ## Context was not provided

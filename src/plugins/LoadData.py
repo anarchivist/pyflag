@@ -280,9 +280,14 @@ class ScanFS(Reports.report):
         self.parameters = self.parameters.copy()
         ## Work out what scan groups are available and require they be
         ## in the parameters:
+        groups = []
         for cls in ScannerUtils.scan_groups_gen():
             drawer = cls.Drawer()
+            if drawer.group in groups: continue
+            
             scan_group_name = drawer.get_group_name()
+            groups.append(scan_group_name)
+            
             ## Add the scan group to our parameters - this will ensure
             ## that type checking is done on it:
             self.parameters[scan_group_name]='onoff'
@@ -300,9 +305,12 @@ class ScanFS(Reports.report):
                result.textfield('Scan files (glob or path)','path',size=50)
 
                ## Draw the form for each scan group:
+               groups = []
                for cls in ScannerUtils.scan_groups_gen():
                    try:
                        drawer = cls.Drawer()
+                       if drawer.group in groups: continue
+                       groups.append(drawer.group)
                        drawer.form(query,result)
                    except RuntimeError:
                        pass
@@ -342,7 +350,6 @@ class ScanFS(Reports.report):
         env = pyflagsh.environment(case=query['case'])
         pyflagsh.shell_execv(env=env, command="scan_path",
                              argv=[query['path'], scanner_names])
-
 
     def progress(self,query,result):
         result.decoration='naked'
