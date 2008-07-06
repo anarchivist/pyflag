@@ -3,7 +3,6 @@
 # URL is used as the filenames in the archive
 
 import urllib
-import base64
 import zipfile
 import sys
 
@@ -25,7 +24,7 @@ for line in downloads.splitlines():
     print "Downloading: %s" % line
     try:
         data = urllib.urlopen(urllib.unquote(line))
-        zfile.writestr(base64.encodestring(line), data.read())
+        zfile.writestr(line.encode("base64"), data.read())
     except IOError, e:
         print "Download Failed: %s" % e
 

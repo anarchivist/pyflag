@@ -30,7 +30,7 @@ import pyflag.DB as DB
 import sys,urllib
 import shutil
 
-config.set_usage(usage = """%prog --case casename [--offline] regex
+config.set_usage(usage = """%prog --case casename [--offline scriptfile] regex
        %prog --case casename --load zipfile
 
 Will download all the missing objects from the sundry table into case casename.
@@ -116,7 +116,7 @@ if config.list:
 
 if config.offline:
     urls = []
-    regex_list = config.args or [".*"]
+    regex_list = config.args[1:] or [".*"]
     for regex in regex_list:
         dbh.execute("select url from http_sundry where url rlike %r and present='no'", regex)
         urls += [ row['url'] for row in dbh ]
@@ -130,15 +130,14 @@ if config.offline:
     template = template.replace("http://www.pyflag.net", "\n".join(urls))
 
     # write out the script
-    fd = open("sundry_downloader.py", "w")
+    fd = open(config.args[0], "w")
     fd.write(template)
     fd.close()
 
-    print "Written download script to: sundry_downloader.py"
+    print "Written download script to: %s" % config.args[0]
     sys.exit(0)
 
 import zipfile
-import base64
 
 dbh2 = DB.DBO(config.case)
 if config.load:
@@ -147,7 +146,7 @@ if config.load:
 
     dbh.execute("select *  from http_sundry")
     for row in dbh:
-    	name = base64.encodestring(row['url'])
+    	name = row['url'].encode("base64")
         if name in namelist and row['present'] == 'no':
             filename = make_filename(row['id'], config.case)
             print "Writing %s into %s" % (row['url'], filename)
