@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # ******************************************************
 # Michael Cohen <scudette@users.sourceforge.net>
 #
@@ -29,9 +30,14 @@ import pyflag.DB as DB
 import sys,urllib
 import shutil
 
-config.set_usage(usage = """%prog --case casename regex
+config.set_usage(usage = """%prog --case casename [--offline] regex
+       %prog --case casename --load zipfile
 
 Will download all the missing objects from the sundry table into case casename.
+
+The --offline arguement will generate a stand-alone python script which can be
+used on another (internet-connected) computer. The zipfile can then be loaded
+using this program with the --load arguement.
 
 NOTE: We will be making web requests to the missing objects, make sure
 you understand the ramifications of this. This is mostly suitable only
@@ -43,6 +49,12 @@ config.add_option("case", default=None,
 
 config.add_option("copy", default=None,
                   help = "The case to copy to. If this is specified, we just copy all the sundry objects from the specified case to this one")
+
+config.add_option("offline", short_option='o', default=False, action='store_true',
+                  help = "Generate a script for retrieval from an internet-connected machine (does not require pyflag)")
+
+config.add_option("load", short_option='i', default=False, action='store_true',
+                  help = "import a sundry archive generated using an offline script")
 
 config.add_option("list", short_option='l', default=False, action='store_true',
                   help = "List the urls matching the regexes but do not fetch them")
@@ -94,7 +106,6 @@ if config.copy:
     sys.exit(0)
         
 
-dbh2 = DB.DBO(config.case)
 if config.list:
     for regex in config.args:
         dbh.execute("select url from http_sundry where url rlike %r and present='no'", regex)
@@ -103,11 +114,58 @@ if config.list:
 
     sys.exit(0)
 
+if config.offline:
+    urls = []
+    regex_list = config.args or [".*"]
+    for regex in regex_list:
+        dbh.execute("select url from http_sundry where url rlike %r and present='no'", regex)
+        urls += [ row['url'] for row in dbh ]
+
+    # read the template
+    fd = open("%s/utilities/http_sundry_loader_template.py" % config.datadir)
+    template = fd.read()
+    fd.close()
+
+    # sub in the URLS
+    template = template.replace("http://www.pyflag.net", "\n".join(urls))
+
+    # write out the script
+    fd = open("sundry_downloader.py", "w")
+    fd.write(template)
+    fd.close()
+
+    print "Written download script to: sundry_downloader.py"
+    sys.exit(0)
+
+import zipfile
+import base64
+
+dbh2 = DB.DBO(config.case)
+if config.load:
+    zfile = zipfile.ZipFile(config.args[0])
+    namelist = zfile.namelist()
+
+    dbh.execute("select *  from http_sundry")
+    for row in dbh:
+    	name = base64.encodestring(row['url'])
+        if name in namelist and row['present'] == 'no':
+            filename = make_filename(row['id'], config.case)
+            print "Writing %s into %s" % (row['url'], filename)
+            fd = open(filename, "w")
+            fd.write(zfile.read(name))
+            fd.close()
+            dbh2.update("http_sundry", where="id = %s" % row['id'],
+                       _fast = True,
+                       present = 'yes')
+
+    zfile.close()
+    sys.exit()
+
 for regex in config.args:
     dbh.execute("select id,url from http_sundry where url rlike %r and present='no'", regex)
     for row in dbh:
         new_filename = make_filename(row['id'], config.case)
-        print "Retriving %s into %s" % (row['url'], new_filename) ,
+        print "Retriving %s into %s" % (row['url'], new_filename)
         try:
             url = urllib.unquote(row['url'])
             filanem, headers = urllib.urlretrieve(url, new_filename)
