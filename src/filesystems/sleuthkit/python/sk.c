@@ -1141,6 +1141,9 @@ static PyObject *skfs_inode_str(skfs_inode *self) {
     PyObject *result;
     char *str;
     str = talloc_asprintf(NULL, "%llu-%u-%u", self->inode, self->type, self->id);
+    if(self->alloc == 2)
+    	talloc_asprintf_append(str, "*");
+
     result = PyString_FromString(str);
     talloc_free(str);
     return result;

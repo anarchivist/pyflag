@@ -1063,6 +1063,8 @@ class DeletedType(StateType):
         tmp=result.__class__(result)
         if value=='alloc':
             tmp.icon("yes.png")
+        elif value=='realloc':
+            tmp.icon("realloc.png")
         elif value=='deleted':
             tmp.icon("no.png")
         else:

@@ -78,6 +78,8 @@ class Sleuthkit_File(File):
 
         ## List the blocks in this file:
         tmp = result.__class__(result)
+        if self.inode.endswith('*'):
+        	tmp.para("This file has been reallocated, the following metadata is for the currently allocated file and may not reflect the filename selected. See http://www.pyflag.net/cgi-bin/moin.cgi/FileTypes")
         tmp.para("Block size is %s bytes. The following blocks make up the file:" % self.block_size)
         tmp.row("Block","Extent", **{'type':'heading', 'class': 'explain'})
         dbh = DB.DBO(self.case)
@@ -123,20 +125,10 @@ class Sleuthkit(DBFS):
         #dbh_inode.mass_insert_start("inode")
         dbh_block.mass_insert_start("block")
 
-        #def insert(inode, type, path, name):
-            # insert inode record
-            #inode_id = insert_inode(inode)
-            # insert the file record
-            #insert_file(inode_id, inode, type, path, name)
-
         def insert_file(inode_id, inode, type, path, name):
             path = path.decode("utf8","ignore")
             name = name.decode("utf8","ignore")
             
-            # dont do anything for realloc inodes
-            if inode.alloc == 2:
-                return
-
             inodestr = "I%s|K%s" % (iosource_name, inode)
             pathstr = "%s%s/" % (mount_point, path)
 
@@ -145,11 +137,13 @@ class Sleuthkit(DBFS):
             if pathstr.endswith("//"):
                 pathstr = pathstr[:-1]
 
-            if inode.alloc:
-                allocstr = "alloc"
-            else:
+            if inode.alloc == 0:
                 allocstr = "deleted"
                 type = type[:-1]+'-'
+            elif inode.alloc == 1:
+                allocstr = "alloc"
+            elif inode.alloc == 2:
+                allocstr = "realloc"
 
             fields = {
                 "inode":inodestr,
@@ -199,7 +193,8 @@ class Sleuthkit(DBFS):
 
             # dont do anything for realloc inodes or those with an invalid
             # inode number. inode_id 1 is the default (dummy) entry
-            if inode.alloc == 2 or str(inode) == "0-0-0":
+            #if inode.alloc == 2 or str(inode) == "0-0-0":
+            if str(inode) == "0-0-0":
                 return 1
 
             inodestr = "I%s|K%s" % (iosource_name, inode)
@@ -274,7 +269,17 @@ class Sleuthkit(DBFS):
             dbh_file.mass_insert(inode = '', mode = 'd/d',
                                  status = 'alloc', path=FlagFramework.normpath(mount_point+root[1].decode("utf8")),
                                  name = '')
+
+            ## if a entry is marked as 'realloc' it is an artifact of NTFS
+            ## directory b-tree re-sorting, quite often there is still an
+            ## alloc entry with exactly the same name, so the realloc entry
+            ## becomes redundant. However, when there is no alloc entry for
+            ## the realloc entry, it becomes important forenic data.
             for d in dirs:
+               	if d[0].alloc == 2: # realloc
+               	    dirs2 = [ x for x in dirs if x != d and x[1] == d[1] and str(x[0]) == str(d[0])[:-1] ]
+               	    if dirs2: continue
+
                 inum = str(d[0])
                 if inum in deleted_inodes:
                     inode_id = deleted_inodes[inum][0]
@@ -284,6 +289,10 @@ class Sleuthkit(DBFS):
                 insert_file(inode_id, d[0], 'd/d', root[1], d[1])
 
             for f in files:
+               	if f[0].alloc == 2: # realloc
+                    files2 = [ x for x in files if x != f and x[1] == f[1] and str(x[0]) == str(f[0])[:-1] ]
+                    if files2: continue
+
             	inum = str(f[0])
                 if inum in deleted_inodes:
                     inode_id = deleted_inodes[inum][0]
