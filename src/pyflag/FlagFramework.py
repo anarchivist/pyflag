@@ -400,11 +400,7 @@ class Flag:
 
         #Lets remember the fact that we analysed this report - in the database
         try:
-            try:
-                dbh = DB.DBO(query['case'])
-            except KeyError:
-                dbh = DB.DBO(None)
-
+            dbh = DB.DBO(query.get('case'))
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
         except DB.DBError:
             pass

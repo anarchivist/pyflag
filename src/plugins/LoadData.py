@@ -343,6 +343,7 @@ class ScanFS(Reports.report):
 
     def analyse(self,query):
         scanner_names = self.calculate_scanners(query)
+        print "Scanner names %s" % (scanner_names,)
 
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Asking pyflash to scan the path: %s with scanners %s" % (query['path'], scanner_names))
             
@@ -374,8 +375,64 @@ class ScanFS(Reports.report):
                        FlagFramework.query_type(case=query['case'],
                                                 family='Disk Forensics', report='BrowseFS',
                                                 open_tree = query['path']), pane='parent')
+
+class ScanInode(ScanFS):
+    parameters = {'inode':'any', 'case':'any'}
+    name = "Scan Inode"
+    description = "Scan a single inode using the specified scanners"
+    hidden = True
+
+    def form(self,query,result):
+        try:
+            ## Draw the form for each scan group:
+            result.text(DB.expand("Scanning Inode %s", (query['inode'])))
+            groups = []
+            for cls in ScannerUtils.scan_groups_gen():
+                try:
+                    drawer = cls.Drawer()
+                    if drawer.group in groups: continue
+                    groups.append(drawer.group)
+                    drawer.form(query,result)
+                except RuntimeError:
+                    pass
+            result.checkbox('Click here when finished','final','ok')
+        except KeyError:
+            return result
+
+    def analyse(self,query):
+        scanner_names = self.calculate_scanners(query)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Asking pyflash to scan the inode: %s with scanners %s" % (query['inode'], scanner_names))
         
- 
+        #Use pyflash to do all the work
+        print scanner_names
+        env = pyflagsh.environment(case=query['case'])
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=[query['inode'],] + scanner_names)
+
+    def progress(self,query,result):
+        result.decoration='naked'
+        result.heading("Scanning inode %s" % (query['inode']))
+        scanners = self.calculate_scanners(query)
+        dbh = DB.DBO()
+        dbh.execute("select count(*) as jobs from jobs")
+        jobs = dbh.fetch()['jobs']
+
+        result.para("%s jobs pending (all cases)" % jobs)
+        result.para("The following scanners are used: %s" % scanners)
+        pyflaglog.render_system_messages(result)
+
+    def display(self,query,result):
+        ## Reset the report cache for us - this eliminates the bug
+        ## where a re-scan on the same directory doesnt work.
+        FlagFramework.reset_all(family = query['family'], report=query['report'],
+                                case=query['case'], path=query['inode'])
+
+        ## Browse the filesystem instantly
+        result.refresh(0,
+                       FlagFramework.query_type(case=query['case'],
+                                                family='Disk Forensics', report='ViewFile',
+                                                inode = query['inode']), pane='parent')
+
 class ResetScanners(ScanFS):
     """ This report will reset the specified scanners.
 

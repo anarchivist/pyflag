@@ -69,7 +69,8 @@ class Menu(Theme.BasicTheme):
         <link rel="stylesheet" type="text/css" href="images/print.css" media="print" />
         </head>
         <body style="overflow: auto;">
-        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>'''
+        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
+        '''
         if toolbar_str:
             result += '''<div class=PyFlagHeader>
             <div class=Toolbar> %s </div>

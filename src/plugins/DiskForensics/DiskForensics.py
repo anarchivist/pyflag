@@ -239,12 +239,10 @@ class ViewFile(Reports.report):
             callbacks=callbacks,
             context="mode"
             )
-
-        path, inode, inode_id = fsfd.lookup(inode=query['inode'])
         
         result.toolbar(text="Scan this File",icon="examine.png",
-                       link=query_type(family="Load Data", report="ScanFS",
-                                       path=path,
+                       link=query_type(family="Load Data", report="ScanInode",
+                                       inode = query['inode'],
                                        case=query['case']
                                        ),
                        pane = 'pane'

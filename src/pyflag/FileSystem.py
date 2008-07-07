@@ -862,7 +862,7 @@ class File:
                                              case   =query['case'],
                                              inode_id  =self.inode_id)
         
-        result.result = "<iframe height='100%%' width='100%%' src='f?%s'></iframe>" % new_query
+        result.result = "<iframe id='summaryFrame' name='summaryFrame' height='100%%' width='100%%' src='f?%s'></iframe><script>AdjustHeightToPageSize('summaryFrame');</script>" % new_query
         
     def download(self, query,result):
         """ Used for dumping the entire file into the browser """
