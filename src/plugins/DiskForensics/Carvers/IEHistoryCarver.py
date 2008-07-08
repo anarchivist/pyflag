@@ -22,6 +22,7 @@
 """ This is a carver for IE History files. It depends on the IEHistory
 File handler to create all the tables etc.
 """
+import pyflag.Scanner as Scanner
 import JPEGCarver
 import pyflag.format as format
 import pyflag.DB as DB
@@ -36,6 +37,10 @@ class IECarver(JPEGCarver.JPEGCarver):
     regexs = ['URL ']
     ids = []
     
+    def __init__(self,fsfd):
+        JPEGCarver.ensure_carver_signatures_in_dictionary(IECarver)
+        Scanner.GenScanFactory.__init__(self,fsfd)
+
     class Scan(JPEGCarver.CarverScan):
         def examine_hit(self, fd, offset, length):
             fd.seek(offset)
@@ -68,7 +73,6 @@ class IECarver(JPEGCarver.JPEGCarver):
             dbh = DB.DBO(self.case)
             dbh.insert("ie_history", **args)
                 
-JPEGCarver.ensure_carver_signatures_in_dictionary(IECarver)
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh

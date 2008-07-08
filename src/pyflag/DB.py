@@ -937,11 +937,15 @@ def convert_to_unicode(case, table):
     which happen to not be unicode. New tables should be automatically
     utf8.
     """
-    dbh = DBO(case)
-    dbh.execute("show create table %s", table)
-    row = dbh.fetch()
-    statement = row['Create Table'].splitlines()
-    last_line = statement[-1]
-    m = re.search("CHARSET=([^ ]+)",last_line)
-    if m and m.group(1).lower() != "utf8":
-        dbh.execute("alter table %s convert to charset 'utf8'", table)
+    try:
+        dbh = DBO(case)
+        dbh.execute("show create table %s", table)
+        row = dbh.fetch()
+        statement = row['Create Table'].splitlines()
+        last_line = statement[-1]
+        m = re.search("CHARSET=([^ ]+)",last_line)
+        if m and m.group(1).lower() != "utf8":
+            dbh.execute("alter table %s convert to charset 'utf8'", table)
+    except:
+        pass
+

@@ -202,6 +202,11 @@ class JPEGCarver(Scanner.GenScanFactory):
     extension = 'jpg'        
     length = 600000
 
+
+    def __init__(self,fsfd):
+        ensure_carver_signatures_in_dictionary(JPEGCarver)
+        Scanner.GenScanFactory.__init__(self,fsfd)
+
     class Drawer(Scanner.Drawer):
         description = "File Carvers"
         group = 'Carvers'
@@ -221,7 +226,6 @@ class JPEGCarver(Scanner.GenScanFactory):
                 pyflaglog.log(pyflaglog.DEBUG, "Carver failed: %s" % e)
                 return  min(self.fd.size-offset, self.outer.length)
             
-ensure_carver_signatures_in_dictionary(JPEGCarver)
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

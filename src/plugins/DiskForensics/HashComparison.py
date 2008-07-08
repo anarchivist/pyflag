@@ -105,9 +105,12 @@ try:
     dbh.fetch()
 except Exception,e:
     print "Cant find nsrl database - creating it"
-    dbh = DB.DBO()
-    h = HashTables()
-    h.init_default_db(dbh, None)
+    try:
+        dbh = DB.DBO()
+        h = HashTables()
+        h.init_default_db(dbh, None)
+    except:
+        pass
 
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """

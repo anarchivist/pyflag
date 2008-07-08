@@ -24,6 +24,7 @@
 Its quite simple, we search for the script header #!/usr/bin/python
 for example, then just scan the rest for ascii chars.
 """
+import pyflag.Scanner as Scanner
 import JPEGCarver
 import pyflag.DB as DB
 import re
@@ -35,6 +36,10 @@ class ScriptCarver(JPEGCarver.JPEGCarver):
     group = "Carvers"
     regexs = [ '#!/usr/bin/', '#!/bin/']
     ids = []
+
+    def __init__(self,fsfd):
+        JPEGCarver.ensure_carver_signatures_in_dictionary(ScriptCarver)
+        Scanner.GenScanFactory.__init__(self,fsfd)
 
     class Scan(JPEGCarver.CarverScan):
         def examine_hit(self, fd, offset, length):
@@ -91,7 +96,6 @@ class ScriptCarver(JPEGCarver.JPEGCarver):
                        type = self.type,
                        )
 
-JPEGCarver.ensure_carver_signatures_in_dictionary(ScriptCarver)
 
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
