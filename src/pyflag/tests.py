@@ -104,7 +104,8 @@ class ScannerTest(unittest.TestCase):
                                    "TZ=%s" % self.TZ
                                    ])
 
-        pyflagsh.shell_execv(command="execute",
+        if self.fstype:
+            pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "fstype=%s" % self.fstype,

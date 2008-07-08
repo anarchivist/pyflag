@@ -104,7 +104,7 @@ class MagicResolver:
         We check the db cache first.
         """
         dbh = DB.DBO(case)
-
+        
         if inode:
             dbh.execute("select inode_id from inode where inode = %r", inode)
             row = dbh.fetch()

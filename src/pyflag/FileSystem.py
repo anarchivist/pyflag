@@ -75,7 +75,7 @@ class FileSystem:
     ## from this FS:
     cookie = 0
     
-    def __init__(self, case):
+    def __init__(self, case, query=None):
         """ Constructor for creating an new filesystem object
 
         @arg case: Case to use
@@ -136,7 +136,7 @@ class FileSystem:
             path, inode, inode_id = self.lookup(inode_id=inode_id)
 
         if not inode:
-            raise IOError('Inode not found for file')
+            raise IOError('Inode not found for file (inode_id %s, path %s)' % (inode_id,path))
 
         parts = inode.split('|')
         sofar = [] # the inode part up to the file we want
@@ -222,12 +222,20 @@ class FileSystem:
     def listdir(self,path):
         """ standards compliant listdir, generates directory entries. """
         return self.ls(path)
+
+    ## These are the list of parameters which we need to fulfil for
+    ## this filesystem
+    parameters = []
+    def form(self, query, result):
+        """ We are able to ask for more optional variables here """
     
 class DBFS(FileSystem):
     """ Class for accessing filesystems using data in the database """
-    def __init__(self, case):
+    def __init__(self, case, query=None):
         """ Initialise the DBFS object """
         self.case = case
+        ## This allows us to get optional args
+        self.query = query
 
     def load(self, mount_point, iosource_name, loading_scanners = None):
         """ Sets up the schema for loading the filesystem.
@@ -696,11 +704,15 @@ class File:
         return size
 
     def lookup_id(self):
+        ## A shortcut cached item
+        if self.inode_id: return self.inode_id
+        
         dbh=DB.DBO(self.case)
         dbh.check_index('inode','inode')
         dbh.execute("select inode_id from inode where inode=%r", self.inode)
         res = dbh.fetch()
         try:
+            self.inode_id = res["inode_id"]
             return res["inode_id"]
         except:
             return None

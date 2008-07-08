@@ -146,6 +146,11 @@ def expand(sql, params):
     if isinstance(params, basestring):
         params = (params,)
 
+    try:
+        params[0]
+    except:
+        params = (params,)
+
     def cb(m):
         if m.group(1)=="s":
             result = u"%s" % (force_unicode(params[d['count']]))

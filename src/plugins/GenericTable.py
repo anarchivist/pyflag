@@ -38,7 +38,6 @@ class GenericReport(Reports.report):
             columns = t.columns + t.extras
             columns_cls, args = columns[i]
             args = args.copy()
-            print columns_cls, args
             elements.append( columns_cls(table=t.name, case=query['case'], **args))
             
         result.table(

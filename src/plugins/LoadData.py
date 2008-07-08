@@ -507,7 +507,19 @@ class LoadFS(Reports.report):
     order = 20
 
     progress_str=None
-    
+
+    def __init__(self, flag, ui=None):
+        if ui:
+            try:
+                c = Registry.FILESYSTEMS.dispatch(ui.defaults['fstype'])
+                c = c(ui.defaults['case'], ui.defaults)
+                for p in c.parameters:
+                    self.parameters[p] = 'any'
+            except KeyError:
+                pass
+
+        Reports.report.__init__(self, flag, ui)
+
     def form(self,query,result):
         result.start_table()
         try:
@@ -525,7 +537,7 @@ class LoadFS(Reports.report):
             metadata = {}
             order = []
             for c in Registry.FILESYSTEMS.classes:
-                c = c(query['case'])
+                c = c(query['case'], query)
                 guess = c.guess(fd, result, metadata)
                 if guess>0:
                     order.append((guess , c.name))
@@ -547,6 +559,15 @@ class LoadFS(Reports.report):
 
             result.textfield("VFS Mount Point:","mount_point")
             result.ruler()
+
+            ## Allow the filesystem to draw a form:
+            try:
+                c = Registry.FILESYSTEMS.dispatch(query['fstype'])
+                c = c(query['case'], query)
+                c.form(query, result)
+            except KeyError:
+                pass
+
         except IOError,e:
             result.text("IOError %s" % e,style='red')
         except (KeyError,TypeError),e:
@@ -559,7 +580,7 @@ class LoadFS(Reports.report):
         self.progress_str=None
 
         # call on FileSystem to load data
-        fsobj=Registry.FILESYSTEMS.dispatch(query['fstype'])(query['case'])
+        fsobj=Registry.FILESYSTEMS.dispatch(query['fstype'])(query['case'],query)
         mount_point = FlagFramework.normpath("/"+query['mount_point'])
         fsobj.load(mount_point, query['iosource'])
         dbh.set_meta("mount_point_%s" % query['iosource'] , mount_point)

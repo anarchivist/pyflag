@@ -248,3 +248,37 @@ class report:
 
         #If we got here without an exception, all is well
         return True
+
+class CaseTableReports(report):
+    """ This is a generic report which automatically generates a table
+    based on registered Case Tables.
+    """
+    ## This is the list of columns which will be used. They are names
+    ## of the form TableName.ColumnName (Note that TableName is the
+    ## name of the class of the CaseTable - not the underlying db
+    ## table). If you dont want to provide the TableName, just set
+    ## default_table.
+    default_table = ''
+    columns = []
+    def display(self, query, result):
+        elements = []
+        ## Search case tables for the elements:
+        for t in self.columns:
+            try:
+                class_name , column_name = t.split(".")
+            except:
+                class_name = self.default_table
+                column_name = t
+                
+            for cls in Registry.CASE_TABLES.classes:
+                if cls.__name__ == class_name:
+                    e  = cls()
+                    elements.append(e.bind_column(query['case'], column_name))
+                    break
+                
+        print elements
+        
+        result.table(
+            elements = elements,
+            case = query['case'],
+            )
