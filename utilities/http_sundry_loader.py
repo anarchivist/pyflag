@@ -29,6 +29,9 @@ config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import sys,urllib
 import shutil
+import zipfile
+import pyflag.FileSystem as FileSystem
+
 
 config.set_usage(usage = """%prog --case casename [--offline scriptfile] regex
        %prog --case casename --load zipfile
@@ -56,6 +59,9 @@ config.add_option("offline", short_option='o', default=False, action='store_true
 config.add_option("load", short_option='i', default=False, action='store_true',
                   help = "import a sundry archive generated using an offline script")
 
+config.add_option("export", default=None, 
+                  help = "A filename to export the sundry from the current case. The file will be a zip file suitable for use with --load")
+
 config.add_option("list", short_option='l', default=False, action='store_true',
                   help = "List the urls matching the regexes but do not fetch them")
 
@@ -69,7 +75,22 @@ def make_filename(id, case):
     return "%s/case_%s/xHTTP%s" % (config.RESULTDIR, case, id)
 
 dbh = DB.DBO(config.case)
-if config.copy:
+if config.export:
+    ## Export the sundry objects into a zip file
+    zfile = zipfile.ZipFile(config.export, "w", compression=zipfile.ZIP_DEFLATED)
+    dbh.execute("select * from http_sundry")
+    for row in dbh:
+        if row['present']=='yes':
+            try:
+                fd = open(make_filename(row['id'], config.case))
+                zfile.writestr(row['url'].encode("base64"), fd.read())
+                fd.close()
+            except IOError,e:
+                print "Skipping %s: %s" % (row['id'], e)
+
+    sys.exit(0)
+    
+elif config.copy:
     dest_dbh = DB.DBO(config.copy)
     dbh.execute("select *  from http_sundry")
     for row in dbh:
@@ -137,14 +158,13 @@ if config.offline:
     print "Written download script to: %s" % config.args[0]
     sys.exit(0)
 
-import zipfile
-
 dbh2 = DB.DBO(config.case)
 if config.load:
     zfile = zipfile.ZipFile(config.args[0])
     namelist = zfile.namelist()
 
     sundry = {}
+    fsfd = FileSystem.DBFS(config.case)
     dbh.execute("select * from http_sundry")
     for row in dbh:
         sundry[row['url']] = row['id']
@@ -157,8 +177,18 @@ if config.load:
                        _fast = True,
                        present = 'yes')
         else:
+            ## Sundry object does not exist, we need to VFSCreate it
             filename = make_filename(dbh2.autoincrement(), config.case)
-            dbh2.insert("http_sundry", url=url, present="yes")
+            
+            ## Make a null call to get an inode id
+            inode_id = fsfd.VFSCreate(None, None, None)
+
+            ## Use the id to really insert now
+            fsfd.VFSCreate(None, "xHTTP%s" % inode_id, "/_Sundry_/xHTTP%s" % inode_id,
+                           inode_id = inode_id, update_only = True)
+
+            ## Update the sundry table
+            dbh2.insert("http_sundry", id=inode_id, url=url, present="yes")
 
         print "Writing %s into %s" % (url, filename)
         fd = open(filename, "w")

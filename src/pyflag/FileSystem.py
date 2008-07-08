@@ -705,7 +705,9 @@ class File:
 
     def lookup_id(self):
         ## A shortcut cached item
-        if self.inode_id: return self.inode_id
+        try:
+            if self.inode_id: return self.inode_id
+        except AttributeError: pass
         
         dbh=DB.DBO(self.case)
         dbh.check_index('inode','inode')
