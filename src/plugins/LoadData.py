@@ -431,7 +431,7 @@ class ScanInode(ScanFS):
         result.refresh(0,
                        FlagFramework.query_type(case=query['case'],
                                                 family='Disk Forensics', report='ViewFile',
-                                                inode = query['inode']), pane='parent')
+                                                inode = query['inode']))
 
 class ResetScanners(ScanFS):
     """ This report will reset the specified scanners.
