@@ -53,14 +53,16 @@ class NewCase(Reports.report):
     def form(self,query,result):
         result.defaults = query
         result.textfield("Please enter a new case name:","create_case")
+        result.tz_selector("Case Timezone", "TZ")
         return result
 
     def display(self,query,result):
 
         ## Use the shell to do the heavy lifting.
         try:
-           pyflagsh.shell_execv(command='create_case',
-                             argv=[ query['create_case'],])
+            pyflagsh.shell_execv(command='create_case',
+                             argv=[ query['create_case'], "TZ=%s" % query['TZ'] ])
+
         except RuntimeError, e:
 
             result.heading("Problem Creating Case!")

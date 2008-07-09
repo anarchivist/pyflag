@@ -684,6 +684,17 @@ class create_case(load):
 
             ## Post the create event on the case
             FlagFramework.post_event('create', case)
+
+            ## set any case parameters that were provided
+            params = dict([arg.split("=",1) for arg in self.args[1:] if "=" in arg])
+
+            ## add a default TZ if not present
+            if not params.has_key("TZ"):
+            	params["TZ"] = "SYSTEM"
+
+            case_dbh  = DB.DBO(case)
+            for p in params:
+                case_dbh.insert("meta", property = p, value = params[p])
             
         yield "Created Case %s" % case
         

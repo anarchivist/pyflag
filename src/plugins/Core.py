@@ -286,12 +286,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         KEY property(property),
         KEY joint(property,value(20)))""")
 
-        ## Defaults
-        case_dbh.insert("meta",
-                        property = "TZ",
-                        value = "SYSTEM",
-                        _fast = True)
-        
         ## This is a transactional table for managing the cache
         case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
@@ -558,6 +552,9 @@ class CaseConfiguration(Reports.report):
     name = "Configure Case"
     
     def form(self, query, result):
+        dbh = DB.DBO(query['case'])
+        tz = dbh.get_meta("TZ")
+        result.defaults.default("TZ", tz)
         result.heading("Case configuration")
         result.tz_selector("Timezone", "TZ")
 

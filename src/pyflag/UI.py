@@ -151,7 +151,7 @@ class GenericUI:
             tz = row['name'][len("posix/"):]
             timezones.append(tz)
 
-        self.const_selector(description, name, timezones, timezones)
+        self.const_selector(description, name, timezones, timezones, **options)
 
     def textfield(self,description,name,**options):
         """ Draws a textfield in a table row. """
