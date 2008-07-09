@@ -936,10 +936,17 @@ class InodeIDType(IntegerType):
             next_row = dbh.fetch()
             fsfd = FileSystem.DBFS(self.case)
             inode_id = row[self.name]
+            dbh.execute("select * from annotate where inode_id = %r limit 1",
+                        inode_id)
+            row2 = dbh.fetch()
 
             query.set('inode_id', inode_id)
             query.default("mode", "Summary")
             report.display(query, result)
+
+            ## What should we do now - we basically set the type of
+            ## toolbar to show
+            action = "activate"
 
             if query.has_key('annotate'):
                 dbh = DB.DBO(self.case)
@@ -954,14 +961,20 @@ class InodeIDType(IntegerType):
                                note = query.get("annotate_text","Tag"),
                                )
                     
-                    query.set('annotate','no')
-                    result.toolbar(icon='no.png', link = query, pane = 'pane')
+                    action = 'deactivate'
                 else:
-                    query.set('annotate','yes')
-                    result.toolbar(icon='yes.png', link = query, pane = 'pane')
-            else:
+                    action = 'activate'
+
+            elif row2:
+                action = 'deactivate'
+
+            ## Now we show the appropriate toolbar
+            if action=='activate':
                 query.set('annotate','yes')
                 result.toolbar(icon='yes.png', link = query, pane = 'pane')
+            else:
+                query.set('annotate','no')
+                result.toolbar(icon='no.png', link = query, pane = 'pane')
 
             query.clear('annotate')
 
@@ -992,11 +1005,26 @@ class InodeIDType(IntegerType):
                 result.end_table()
                 result.end_form()
 
+            def goto_cb(query,result):
+                query.default('goto','0')
+                result.decoration='naked'
+                result.heading("Goto row number")
+                result.start_form(query, pane='parent_pane')
+                result.textfield("Row number",'inode_limit')
+                result.end_table()
+                result.end_form()
+
             result.toolbar(
                 cb = set_annotation_text,
                 text = "Set Annotation Text",
                 icon = 'annotate.png', pane='popup',
                 )
+
+            result.toolbar(
+                cb = goto_cb,
+                text = "Goto row number (Current %s)" % query.get('inode_limit',1),
+                icon = 'stock_next-page.png',
+                pane = 'popup',)
 
         result.toolbar(cb = browse_cb, icon="browse.png",
                        tooltip = "Browse Inodes in table", pane='new')
