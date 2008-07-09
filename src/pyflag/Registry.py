@@ -88,12 +88,7 @@ class Registry:
 
                                 #load the module into our namespace
                                 try:
-                                    ## Try to load the module from the
-                                    ## currently cached copy
-                                    try:
-                                        module = sys.modules[module_name]
-                                    except KeyError:
-                                        module = imp.load_source(module_name,dirpath+'/'+filename,fd)
+                                    module = imp.load_source(module_name,dirpath+'/'+filename,fd)
                                 except Exception,e:
                                     pyflaglog.log(pyflaglog.ERRORS, "*** Unable to load module %s: %s"
                                                 % (module_name,e))

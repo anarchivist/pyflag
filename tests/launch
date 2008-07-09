@@ -10,6 +10,6 @@ INSTALL_DIR=/var/tmp/build/pyflag/
 ## can find it itself) 
 
 export PYFLAG_PLUGINS=$SRC_DIR/src/plugins
-export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:$INSTALL_DIR/lib/python2.5/site-packages/pyflag:$INSTALL_DIR/lib/python2.4/site-packages/pyflag
+export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:/usr/loca/lib/python2.5/site-packages/:$INSTALL_DIR/lib/python2.5/site-packages/pyflag:$INSTALL_DIR/lib/python2.4/site-packages/pyflag
 
 $@

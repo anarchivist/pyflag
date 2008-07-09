@@ -6,7 +6,7 @@ EXTRA_DIST		= 	$(nobase_pkgdata_DATA)
 
 # main pyflag (python) application
 ## The pyflag directory goes in the system site-packages
-pkgpython_PYTHON 	=	$(shell find pyflag -name \*.py -not -name .\* ) 
+pkgpython_PYTHON 	=	$(shell find pyflag -maxdepth 1 -name \*.py -not -name .\* ) 
 
 ## The plugins go in site-packages/pyflag/
 nobase_pkgpython_PYTHON 	=	$(shell find plugins -name \*.py -not -name .\*) \
