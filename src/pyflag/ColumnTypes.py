@@ -938,6 +938,7 @@ class InodeIDType(IntegerType):
             inode_id = row[self.name]
 
             query.set('inode_id', inode_id)
+            query.default("mode", "Summary")
             report.display(query, result)
 
             annotate = query.get('annotate','no')
