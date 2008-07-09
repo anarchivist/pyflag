@@ -10,6 +10,7 @@ import pyflag.FileSystem as FileSystem
 import pyflag.Scanner as Scanner
 import time, types
 import pyflag.pyflaglog as pyflaglog
+import BasicCommands
 
 class scan_path(pyflagsh.command):
     """ This takes a path as an argument and runs the specified scanner on the path
@@ -160,6 +161,53 @@ class scan(pyflagsh.command):
 
             time.sleep(1)
 
+class scan_file(scan,BasicCommands.ls):
+    """ Scan a file in the VFS by name """
+    def help(self):
+        return "scan file [list of scanners]: Scan the file with the scanners specified "
+
+    def complete(self, text,state):
+        if len(self.args)>2 or len(self.args)==2 and not text:
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            return scanners[state]
+        else:
+            dbh = DB.DBO(self.environment._CASE)
+            dbh.execute("select  substr(path,1,%r) as abbrev,path from file where path like '%s%%' group by abbrev limit %s,1",(len(text)+1,text,state))
+            return dbh.fetch()['path']
+
+    def execute(self):
+        if len(self.args)<2:
+            yield self.help()
+            return
+
+        pdbh = DB.DBO()
+        pdbh.mass_insert_start('jobs')
+        cookie = int(time.time())
+        scanners = []
+        for i in range(1,len(self.args)):
+            scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
+
+        for path in self.glob_files(self.args[:1]):
+            path, inode, inode_id = self.environment._FS.lookup(path = path)
+            ## This is a cookie used to identify our requests so that we
+            ## can check they have been done later.
+
+            pdbh.mass_insert(
+                command = 'Scan',
+                arg1 = self.environment._CASE,
+                arg2 = inode,
+                arg3 = ','.join(scanners),
+                cookie=cookie,
+                )
+
+        pdbh.mass_insert_commit()
+        
+        ## Wait for the scanners to finish:
+        if 1 or self.environment.interactive:
+            self.wait_for_scan(cookie)
+            
+        yield "Scanning complete"
+
 ##
 ## This allows people to reset based on the VFS path
 ##
@@ -243,14 +291,20 @@ class load_and_scan(scan):
         iosource=self.args[0]
         mnt_point=self.args[1]
         filesystem=self.args[2]
+        query = {}
 
         dbh = DB.DBO()
         dbh.mass_insert_start('jobs')
         ## This works out all the scanners that were specified:
         tmp = []
         for i in range(3,len(self.args)):
-            tmp.extend([x for x in fnmatch.filter(
-                Registry.SCANNERS.scanners, self.args[i]) ])
+            ## Is it a parameter?
+            if "=" in self.args[i]:
+                prop,value = self.args[i].split("=",1)
+                query[prop] = value
+            else:
+                tmp.extend([x for x in fnmatch.filter(
+                    Registry.SCANNERS.scanners, self.args[i]) ])
 
 
         scanners = [ ]
@@ -265,7 +319,7 @@ class load_and_scan(scan):
             yield "Unable to find a filesystem of %s" % filesystem
             return
 
-        fs=fs(self.environment._CASE)
+        fs=fs(self.environment._CASE, query)
         fs.cookie = int(time.time())
         fs.load(mnt_point, iosource, scanners)
 

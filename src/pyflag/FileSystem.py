@@ -161,6 +161,7 @@ class FileSystem:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
         retfd.inode_id = inode_id
+
         return retfd
 
     def istat(self, path=None, inode=None):
@@ -687,7 +688,7 @@ class File:
         ## Copy ourself into the file
         while 1:
             data=self.read(10000000)
-            if data or len(data)==0: break
+            if not data or len(data)==0: break
             fd.write(data)
             size+=len(data)
 

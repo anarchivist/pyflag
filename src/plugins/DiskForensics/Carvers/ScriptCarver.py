@@ -49,6 +49,7 @@ class ScriptCarver(JPEGCarver.JPEGCarver):
             fd.seek(offset)
             ## Scripts are usually small so we limit ourselves to 10k
             data = fd.read(100000)
+            if not data: return
             lines = data.splitlines()
             m = re.match("#!/(usr/)?bin/([^\n]+)", lines[0])
             interpreter = m.group(2)

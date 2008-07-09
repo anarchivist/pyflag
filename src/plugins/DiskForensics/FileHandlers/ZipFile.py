@@ -370,7 +370,7 @@ class GZ_file(File):
                     continue
 
             except Exception, e:
-                pyflaglog.log(pyflaglog.WARNING, "Unable to decompress inode (%s) %s" % (self.inode, e))
+                #pyflaglog.log(pyflaglog.WARNING, "Unable to decompress inode (%s) %s" % (self.inode, e))
                 break
             
             count += len(data)

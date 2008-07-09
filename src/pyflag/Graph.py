@@ -214,7 +214,9 @@ class Thumbnailer(Image):
             self.Unknown()
             return
 
-        method()
+        try:
+            method()
+        except IOError: pass
 
         ## Note that handler are expected to set
         ## self.width,self.height as well as self.thumbnail which

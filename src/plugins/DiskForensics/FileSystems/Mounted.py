@@ -30,7 +30,21 @@ class Raw(DBFS):
         DBFS.load(self, mount_point, iosource_name)
 
         ## Just add a single inode:
-        self.VFSCreate("I%s" % iosource_name,'o0', "%s/raw_filesystem" % mount_point)
+        inode = "I%s|o0" % iosource_name
+        self.VFSCreate(None,inode, "%s/raw_filesystem" % mount_point)
+
+        ## Call the scanners on the new inode
+        if scanners:
+            scanner_string = ",".join(scanners)
+            pdbh = DB.DBO()
+            pdbh.insert('jobs',
+                        command = 'Scan',
+                        arg1 = self.case,
+                        arg2 = inode,
+                        arg3= scanner_string,                       
+                        cookie = int(time.time()),
+                        _fast = True,
+                        )
 
 ## This is the IO Source:
 class Mounted(IO.Image):

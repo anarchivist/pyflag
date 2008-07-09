@@ -278,12 +278,12 @@ class GenericUI:
                 result.heading("No case selected")
             else:
                 import pyflag.FileSystem as FileSystem
-                def make_new_query(query):
+                def make_new_query(query, path=''):
                     case = query['case']
                     new_query = query.clone()
                     new_query['__target__'] = name
                     new_query['__target_type__'] = 'append'
-                    new_query['__target_format__'] = "vfs://%s%%s" % case
+                    new_query['__target_format__'] = "vfs://%s%s%%s" % (case,path)
                     new_query.poparray('callback_stored')
                     return new_query
 
@@ -301,12 +301,11 @@ class GenericUI:
                                 yield(([i['name'],i['name'],'branch']))
                                 
                     def pane_cb(path,tmp):
-                        print path
                         fsfd = FileSystem.DBFS( query["case"])
                         if not fsfd.isdir(path):
                             path=os.path.dirname(path)
 
-                        new_query = make_new_query(query)
+                        new_query = make_new_query(query, path + '/')
 
                         tmp.table(
                             elements = [ InodeIDType(case=query['case']),
@@ -326,7 +325,7 @@ class GenericUI:
 
                 def table_view_cb(query,result):
                     case = query['case']
-                    new_query = make_new_query(query)
+                    new_query = make_new_query(query,'')
                     
                     result.table(
                         elements = [ InodeIDType(),
