@@ -941,11 +941,24 @@ class InodeIDType(IntegerType):
             query.default("mode", "Summary")
             report.display(query, result)
 
-            annotate = query.get('annotate','no')
-            
-            if annotate == 'yes':
-                query.set('annotate','no')
-                result.toolbar(icon='no.png', link = query, pane = 'pane')
+            if query.has_key('annotate'):
+                dbh = DB.DBO(self.case)
+                ## We always do a delete in case there was a row there
+                dbh.delete('annotate',
+                           where = 'inode_id = %s' % inode_id,)
+
+                ## Then we do an insert to set the new value
+                if query['annotate'] == 'yes':
+                    dbh.insert('annotate',
+                               inode_id = inode_id,
+                               note = query.get("annotate_text","Tag"),
+                               )
+                    
+                    query.set('annotate','no')
+                    result.toolbar(icon='no.png', link = query, pane = 'pane')
+                else:
+                    query.set('annotate','yes')
+                    result.toolbar(icon='yes.png', link = query, pane = 'pane')
             else:
                 query.set('annotate','yes')
                 result.toolbar(icon='yes.png', link = query, pane = 'pane')
@@ -968,7 +981,23 @@ class InodeIDType(IntegerType):
                 new_query.set('inode_limit', limit + 1)
                 result.toolbar(icon = 'stock_right.png', link=new_query,
                                pane='self',tooltip = "Inode %s" % (limit + 1))
-                
+
+            def set_annotation_text(query,result):
+                query.default('annotate_text','Tag')
+                result.decoration='naked'
+                result.heading("Set Annotation Text")
+                result.para("This text will be used for all quick annotation")
+                result.start_form(query, pane='parent_pane')
+                result.textarea("Annotation Text",'annotate_text')
+                result.end_table()
+                result.end_form()
+
+            result.toolbar(
+                cb = set_annotation_text,
+                text = "Set Annotation Text",
+                icon = 'annotate.png', pane='popup',
+                )
+
         result.toolbar(cb = browse_cb, icon="browse.png",
                        tooltip = "Browse Inodes in table", pane='new')
 

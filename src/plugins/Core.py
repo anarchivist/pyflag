@@ -189,7 +189,7 @@ class OffsetFile(FileSystem.File):
         print self.offset, self.size
 
         if self.size > 0:
-            extract = "Extract %s bytes starting at byte %s" % (self.size - self.offset,
+            extract = "Extract %s bytes starting at byte %s" % (self.size,
                                                                 self.offset)
         else:
             extract = 'Extract %s bytes after end of file'\
