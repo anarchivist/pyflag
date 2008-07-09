@@ -277,25 +277,73 @@ class GenericUI:
             if not query.has_key('case'):
                 result.heading("No case selected")
             else:
-                case = query['case']
-                new_query = query.clone()
-                new_query['__target__'] = name
-                new_query['__target_type__'] = 'append'
-                new_query['__target_format__'] = "vfs://%s%%s" % case
-                new_query.poparray('callback_stored')
-                
-                result.table(
-                    elements = [ InodeIDType(),
+                import pyflag.FileSystem as FileSystem
+                def make_new_query(query):
+                    case = query['case']
+                    new_query = query.clone()
+                    new_query['__target__'] = name
+                    new_query['__target_type__'] = 'append'
+                    new_query['__target_format__'] = "vfs://%s%%s" % case
+                    new_query.poparray('callback_stored')
+                    return new_query
+
+                def tree_view_cb(query,result):
+                    
+                    def tree_cb(path):
+                        fsfd = FileSystem.DBFS(query['case'])
+                        query.default("path",'/')
+                        if not path.endswith('/'): path=path+'/'
+                        
+                        dirs = []
+                        for i in fsfd.dent_walk(path): 
+                            if i['mode']=="d/d" and i['status']=='alloc' and i['name'] not in dirs:
+                                dirs.append(i['name'])
+                                yield(([i['name'],i['name'],'branch']))
+                                
+                    def pane_cb(path,tmp):
+                        print path
+                        fsfd = FileSystem.DBFS( query["case"])
+                        if not fsfd.isdir(path):
+                            path=os.path.dirname(path)
+
+                        new_query = make_new_query(query)
+
+                        tmp.table(
+                            elements = [ InodeIDType(case=query['case']),
+                                         FilenameType(basename=True, case=query['case'],
+                                                      link = new_query,
+                                                      link_pane = 'parent'),
+                                         IntegerType('File Size','size'),
+                                         ],
+                            table='inode',
+                            where=DB.expand("file.path=%r and file.mode!='d/d'", (path+'/')),
+                            case=query['case'],
+                            pagesize=10,
+                            filter="filter2",
+                            )
+
+                    result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = [''] )
+
+                def table_view_cb(query,result):
+                    case = query['case']
+                    new_query = make_new_query(query)
+                    
+                    result.table(
+                        elements = [ InodeIDType(),
                                  FilenameType(case = case,
                                               link = new_query,
                                               link_pane = 'parent'),
                                  IntegerType('File Size', 'size')
                                  ],
-                    table = 'inode',
-                    case=case,
-                    order = 2,
-                    direction = 1
-                    )
+                        table = 'inode',
+                        case=case,
+                        order = 2,
+                        direction = 1
+                        )
+                    
+                result.notebook(names = ["Tree View", "Table View",],
+                                callbacks = [tree_view_cb, table_view_cb,],
+                                context = "vfs_selector")
 
         def file_popup(query, result):
             result.heading(description)
