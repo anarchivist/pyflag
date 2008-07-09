@@ -129,9 +129,13 @@ class ResetCase(Reports.report):
         query['create_case'] = query['reset_case']
         tmp = result.__class__(result)
         
+        dbh = DB.DBO(query['reset_case'])
+        tz = dbh.get_meta("TZ")
+
         report = DelCase(self.flag, self.ui)
         report.display(query,tmp)
         
+        query['TZ'] = tz
         report = NewCase(self.flag, self.ui)
         report.display(query,tmp)
 

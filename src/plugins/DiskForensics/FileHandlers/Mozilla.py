@@ -269,6 +269,7 @@ class MozCacheScan(Scanner.GenScanFactory):
                     inode = '%s|o%s:%s' % (data_fds[fileidx].inode, offset, length)
                 else:
                     inode = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber'].get_value()))[1]
+                    inode += "|o0" # differentiate the inode from the existing one
 
                 # add new entry to the VFS
                 if encoding: length=0
