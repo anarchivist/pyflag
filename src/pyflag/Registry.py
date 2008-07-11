@@ -52,6 +52,8 @@ class Registry:
     class_names = []
     order = []
     filenames = {}
+    ## These are the modules which have been disabled
+    loaded_modules = []
     
     def __init__(self,ParentClass):
         """ Search the plugins directory for all classes extending ParentClass.
@@ -74,10 +76,11 @@ class Registry:
                     if filename.endswith(".py"):
                         path = dirpath+'/'+filename
                         try:
-                            if path not in self.module_paths:
+                            if path not in self.loaded_modules:
+                                self.loaded_modules.append(path)
+                                
                                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Will attempt to load plugin '%s/%s'"
                                             % (dirpath,filename))
-                                ## If we do not have the module in the cache, we load it now
                                 try:
                                     #open the plugin file
                                     fd = open(path ,"r")
@@ -123,9 +126,13 @@ class Registry:
                                 self.module_paths.append(path)
                                 
                             else:
-                                ## We already have the module in the cache:
-                                module = self.modules[self.module_paths.index(path)]
-                                module_desc = self.module_desc[self.module_paths.index(path)]
+                                try:
+                                    ## We already have the module in the cache:
+                                    module = self.modules[self.module_paths.index(path)]
+                                    module_desc = self.module_desc[self.module_paths.index(path)]
+                                except (ValueError, IndexError),e:
+                                    ## If not the module has been loaded, but disabled
+                                    continue
 
                             #Now we enumerate all the classes in the
                             #module to see which one is a ParentClass:

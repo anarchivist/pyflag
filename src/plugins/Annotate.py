@@ -72,7 +72,8 @@ class ViewCaseReport(Reports.report):
     def display(self,query,result):
         def Annotated_inodes(query, result):
             result.table(
-                elements = [ InodeIDType(case=query['case']),
+                elements = [ TimestampType(name='Time',column='mtime', table='inode'),
+                             InodeIDType(case=query['case']),
                              FilenameType(case=query['case']),
                              StringType('Category','category'),
                              StringType('Note','note'),

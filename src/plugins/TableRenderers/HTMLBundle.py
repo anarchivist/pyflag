@@ -591,10 +591,16 @@ def render_html(self, inode_id, table_renderer):
         result += "<a href='%s'><img src=images/browse.png /></a>" % (filename,)
     except AttributeError: pass
 
-    if table_renderer.explain_inodes:
+    #if table_renderer.explain_inodes:
     ## Add a link to the explaination page:
-        filename = "inodes/%s_explain.html" % inode_id
-        result+="<a href='%s'><img src=images/question.png /></a>" %(filename,)
+    filename = "inodes/%s_explain.html" % inode_id
+    result+="<a href='%s'><img src=images/question.png /></a>" %(filename,)
+
+    ## Check if there are annotations for this
+    dbh = DB.DBO(case)
+    dbh.execute("select * from annotate where inode_id=%r", inode_id)
+    for row in dbh:
+        result += "<br>%s" % row['note']
 
     return result
 

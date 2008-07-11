@@ -288,7 +288,10 @@ class ZipFile(File):
 
                 if self.type == Zip.ZIP_DEFLATED:
                     ## Now Decompress that:
-                    ddata = self.d.decompress(cdata)
+                    try:
+                        ddata = self.d.decompress(cdata)
+                    except:
+                        ddata = ''
                 elif self.type == Zip.ZIP_STORED:
                     ddata = cdata
                 else:

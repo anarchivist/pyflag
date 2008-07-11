@@ -194,6 +194,12 @@ class DNSHandler(Packets.PacketHandler):
 
         except (AttributeError,KeyError),e:
             pass
+        
+# FIXME: this does not have an InodeID
+#class DNSTable(FlagFramework.CaseTable):
+#    """ DNS Table - holds DNS lookups """
+#    name = "dns"
+#    columns = [ [ In
 
 class DNSInit(FlagFramework.EventHandler):
     def create(self, dbh, case):

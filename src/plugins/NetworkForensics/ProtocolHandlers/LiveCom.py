@@ -506,7 +506,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
-        dbh = DB.DBO(self.case)        
+        dbh = DB.DBO(self.case)
         columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
         dbh.execute("select * from webmail_messages where `inode_id`=%r", self.lookup_id())
         row = dbh.fetch()

@@ -214,7 +214,9 @@ class GmailScanner(LiveCom.HotmailScanner):
                 ## This is a single combined message:
                 elif i[0]=='ms':
                     message = i[13]
-                    try: result['From'] = gmail_unescape(message[1])
+                    try: result['From'] = gmail_unescape(i[4])
+                    except IndexError: pass
+                    try: result['To'] = gmail_unescape(message[1])
                     except IndexError: pass
                     try: result['Subject'] = gmail_unescape(message[5])
                     except IndexError: pass
