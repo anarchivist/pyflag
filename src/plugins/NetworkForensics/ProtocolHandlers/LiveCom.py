@@ -507,7 +507,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
         dbh = DB.DBO(self.case)
-        columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
+        columns = ["service","type","From","To","CC","BCC","sent","subject","message"]
         dbh.execute("select * from webmail_messages where `inode_id`=%r", self.lookup_id())
         row = dbh.fetch()
         
@@ -517,7 +517,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         result.row("Timestamp", row2['mtime'])
 
         for c in columns:
-            if c=='Message':
+            if c=='message':
                 ## Filter the message out here:
                 parser = HTML.HTMLParser(tag_class = \
                                          FlagFramework.Curry(HTML.ResolvingHTMLTag,

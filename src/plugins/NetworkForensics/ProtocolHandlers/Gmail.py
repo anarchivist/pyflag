@@ -308,8 +308,9 @@ class WebmailViewer(FileSystem.StringIOFile):
         dbh = DB.DBO(self.case)
         dbh.execute("select * from webmail_messages where inode_id = %r limit 1" , id)
         row = dbh.fetch()
-        result.row("Web App", "Analyse %s transaction" % row['service'],
-                   **{'class': 'explainrow'})
+        if row:
+            result.row("Web App", "Analyse %s transaction" % row.get('service','unknown'),
+                       **{'class': 'explainrow'})
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

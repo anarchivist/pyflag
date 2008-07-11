@@ -974,7 +974,8 @@ class InodeIDType(IntegerType):
                 result.toolbar(icon='yes.png', link = query, pane = 'pane')
             else:
                 query.set('annotate','no')
-                result.toolbar(icon='no.png', link = query, pane = 'pane')
+                result.toolbar(icon='no.png', link = query, pane = 'pane',
+                               tooltip=row2['note'])
 
             query.clear('annotate')
 

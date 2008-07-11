@@ -247,7 +247,8 @@ class SanitizingTag(Tag):
 
     def css_filter(self, data):
         def resolve_css_references(m):
-            url = m.group(1)
+            action = m.group(1)
+            url = m.group(2)
             args={}
             ## This is a bit of a hack - magic detection of css is
             ## quite hard
@@ -255,11 +256,15 @@ class SanitizingTag(Tag):
                 args['hint'] = 'text/css'
                 
             result = self.resolve_reference(url, build_reference = False, **args)
-            return "url(%s)" % result
+            return "%s(%s)" % (action,result)
         
-        return re.sub("(?i)url\(\"?([^\)\"]+)\"?\)",
+        data = re.sub("(?i)(url)\(\"?([^\)\"]+)\"?\)",
                       resolve_css_references,
                       data)
+        data = re.sub("(?i)(@import)\s+'([^']+)'",
+                      resolve_css_references,
+                      data)
+        return data
 
     def __str__(self):
         ## Some tags are never allowed to be outputted

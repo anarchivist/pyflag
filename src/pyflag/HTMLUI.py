@@ -346,7 +346,8 @@ class HTMLUI(UI.GenericUI):
     def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:
         try:
-            self.result += expand("<a href='%s' target=_top>%s</a>",(target_options['url'],string))
+            self.result += expand("<a href='%s' target=_top>%s</a>",
+                                  (target_options['url'],string))
             return
         except KeyError:
             pass
@@ -1239,16 +1240,16 @@ class HTMLUI(UI.GenericUI):
         if int(interval)>0:
             base = "window.setTimeout(function() {refresh('f?%s',%r);},%s);" % (query, pane, 1000*int(interval))
         else:
-            base = "refresh('f?%s',%r);" % (query,pane)
+            base = expand("refresh('f?%s',%r);", (query,pane))
 
         self.result += "<script>%s</script>" % base
 
     def icon(self, path, tooltip=None, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""
         option_str = self.opt_to_str(options)
-        data = "<img border=0 src='images/%s' %s />" % (path, option_str)
+        data = expand("<img border=0 src='images/%s' %s />", (path, option_str))
         if tooltip:
-            data = "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),data)
+            data = expand("<abbr title=%r>%s</abbr>",((quote_quotes(tooltip),data)))
         self.result += data
 
     def wizard(self,names=[],context="wizard",callbacks=[],title=''):

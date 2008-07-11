@@ -37,10 +37,6 @@ class IECarver(JPEGCarver.JPEGCarver):
     regexs = ['URL ']
     ids = []
     
-    def __init__(self,fsfd):
-        JPEGCarver.ensure_carver_signatures_in_dictionary(IECarver)
-        Scanner.GenScanFactory.__init__(self,fsfd)
-
     class Scan(JPEGCarver.CarverScan):
         def examine_hit(self, fd, offset, length):
             fd.seek(offset)
