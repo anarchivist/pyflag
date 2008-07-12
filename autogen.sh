@@ -65,6 +65,7 @@ echo
 
 ## Fix up permissions of some files:
 chmod +x tests/pyflag tests/pyflash debian/rules
+chmod +x utilities/*.py
 
 echo everything done...
 echo

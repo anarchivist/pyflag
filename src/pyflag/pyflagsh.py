@@ -182,7 +182,7 @@ def process_line(line):
 
             ## If the output is short enough to fit on the screen,
             ## just print it there, otherwise pipe it to less.
-            if len(lines)<20:
+            if len(lines)<20 or config.command_file != None:
                 print "\n".join(lines)
             else:
                 ## FIXME: we should set a config parameter for pager.
