@@ -171,7 +171,7 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
 # below are some helpful functions to deal with date and timezone translation
 
 from dateutil.tz import gettz
-from dateutil.parser import parse as du_parse
+import dateutil.parser
 import datetime
 from os.path import basename
 
@@ -214,8 +214,13 @@ def parse(timestr, case=None, evidence_tz=None, **options):
     evidence_tz = gettz(evidence_tz)
     case_tz = get_case_tz(case)
 
-    DEFAULT = datetime.datetime(tzinfo=gettz("UTC"), *time.gmtime()[:6]).astimezone(evidence_tz)
-    dt = du_parse(timestr, default=DEFAULT, **options).astimezone(case_tz)
+    ## Maybe timestr is a unixtime:
+    try:
+        dt = datetime.datetime.fromtimestamp(int(timestr))
+    except:
+        DEFAULT = datetime.datetime(tzinfo=gettz("UTC"), *time.gmtime()[:6]).astimezone(evidence_tz)
+        dt = dateutil.parser.parse(timestr, default=DEFAULT, **options).astimezone(case_tz)
+
     return time.strftime("%Y-%m-%d %H:%M:%S", dt.timetuple())
 
 def convert(timeval, case=None, evidence_tz=None):

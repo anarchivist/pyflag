@@ -93,7 +93,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             if tmp:
                 message = HTML.decode_entity(tmp['value'])
                 if message:
-                    result['Message'] = message
+                    result['message'] = message
 
             if result:
                 result['type']='Edit Read'
@@ -114,7 +114,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             """ This looks for the listing in the mail box """
             table = self.parser.root.find("table",{"id":"datatable"})
             if not table: return False
-            result = {'type': 'Listed', 'Message': table}
+            result = {'type': 'Listed', 'message': table}
 
             mail_box = self.parser.root.find("h2", {"id":"folderviewheader"})
             if mail_box:
@@ -137,8 +137,8 @@ class YahooMailScan(LiveCom.HotmailScanner):
                                    ('From','username'),
                                    ('CC','send_to_cc'),
                                    ('Bcc', 'send_to_bcc'),
-                                   ('Subject', 'subject'),
-                                   ('Message', 'body'),
+                                   ('subject', 'subject'),
+                                   ('message', 'body'),
 
                                    ## These apply for Yahoo Versions after 20080424:
                                    ('Message', 'content'),
@@ -146,7 +146,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                                    ('CC', 'cc'),
                                    ('Bcc','bcc'),
                                    ('From','deffromaddress'),
-                                   ('Subject', 'subj'),
+                                   ('subject', 'subj'),
                                    ('message_id', 'ym.gen'),
                                    ]:
                 if query.has_key(pattern):
@@ -168,7 +168,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             return True
 
         def process_readmessage(self, fd):
-            result = {'type': 'Read', 'Message':'' }
+            result = {'type': 'Read', 'message':'' }
 
             dbh = DB.DBO(self.case)
             dbh.execute("select value from http_parameters where inode_id = %r and `key`='MsgId'", self.fd.inode_id)
@@ -212,7 +212,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                     elif a.startswith("From:"):
                         context = "From"
                         
-            result['Message'] = header.innerHTML()
+            result['message'] = header.innerHTML()
 
             return self.insert_message(result, inode_template = "y%s")
             
@@ -241,11 +241,11 @@ class YahooMailScan(LiveCom.HotmailScanner):
             ## Now the message:
             msgbody = self.parser.root.find('div', {"class":"msgbody"})
             if msgbody:
-                result['Message'] = msgbody.innerHTML()
+                result['message'] = msgbody.innerHTML()
                 
             if 'Sent' in result:
                 #result['Sent'] = ColumnTypes.guess_date(result['Sent'])
-                result['Sent'] = Time.parse(result['Sent'], case=self.case, evidence_tz=None) 
+                result['sent'] = Time.parse(result['sent'], case=self.case, evidence_tz=None) 
 
             ## Find the message id:
             tag = header.find('input', dict(name='MsgId'))
@@ -254,7 +254,133 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
             if len(result.keys())>3:
                 return self.insert_message(result, inode_template = "y%s")
-            
+
+class YahooMail20Scan(YahooMailScan):
+        """ A Scanner for Yahoo Mail 2.0 (AJAX) """
+        class Scan(YahooMailScan.Scan):
+            types = ( 'xml', 'text/html' )
+        
+            def boring(self, metadata, data=''):
+                ## Yahoo web 2.0 is very nice to work with- All
+                ## responses are in nice XML
+                if not Scanner.StoreAndScanType.boring(self, metadata, data=''):
+                    m=re.search("<(GetDisplayMessageResponse|ListMessagesResponse|SendMessageResponse)", data)
+                    if m:
+                        self.context = m.group(1)
+                        ## Make a new parser:
+                        if not self.parser:
+                            self.parser =  HTML.HTMLParser(verbose=0)
+                        return False
+
+                return True
+  
+            def external_process(self, fd):
+                pyflaglog.log(pyflaglog.DEBUG,"Opening %s for YahooMail2.0 processing" % self.fd.inode)
+
+                if self.context=='GetDisplayMessageResponse':
+                    self.process_readmessage()
+                elif self.context=='ListMessagesResponse':
+                    self.process_mail_listing()
+                elif self.context=='SendMessageResponse':
+                    self.process_send_message()
+
+            def process_send_message(self):
+                dbh = DB.DBO(self.case)
+                dbh.execute("select `key`,`value`,`indirect` from http_parameters where `key`='body' and inode_id = %r limit 1", self.fd.inode_id)
+                row = dbh.fetch()
+                if not row: return
+                
+                inode_id = row['indirect']
+                if not inode_id: return
+                
+                ## Need to parse the sent message
+                fsfd = FileSystem.DBFS(self.case)
+                fd = fsfd.open(inode_id = inode_id)
+                self.parser =  HTML.HTMLParser(verbose=0)
+                self.parser.feed(fd.read())
+                self.parser.close()
+                root = self.parser.root
+
+                result = {'type':'Edit Sent'}
+                result['From'] = self.parse_email_address(root, 'from')
+                result['To'] = self.parse_email_address(root, 'to')
+                try:
+                    result['message'] = root.find("text").innerHTML()
+                except: pass
+
+                ## Sometimes they also give us the html version
+                #try:
+                #    result['message'] = root.find("html").innerHTML()
+                #except: pass
+
+                try:
+                    result['subject'] = root.find("subject").innerHTML()
+                except: pass
+
+                self.insert_message(result, "webmail")
+
+            def parse_email_address(self, message, tag):
+                from_tag = message.find(tag)
+                if from_tag:
+                    try:
+                        name = from_tag.find("name").innerHTML()
+                    except: name = ''
+
+                    email = from_tag.find("email").innerHTML()
+                    return "%s &lt;%s&gt;" % (name, email)                    
+
+            def process_mail_listing(self):
+                result = {'type': 'Listed', 'message': ''}
+                root = self.parser.root
+                folder = root.find("folderinfo")
+                if not folder: return
+                result['from'] = folder.innerHTML()
+                
+                listing = "<table><tr><th>From</th><th>To</th><th>Subject</th><th>Received</th></tr>"
+                for message in root.search("messageinfo"):
+                    from_tag = message.find("from")
+                    
+                    listing += "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n" % (
+                        self.parse_email_address(message, 'from'),
+                        message.attributes.get("toemail"),
+                        message.attributes.get("subject"),
+                        Time.parse(message.attributes.get("receiveddate")),
+                        )
+                    
+                listing += "<table>"
+
+                result['message'] = listing
+
+                self.insert_message(result, "webmail")
+                
+            def process_readmessage(self):
+                result = {'type': 'Read', 'message':'' }
+
+                ## We could get several messages in the same response:
+                root = self.parser.root
+                for message in root.search('message'):
+                    result['message_id'] = message.find("mid").innerHTML()
+                    try:
+                        result['sent'] = Time.parse(message.find("receiveddate").innerHTML())
+                    except: pass
+
+                    result['subject'] = message.find("subject").innerHTML()
+                    for tag,field in [('from','From'),
+                                      ('to','To')]:
+                        result[field] = self.parse_email_address(message, tag)
+
+                    ## now iterate over all the parts:
+                    for part in message.search("part"):
+                        ## Usually text/html are the main body
+                        try:
+                            if not result['message'] and part.attributes['type'] == 'text':
+                                text = part.find("text")
+                                result['message'] = HTML.unquote(HTML.decode_entity(text.innerHTML()))
+                        except KeyError: pass
+                        
+
+                self.insert_message(result, "webmail")
+        
 class YahooMailViewer(LiveCom.LiveMailViewer):
     """ This implements some fixups for Yahoo webmail messages """
     specifier = 'y'
@@ -305,4 +431,20 @@ class YahooMailTests(tests.ScannerTest):
                              command="scan",
                              argv=["*",                   ## Inodes (All)
                                    "YahooMailScan",
+                                   ])                   ## List of Scanners
+
+class YahooMail20Tests(tests.ScannerTest):
+    """ Test YahooMail20 Scanner """
+    test_case = "PyFlagTestCase"
+    test_file = "yahoo_test.pcap"
+    subsystem = "Standard"
+    fstype = "PCAP Filesystem"
+
+    def test01YahooMailScanner(self):
+        """ Test Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "YahooMail20Scan",
                                    ])                   ## List of Scanners

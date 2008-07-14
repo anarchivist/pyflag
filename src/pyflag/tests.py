@@ -92,7 +92,8 @@ class ScannerTest(unittest.TestCase):
         except: pass
         
         pyflagsh.shell_execv(command="execute",
-                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case,
+                                   "TZ=%s" % self.TZ])
 
         if not self.test_file: return
         pyflagsh.shell_execv(command="execute",

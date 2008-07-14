@@ -41,12 +41,16 @@ class HTML(Magic.Magic):
     literal_rules = [
         ( "<html", (0,500)),
         ( "<div", (0,500)),
-        ( "<title", (0,500))
+        ( "<title", (0,500)),
+        ( "<table", (0,500)),
+        ( "<tr", (0,500)),
+        ( "<td", (0,500)),
+        ( "<th", (0,500)),
         ]
 
     samples = [ (60, """<html>
 <body>
-</body></html>"""),
+</body></html>"""), (100, """<table><tr><th>From</th><th>""")
                 ]
 
 import magic

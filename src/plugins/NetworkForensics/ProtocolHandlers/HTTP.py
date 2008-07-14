@@ -322,40 +322,51 @@ class HTTPScanner(StreamScannerFactory):
                            key = k,
                            value = C[k].value)
                 
-        except (KeyError, Cookie.CookieError): pass
+        except (KeyError, Cookie.CookieError):
+            pass
 
         result =cgi.FieldStorage(environ = env, fp = cStringIO.StringIO(body))
-        count = 1
-        for key in result:
-            ## Non printable keys are probably not keys at all.
-            if re.match("[^a-z0-9A-Z_]+",key): continue
-            value = result[key]
-            try:
-                value = value[0]
-            except: pass
+        self.count = 1
+        if type(result.value)==str:
+            class dummy:
+                value = result.value
+                filename = "body"
+                
+            self.process_parameter("body", dummy(), inode_id)
+        else:
+            for key in result:
+                self.process_parameter(key, result[key], inode_id)
 
-            ## Deal with potentially very large uploads:
-            if hasattr(value,'filename') and value.filename:
-                path,inode,inode_id=self.fsfd.lookup(inode_id=inode_id)
-                ## This is not quite correct at the moment because the
-                ## mime VFS driver is unable to reconstruct the file
-                ## from scratch
-                new_inode = "m%s" % count
-                new_inode_id = self.fsfd.VFSCreate(inode, new_inode,
-                                               value.filename,
-                                               size = len(value.value))
-                fd = self.fsfd.open(inode_id=new_inode_id)
-                ## dump the file to the correct filename:
-                open(fd.get_temp_path(),'w').write(value.value)
-                dbh.insert('http_parameters',
-                       inode_id = inode_id,
-                       key = key,
-                       indirect = new_inode_id)                
-            else:
-                dbh.insert('http_parameters',
-                       inode_id = inode_id,
-                       key = key,
-                       value = value.value)
+    def process_parameter(self, key, value, inode_id):
+        dbh = DB.DBO(self.case) 
+       ## Non printable keys are probably not keys at all.
+        if re.match("[^a-z0-9A-Z_]+",key): return
+        try:
+            value = value[0]
+        except: pass
+
+        ## Deal with potentially very large uploads:
+        if hasattr(value,'filename') and value.filename:
+            path,inode,inode_id=self.fsfd.lookup(inode_id=inode_id)
+            ## This is not quite correct at the moment because the
+            ## mime VFS driver is unable to reconstruct the file
+            ## from scratch
+            new_inode = "m%s" % self.count
+            new_inode_id = self.fsfd.VFSCreate(inode, new_inode,
+                                           value.filename,
+                                           size = len(value.value))
+            fd = self.fsfd.open(inode_id=new_inode_id)
+            ## dump the file to the correct filename:
+            open(fd.get_temp_path(),'w').write(value.value)
+            dbh.insert('http_parameters',
+                   inode_id = inode_id,
+                   key = key,
+                   indirect = new_inode_id)                
+        else:
+            dbh.insert('http_parameters',
+                   inode_id = inode_id,
+                   key = key,
+                   value = value.value)
             
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
@@ -386,7 +397,7 @@ class HTTPScanner(StreamScannerFactory):
 
             ## Create the VFS node:
             new_inode="%s|H%s:%s" % (combined_inode,offset,size)
-
+            
             try:
                 if 'chunked' in p.response['transfer-encoding']:
                     new_inode += "|c0"

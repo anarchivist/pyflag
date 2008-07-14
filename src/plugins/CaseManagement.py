@@ -61,7 +61,7 @@ class NewCase(Reports.report):
         ## Use the shell to do the heavy lifting.
         try:
             pyflagsh.shell_execv(command='create_case',
-                             argv=[ query['create_case'], "TZ=%s" % query['TZ'] ])
+                             argv=[ query['create_case'], "TZ=%s" % query.get('TZ',"SYSTEM") ])
 
         except RuntimeError, e:
 
