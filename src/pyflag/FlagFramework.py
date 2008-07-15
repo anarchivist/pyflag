@@ -152,9 +152,9 @@ class query_type:
         tmp = self.clone()
         result = []
         
-        if tmp.has_key('__mark__'):
-            mark='#'+ tmp.__getitem__('__mark__')
-            tmp.__delitem__('__mark__')
+        #if tmp.has_key('__mark__'):
+        #    mark='#'+ tmp.__getitem__('__mark__')
+        #    tmp.__delitem__('__mark__')
 
         for k in tmp.keys():
             if k.startswith("__"):
@@ -1068,7 +1068,8 @@ def iri_to_uri(iri):
     # section 3.1 of RFC 3987.
     if iri is None:
         return iri
-    return urllib.quote(smart_str(iri), safe='/#%[]=:;$&()+,!?*')
+
+    return urllib.quote(smart_str(iri), safe='/[]=:;$&()+,!?*')
 
 def calculate_offset_suffix(offset):
     base = 10
