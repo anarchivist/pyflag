@@ -101,12 +101,15 @@ del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]
 
-escape_re = re.compile(r"([\b\r\n\t\\])")
-def escape(string, quote=''):
-    result = escape_re.sub(r"\\\1", string)
-    result = result.replace("\x00","\\0")
+def escape(result, quote='\''):
+    result = result.replace("\\","\\\\")
     for q in quote:
         result = result.replace(q,'\\'+q)
+
+    result = result.replace("\n","\\n")
+    result = result.replace("\r","\\r")
+    result = result.replace("\t","\\t")
+    result = result.replace("\x00","\\0")
 
     return result
 

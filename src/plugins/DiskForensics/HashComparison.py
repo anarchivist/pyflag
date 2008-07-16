@@ -62,6 +62,16 @@ class HashCaseTable(FlagFramework.CaseTable):
                 ]
     
 class HashTables(FlagFramework.EventHandler):
+    def startup(self):
+        ## Check to see if the nsrl db exists
+        try:
+            dbh = DB.DBO(config.HASHDB)
+            dbh.execute("select * from meta limit 1")
+            dbh.fetch()
+        except Exception,e:
+            dbh = DB.DBO()
+            self.init_default_db(dbh, None)
+
     def init_default_db(self, dbh, case):
         # Remember to add indexes to this table after uploading the
         # NSRL. Use the nsrl_load.py script.
@@ -98,19 +108,6 @@ class HashTables(FlagFramework.EventHandler):
                         _fast=True);
         except Exception,e:
             pass
-
-try:
-    dbh = DB.DBO(config.HASHDB)
-    dbh.execute("select * from meta limit 1")
-    dbh.fetch()
-except Exception,e:
-    print "Cant find nsrl database - creating it"
-    try:
-        dbh = DB.DBO()
-        h = HashTables()
-        h.init_default_db(dbh, None)
-    except:
-        pass
 
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """

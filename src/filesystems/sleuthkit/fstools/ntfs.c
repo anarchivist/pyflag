@@ -3075,9 +3075,9 @@ ntfs_load_sdh(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sdh_buffer)
 
         do {
             NTFS_SDH_ENTRY *sdh_entry =
-                (NTFS_SDH_ENTRY *) malloc(sizeof(NTFS_SDH_ENTRY));
+                (NTFS_SDH_ENTRY *) tsk_malloc(sizeof(NTFS_SDH_ENTRY));
             sdh_entry->data =
-                (ntfs_attr_sdh *) malloc(sizeof(ntfs_attr_sdh));
+                (ntfs_attr_sdh *) tsk_malloc(sizeof(ntfs_attr_sdh));
             memcpy(sdh_entry->data, sdh, sizeof(ntfs_attr_sdh));
 
             if (previous_sdh_entry == NULL) {

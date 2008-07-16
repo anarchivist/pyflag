@@ -110,6 +110,7 @@ class JPEG(BasicFormats.SimpleStruct):
         return self.offset
 
 def ensure_carver_signatures_in_dictionary(carver):
+    carver.ids = []
     for word in carver.regexs:
         id = Indexing.insert_dictionary_word(word, word_type='regex',
                                              classification='_Carver',
@@ -198,13 +199,13 @@ class JPEGCarver(Scanner.GenScanFactory):
     group = 'Carvers'
     regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
     ## This will contain the ids of all our regexes
-    ids = []
+    ids = None
     extension = 'jpg'        
     length = 600000
 
 
     def __init__(self,fsfd):
-        ensure_carver_signatures_in_dictionary(JPEGCarver)
+        ensure_carver_signatures_in_dictionary(self)
         Scanner.GenScanFactory.__init__(self,fsfd)
 
     class Drawer(Scanner.Drawer):

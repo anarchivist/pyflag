@@ -18,7 +18,13 @@
 #include "tsk/libtsk.h"
 #include "tsk/fs/tsk_ntfs.h"
 
+#define SK_TALLOC_HACK 1
+
 static int TSK_IMG_INFO_TYPE_PYFILE_TYPE	=	0x40;
+
+/** Some accounting for tracking down memleaks **/
+static int skfs_object_count=0;
+static int skfile_object_count=0;
 
 /*
  * Suggested functions:
@@ -397,8 +403,8 @@ pyfile_read_random(TSK_IMG_INFO * img_info, TSK_OFF_T vol_offset, char *buf,
         snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't seek to %llu", tot_offset);
         tsk_errstr2[0] = '\0';
         return -1;
-    }
-    Py_XDECREF(res);
+    } else
+      Py_DECREF(res);
 	
     /* try the read */
     res = PyObject_CallMethod(pyfile_info->fileobj, "read", "(k)", len);
@@ -418,14 +424,13 @@ pyfile_read_random(TSK_IMG_INFO * img_info, TSK_OFF_T vol_offset, char *buf,
         Py_DECREF(res);
         return -1;
     }
+    // Make sure we dont overflow our buffer
+    if(read > len) read = len;
 
     memcpy(buf, strbuf, read);
 
-    if(read < len) {
-      //printf("Tried to read %llu, only got %llu\n", (uint64_t)len, (uint64_t)read);
-    };
+    Py_DECREF(res);
 
-    Py_XDECREF(res);
     return read;
 }
 
@@ -497,17 +502,18 @@ pyfile_open(PyObject *fileobj) {
     /* this block looks aweful! */
     tmp = PyObject_CallMethod(fileobj, "seek", "(ii)", 0, 2);
     if(tmp) {
-        Py_DECREF(tmp); tmp=NULL;
+        Py_DECREF(tmp);
         tmp = PyObject_CallMethod(fileobj, "tell", NULL);
         if(tmp) {
             tmp2 = PyNumber_Long(tmp);
             if(tmp2) {
-                Py_DECREF(tmp);
-                img_info->size = PyLong_AsUnsignedLongLong(tmp2);
-                Py_DECREF(tmp2);
+	      img_info->size = PyLong_AsUnsignedLongLong(tmp2);
+	      Py_DECREF(tmp2);
             }
+	    Py_DECREF(tmp);
         }
-        PyObject_CallMethod(fileobj, "seek", "(i)", 0);
+        tmp = PyObject_CallMethod(fileobj, "seek", "(i)", 0);
+	Py_DECREF(tmp);
     }
 
     return img_info;
@@ -537,6 +543,8 @@ skfs_dealloc(skfs *self) {
 #ifdef SK_TALLOC_HACK
   global_talloc_context = self->context;
 #endif
+
+  skfs_object_count --;
 
   // This is not deeded here as skfs_close gets called already
   //  Py_DECREF(skfs_close(self));
@@ -600,6 +608,8 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     self->block_size = self->fs->block_size;
     self->first_block = self->fs->first_block;
     self->last_block = self->fs->last_block;
+
+    skfs_object_count++;
     return 0;
 }
 
@@ -1142,7 +1152,7 @@ static PyObject *skfs_inode_str(skfs_inode *self) {
     char *str;
     str = talloc_asprintf(NULL, "%llu-%u-%u", self->inode, self->type, self->id);
     if(self->alloc == 2)
-    	talloc_asprintf_append(str, "*");
+      str = talloc_asprintf_append(str, "*");
 
     result = PyString_FromString(str);
     talloc_free(str);
@@ -1174,6 +1184,7 @@ skfile_dealloc(skfile *self) {
     if(self->fs_inode)
         fs_inode_free(self->fs_inode);
     */
+    skfile_object_count--;
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -1272,6 +1283,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
       return -1;
     };
 
+    skfile_object_count++;
     return 0;
 }
 
@@ -1596,6 +1608,8 @@ initsk(void)
 
     Py_INCREF(&skfsType);
     PyModule_AddObject(m, "skfs", (PyObject *)&skfsType);
+
+    //    talloc_enable_leak_report();
 
     /* setup skfs_walkiter type */
     skfs_walkiterType.tp_new = PyType_GenericNew;

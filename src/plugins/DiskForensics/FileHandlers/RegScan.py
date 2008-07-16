@@ -106,7 +106,7 @@ class RegistryScan(GenScanFactory):
             def store_key(nk_key, path):
                 if not nk_key: return
                 regi_handle.mass_insert(dirname=path,
-                                        basename=nk_key['key_name'])
+                                        basename=nk_key['key_name'].decode('ascii','ignore'))
 
                 new_path="%s/%s/" % (path,nk_key['key_name'])
                 new_path=FlagFramework.normpath(new_path)

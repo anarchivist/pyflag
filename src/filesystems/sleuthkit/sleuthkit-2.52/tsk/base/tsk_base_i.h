@@ -11,6 +11,8 @@
 #ifndef _TSK_BASE_I_H
 #define _TSK_BASE_I_H
 
+#define SK_TALLOC_HACK 1
+
 // include the autoconf header file 
 #if HAVE_CONFIG_H
 #include "tsk/tsk_config.h"

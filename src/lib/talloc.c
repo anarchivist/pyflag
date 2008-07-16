@@ -1035,6 +1035,14 @@ void talloc_report_null_full(void)
 	}
 }
 
+void talloc_report_null_full_to_tmpfile(void) {
+  FILE *fd = fopen("/tmp/talloc_debug.txt","w");
+  if(fd && talloc_total_size(null_context) != 0) {
+    talloc_report_full(null_context, fd);
+  }
+  fclose(fd);
+}; 
+
 /*
   enable tracking of the NULL context
 */

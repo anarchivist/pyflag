@@ -594,9 +594,9 @@ def reindex():
         t = row['type']
         ## Literal and extended are encoded using latin
         if t == 'literal':
-            INDEX.add_word(row['word'].encode("latin"),id, index.WORD_LITERAL)
+            INDEX.add_word(row['word'].decode("latin").encode("latin"),id, index.WORD_LITERAL)
         elif t == 'regex':
-            INDEX.add_word(row['word'].encode("latin"),id, index.WORD_EXTENDED)
+            INDEX.add_word(row['word'].decode("latin").encode("latin"),id, index.WORD_EXTENDED)
         elif t=='word':
             try:
                 word = row['word'].decode("UTF-8").lower()

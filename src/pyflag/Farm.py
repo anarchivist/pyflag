@@ -303,6 +303,10 @@ def start_workers():
                 
     atexit.register(terminate_children)
 
+    ## The parent now calls the startup method on each of the events:
+    for event in Registry.EVENT_HANDLERS.classes:
+        event().startup()
+
 def handler(sig, frame):
     #print "Got woken up"
     pass

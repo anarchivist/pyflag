@@ -61,6 +61,8 @@
 #include "tsk_base_i.h"
 #include <errno.h>
 
+#define SK_TALLOC_HACK 1
+
 #ifdef SK_TALLOC_HACK
 #include "talloc.h"
 void *global_talloc_context=NULL;

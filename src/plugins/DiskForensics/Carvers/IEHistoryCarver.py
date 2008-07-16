@@ -35,7 +35,6 @@ class IECarver(JPEGCarver.JPEGCarver):
     depends = 'IndexScan'
     group = "Carvers"
     regexs = ['URL ']
-    ids = []
     
     class Scan(JPEGCarver.CarverScan):
         def examine_hit(self, fd, offset, length):
@@ -58,8 +57,8 @@ class IECarver(JPEGCarver.JPEGCarver):
             args = dict(inode_id = self.fd.inode_id,
                         offset = offset,
                         length = event['size'].get_value() * IECache.blocksize,
-                        type  = event['type'],
-                        url = event['url'],
+                        type  = event['type'].get_value().decode("ascii","ignore"),
+                        url = event['url'].get_value().decode("ascii","ignore"),
                         _modified = 'from_unixtime(%d)' % event['modified_time'].get_value(),
                         _accessed = 'from_unixtime(%d)' % event['accessed_time'].get_value(),
                         filename = event['filename'],)

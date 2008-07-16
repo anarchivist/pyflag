@@ -200,7 +200,7 @@ MAIN(int argc, TSK_TCHAR ** argv)
         size_t len = TSTRLEN(macpre);
         if (macpre[len - 1] != '/') {
             TSK_TCHAR *tmp = macpre;
-            macpre = (TSK_TCHAR *) malloc(len + 2 * sizeof(TSK_TCHAR));
+            macpre = (TSK_TCHAR *) tsk_malloc(len + 2 * sizeof(TSK_TCHAR));
             TSTRNCPY(macpre, tmp, len + 1);
             TSTRNCAT(macpre, _TSK_T("/"), len + 2);
         }

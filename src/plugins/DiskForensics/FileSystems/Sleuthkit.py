@@ -478,12 +478,11 @@ class LargeFileTest(pyflag.tests.ScannerTest):
     """ Test that pyflag can load very large images efficiently (WinXp) """
     test_case = "WinXp"
     test_file = "winxp"
-    subsystem = 'Advanced'
+    subsystem = 'Standard'
     level = 15
     
-   
     def test01RunScanners(self):
-	""" Run all scanners on the image """ 
+	""" Run all scanners on the image """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
 #                             argv=["*",'TypeScan','MD5Scan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
