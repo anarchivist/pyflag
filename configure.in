@@ -125,8 +125,6 @@ AC_OUTPUT([
 	src/Makefile 
 	src/pyflag/Makefile 
 	src/lib/Makefile 
-	src/lib/libsgzip/Makefile
-	src/lib/libiosubsys/Makefile
 	src/lib/pyewf/Makefile
 	src/lib/pyaff/Makefile
 	src/remote/Makefile
@@ -136,13 +134,10 @@ AC_OUTPUT([
 	src/network/Makefile
 	src/filesystems/Makefile
 	src/filesystems/sleuthkit/Makefile
-	src/filesystems/sleuthkit/auxtools/Makefile
-	src/filesystems/sleuthkit/imgtools/Makefile
-	src/filesystems/sleuthkit/fstools/Makefile
-	src/filesystems/sleuthkit/mmtools/Makefile
 	src/filesystems/sleuthkit/python/Makefile
 	src/filesystems/magic/Makefile
 	src/include/Makefile
+	src/include/crypto/Makefile
 	debian/Makefile
 	src/filesystems/sleuthkit/sleuthkit-2.52/Makefile
 	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/Makefile
@@ -152,6 +147,13 @@ AC_OUTPUT([
 	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/fs/Makefile
 	src/filesystems/sleuthkit/sleuthkit-2.52/tsk/hashdb/Makefile
 	])
+
+#	src/lib/libsgzip/Makefile
+#	src/lib/libiosubsys/Makefile
+#	src/filesystems/sleuthkit/auxtools/Makefile
+#	src/filesystems/sleuthkit/imgtools/Makefile
+#	src/filesystems/sleuthkit/fstools/Makefile
+#	src/filesystems/sleuthkit/mmtools/Makefile
 
 ## Tell the use what we found:
 AC_MSG_NOTICE([])
