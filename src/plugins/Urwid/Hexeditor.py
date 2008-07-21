@@ -779,39 +779,41 @@ try:
         FileSystem.File.hexdump = hexedit
 
     Screen = pyflag_display.Screen
+
+    class OverlayEdit(urwid.Edit):
+        """ A specialised edit box which supports highlighting of the
+        edited text
+        """
+        def __init__(self, text, edit_pos=0):
+            urwid.Edit.__init__(self, multiline = True, wrap = 'any')
+            self.set_edit_text(text)
+            self.set_edit_pos(edit_pos)
+
+        def set_edit_pos(self, pos):
+            self.edit_pos = min(pos, len(self.edit_text))
+
+        def set_edit_text(self, text):
+            self.edit_text, self.attrib = urwid.decompose_tagmarkup(text)
+            if self.edit_pos > len(self.edit_text):
+                self.edit_pos = len(self.edit_text)
+
+            self._invalidate()
+
+
+    class PowerEdit(urwid.Edit):
+        """ An Edit box with a few more keys """
+        def keypress(self, maxcol,key):
+            p = self.edit_pos
+            if key=="meta backspace":
+                # Delete from point to the previous space
+                left = self.edit_text[:p].rfind(" ")
+                if left==-1: left = 0
+
+                self.edit_text = self.edit_text[:left] + self.edit_text[p:]
+                self.edit_pos = left
+            else:
+                return urwid.Edit.keypress(self, maxcol, key)
+
 except ImportError:
     disabled = True
 
-class OverlayEdit(urwid.Edit):
-    """ A specialised edit box which supports highlighting of the
-    edited text
-    """
-    def __init__(self, text, edit_pos=0):
-        urwid.Edit.__init__(self, multiline = True, wrap = 'any')
-        self.set_edit_text(text)
-        self.set_edit_pos(edit_pos)
-
-    def set_edit_pos(self, pos):
-        self.edit_pos = min(pos, len(self.edit_text))
-
-    def set_edit_text(self, text):
-        self.edit_text, self.attrib = urwid.decompose_tagmarkup(text)
-        if self.edit_pos > len(self.edit_text):
-            self.edit_pos = len(self.edit_text)
-            
-        self._invalidate()
-        
-
-class PowerEdit(urwid.Edit):
-    """ An Edit box with a few more keys """
-    def keypress(self, maxcol,key):
-        p = self.edit_pos
-        if key=="meta backspace":
-            # Delete from point to the previous space
-            left = self.edit_text[:p].rfind(" ")
-            if left==-1: left = 0
-
-            self.edit_text = self.edit_text[:left] + self.edit_text[p:]
-            self.edit_pos = left
-        else:
-            return urwid.Edit.keypress(self, maxcol, key)

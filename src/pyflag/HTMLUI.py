@@ -489,8 +489,8 @@ class HTMLUI(UI.GenericUI):
                 del link['yoffset']
                 del link['xoffset']
                 cb = link.poparray('callback_stored')
-                
-                link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
+
+                link['open_tree'] = DB.escape(FlagFramework.normpath("/".join(branch[:depth] + [name])))
                 open_tree = FlagFramework.urlencode(link['open_tree'])
                 sv=("%s" % value).replace(' ','&nbsp;')
 
