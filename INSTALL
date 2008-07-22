@@ -2,57 +2,59 @@
 PyFLAG Installation instructions
 ================================
 
-PyFlag is now shipped with an autoconf build system. For most systems
+PyFlag is shipped with an autoconf build system. For most systems
 you should be able to do:
 
 ./configure
 make
 make install
 
-On Debian this installs pyflag into:
+On Debian this installs pyflag into /usr/local/:
 
-/usr/local/lib/pyflag
 /usr/local/bin
-/usr/local/share/pyflag/
-/usr/local/lib/python2.4/site-packages/pyflag/
+/usr/local/lib/pyflag
+/usr/local/share/pyflag
+/usr/local/lib/python2.5/site-packages/pyflag
 
 --------------
 Pre-Requisites
 --------------
 
-The following package pre-requisites are required. This is what they
-are named on debian/Ubuntu - other distributions might name them
-differently:
+The following pre-requisites are required. Debian/Ubuntu package names are
+shown in brackets.
 
-sudo apt-get install \
-python2.4 \
-python2.4-mysqldb \
-python2.4-imaging \
-python2.4-pexpect \
-python2.4-ctypes \
-python2.4-dev \
-libextractor-dev \
-libclamav-dev \
-libpcap-dev \
-zlib1g-dev \
-libmagic-dev \
-mysql-server \
-mysql-client \
-libtool \
-make \
-g++ \
-automake1.9 \
-swig1.3
+build environment (build-essential)
+python dev files (python-dev)
+libz (libz-dev)
+libmagic (libmagic-dev)
+MySQLdb (python-mysqldb)
+PIL (python-imaging)
+pexpect (python-pexpect)
+dateutil (python-dateutil)
+urwid (python-urwid)
 
-To make the debian package you also need: fakeroot
+If the database server will be on the same box:
+
+mysql server (mysql-server)
+
+The following optional dependancies enable additional features:
+
+geoip (libgeoip-dev) for Maxmind GeoIP support.
+libjpeg (libjpeg62-dev) for Advanced JPEG Carving support.
+afflib for AFF image support.
+libewf for EWF (Encase E01) image support.
+clamd (clamav-daemon) for Virus Scanning support.
 
 ---------
-SQL Setup
+Database Setup
 ---------
 
-Once you are installed, you need to set the root password on mysql:
+Database setup is handled automatically by pyflag when it is first run.
 
-  mysqladmin -u root password "password"
+To make mysql aware of timezone information (recommended), use the script
+which comes with mysql. e.g.:
+
+ mysql_tzinfo_to_sql /usr/share/zoneinfo/ | mysql -uroot -p mysql
 
 ----------
 Run PyFlag
@@ -88,9 +90,12 @@ Debug/Development
 =================
 
 If you want to tinker with the source you should probably install to a
-different location (so you don't need to be root to edit files).  The scripts
+different location (so you don't need to be root to edit files). The scripts
 in the test directory are set-up to work with this install process:
+(first ensure you have darcs, autoconf, automake and libtool)
 
+darcs get http://www.pyflag.net/pyflag
+cd pyflag
 ./autogen.sh
 ./configure --prefix=/var/tmp/build/pyflag
 make

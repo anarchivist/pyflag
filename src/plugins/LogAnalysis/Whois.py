@@ -426,9 +426,12 @@ class LookupWhoisID(LookupIP):
 
 class WhoisInit(FlagFramework.EventHandler):
     def startup(self):
-        dbh = DB.DBO()
-        dbh.check_index("whois_routes","netmask")
-        dbh.check_index("whois_routes","network")
+        try:
+            dbh = DB.DBO()
+            dbh.check_index("whois_routes","netmask")
+            dbh.check_index("whois_routes","network")
+        except:
+            pass
 
     def init_default_db(self, dbh, case):
         dbh.execute("""CREATE TABLE `whois` (

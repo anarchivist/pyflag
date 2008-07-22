@@ -69,8 +69,11 @@ class HashTables(FlagFramework.EventHandler):
             dbh.execute("select * from meta limit 1")
             dbh.fetch()
         except Exception,e:
-            dbh = DB.DBO()
-            self.init_default_db(dbh, None)
+            try:
+                dbh = DB.DBO()
+                self.init_default_db(dbh, None)
+            except:
+                pass
 
     def init_default_db(self, dbh, case):
         # Remember to add indexes to this table after uploading the
