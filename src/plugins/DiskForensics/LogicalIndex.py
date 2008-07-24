@@ -148,8 +148,9 @@ class IndexEventHandler(FlagFramework.EventHandler):
         `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
         PRIMARY KEY  (`id`))""")
 
-## These check that the schema is up to date
-DB.convert_to_unicode(None, 'dictionary')
+    def startup(self):
+        ## These check that the schema is up to date
+        DB.convert_to_unicode(None, 'dictionary')
 
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
@@ -596,7 +597,12 @@ def reindex():
         if t == 'literal':
             INDEX.add_word(row['word'].decode("latin").encode("latin"),id, index.WORD_LITERAL)
         elif t == 'regex':
-            INDEX.add_word(row['word'].decode("latin").encode("latin"),id, index.WORD_EXTENDED)
+            if type(row['word'])==type(str):
+                word = row['word'].decode('latin')
+            else:
+                word = row['word']
+                
+            INDEX.add_word(word.encode("latin"),id, index.WORD_EXTENDED)
         elif t=='word':
             try:
                 word = row['word'].decode("UTF-8").lower()

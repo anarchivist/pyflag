@@ -377,12 +377,16 @@ class AFF(Standard):
 try:
     import pyaff
 except ImportError:
-    AFF = None
+    def error(*args, **kwargs):
+        raise RuntimeError("LibAFF is not installed - please install it and run configure again.")
+    AFF = error
 
 try:
     import pyewf
 except ImportError:
-    EWF = None
+    def error(*args, **kwargs):
+        raise RuntimeError("LibEWF is not installed - please install it and run configure again.")
+    EWF = error
 
 import Store
 

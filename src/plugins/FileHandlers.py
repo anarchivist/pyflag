@@ -64,8 +64,7 @@ class VFSMethod(IO.FileHandler):
 
     def open(self):
         fsfd = FileSystem.DBFS(self.name)
-        
-        return fsfd.open(self.path)
+        return fsfd.open(path = self.path)
 
 class IOSourceMethod(IO.FileHandler):
     """ This method returns an IO Source expressed as a URL.

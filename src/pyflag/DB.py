@@ -84,8 +84,11 @@ config.add_option("DBCACHE_LENGTH", default=1024, type='int',
 config.add_option("MASS_INSERT_THRESHOLD", default=300, type='int',
                   help="Number of rows where the mass insert buffer will be flushed.")
 
-config.add_option("TABLE_QUERY_TIMEOUT", default=60, type='int',
+config.add_option("TABLE_QUERY_TIMEOUT", default=10, type='int',
                   help="The table widget will timeout queries after this many seconds")
+
+config.add_option("SQL_CACHE_MODE", default="realtime",
+                  help="The SQL Cache mode (can be realtime, periodic, all) see the wiki page for explaination")
 
 import types
 import MySQLdb.converters
@@ -508,8 +511,101 @@ class DBO:
                 
         finally:
             self.end_transaction()
-
+            
     def cached_execute(self, sql, limit=0, length=50):
+        """ Executes the sql statement using the cache.
+
+        strategy: Check the sql_cache table for the row, if it does not exist, make it
+        if its in progress, spin for a while
+        if its cached return it.
+        
+        """
+        self.expire_cache()
+        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r limit 1 for update""", (sql, limit, limit + length))
+        row = self.fetch()
+        if not row:
+            ## Row does not exist - make it
+            return self._make_sql_cache_entry(sql, limit, length)
+        elif row['status'] == 'dirty':
+            if config.SQL_CACHE_MODE == "realtime":
+                ## Row is dirty - make it
+                self._make_sql_cache_entry(sql, limit, length)
+            else:
+                ## We dont care about dirty rows now
+                return self.execute("select * from cache_%s limit %s,%s",
+                                    (row['id'], limit - row['limit'], length))
+            
+        elif row['status'] == 'cached':
+            return self.execute("select * from cache_%s limit %s,%s",
+                                (row['id'], limit - row['limit'], length))
+        elif row['status'] == 'progress':
+            ## Spin until its ready
+            count = config.TABLE_QUERY_TIMEOUT
+            while count>0:
+                self.execute("select * from sql_cache where id=%r and status!='pending' limit 1", row['id'])
+                row2=self.fetch()
+                if row2:
+                    return self.execute("select * from cache_%s limit %s,%s",
+                                        (row['id'], limit - row['limit'], length))
+
+                time.sleep(1)
+                count -= 1
+            raise DBError("Query still executing - try again soon")
+
+    def _make_sql_cache_entry(self, sql, limit, length):
+        ## Query is not in cache - create a new cache entry: We create
+        ## the cache centered on the required range - this allows
+        ## quick paging forward and backwards.
+        lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
+
+        ## Determine which tables are involved:
+        self.execute("explain %s", sql)
+        tables = [ row['table'] for row in self if row['table'] ]
+            
+        if not tables:
+            ## Should not happen - the query does not affect any tables??
+            return self.execute("%s limit %s,%s",sql, limit, length)
+
+        self.insert('sql_cache',
+                    query = sql, _timestamp='now()',
+                    limit = lower_limit,
+                    length = config.DBCACHE_LENGTH,
+                    status = 'progress',
+                    _fast = True
+                    )
+
+        ## Create the new table
+        id = self.autoincrement()
+            
+        ## Store the tables in the sql_cache_tables:
+        for t in tables:
+            self.insert('sql_cache_tables',
+                        sql_id = id,
+                        table_name = t,
+                        _fast = True)
+            
+        ## Now comes the tricky part - we fork to execute the query
+        def run_query():
+            dbh = DBO(self.case)
+            dbh.discard = True
+            
+            dbh.execute("create table cache_%s %s limit %s,%s",
+                        (id,sql, lower_limit, config.DBCACHE_LENGTH))
+            dbh.execute("update sql_cache set status='cached' where id=%r" , id)
+
+        ## We start by launching a worker thread
+        worker = threading.Thread(target=run_query)
+        worker.start()
+
+        ## Wait for the worker to finish
+        worker.join(config.TABLE_QUERY_TIMEOUT)
+        if worker.isAlive():
+            raise DBError("Query still executing - try again soon")
+
+        return self.execute("select * from cache_%s limit %s,%s",
+                            (id,limit - lower_limit,length))
+            
+    def xxcached_execute(self, sql, limit=0, length=50):
         """ Execute the query_str with params inside the pyflag Cache system.
 
         PyFlag often needs to execute the same query with different
@@ -635,19 +731,20 @@ class DBO:
 
     def invalidate(self,table):
         """ Invalidate all copies of the cache which relate to this table """
-        self.execute("start transaction")
-        try:
+        if config.SQL_CACHE_MODE=='realtime':
+            self.execute("start transaction")
             try:
-                self.execute("select sql_id from sql_cache_tables where `table_name`=%r", table)
-            except Exception, e:
-                pass
-            ids = [row['sql_id'] for row in self]
-            for id in ids:
-                self.execute("drop table if exists cache_%s", id)
-                self.execute("delete from sql_cache where id=%r", id)
-                self.execute("delete from sql_cache_tables where sql_id=%r", id)
-        finally:
-            self.end_transaction()
+                try:
+                    self.execute("select sql_id from sql_cache_tables where `table_name`=%r", table)
+                except Exception, e:
+                    pass
+                ids = [row['sql_id'] for row in self]
+                for id in ids:
+                    self.execute("drop table if exists cache_%s", id)
+                    self.execute("delete from sql_cache where id=%r", id)
+                    self.execute("delete from sql_cache_tables where sql_id=%r", id)
+            finally:
+                self.end_transaction()
 
     def _calculate_set(self, **fields):
         """ Calculates the required set clause from the fields provided """
@@ -871,6 +968,12 @@ class DBO:
             
             count+=1
 
+    ## This flag controls if we shall discard our dbh from the
+    ## pool. Normally dbhs are returned to the pool upon destructions
+    ## but this can cause problems e.g. when we fork - so we have this
+    ## as a way to stop the dbh from returning to the pool
+    discard = False
+
     def __del__(self):
         """ Destructor that gets called when this object is gced """
         try:
@@ -890,7 +993,7 @@ class DBO:
 
             ##key = "%s/%s" % (self.case, threading.currentThread().getName())
             key = "%s" % (self.case)
-            if self.DBH:
+            if self.DBH and not self.discard:
                 pool = self.DBH.get(key)
                 pool.put((self.dbh, self.mysql_bin_string))
                 
@@ -901,7 +1004,6 @@ class DBO:
             import FlagFramework
             
             print FlagFramework.get_bt_string(e)
-
 
     def MySQLHarness(self,client):
         """ A function to abstact the harness pipes for all programs emitting SQL.
@@ -936,6 +1038,17 @@ def escape_column_name(name):
     names = name.split(".")
     return '.'.join(["`%s`" % x for x in names])
 
+def check_column_in_table(case, table, column_name, sql):
+    """ This function checks that the column_name is defined in table
+    and adds it if not. This is mostly used for schema migrations for
+    later versions of pyflag.
+    """
+    dbh = DBO(case)
+    try:
+        dbh.execute("select `%s` from `%s` limit 1", column_name, table)
+        row= dbh.fetch()
+    except:
+        dbh.execute("alter table `%s` add `%s` %s", table, column_name, sql)
 
 ## The following are utilitiy functions which can be used to manage
 ## schema changes

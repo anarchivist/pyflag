@@ -307,6 +307,11 @@ def start_workers():
     for event in Registry.EVENT_HANDLERS.classes:
         event().startup()
 
+    ## The parent now calls the startup method on each of the events:
+    print "Launching startup"
+    for event in Registry.EVENT_HANDLERS.classes:
+        event().startup()
+        
 def handler(sig, frame):
     #print "Got woken up"
     pass

@@ -293,7 +293,7 @@ class CaseDBInit(FlagFramework.EventHandler):
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
         `length` INT default 100,
-        `locked` INT default 1
+        `status` enum('progress','dirty','cached')
         ) ENGINE=InnoDB""")
 
         case_dbh.execute("""CREATE TABLE sql_cache_tables (
@@ -464,7 +464,15 @@ class CaseDBInit(FlagFramework.EventHandler):
         ## Update the schema version.
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
-
+    def startup(self):
+        print "Starting Database Cache manager"
+        ## Make sure that the schema conforms
+        dbh = DB.DBO()
+        dbh.execute("select value from meta where property='flag_db'")
+        for row in dbh:
+            DB.check_column_in_table(row['value'], 'sql_cache', 'status',
+                                     'enum("progress","dirty","cached")')
+        
     def exit(self, dbh, case):
         IO.IO_Cache.flush()
         DB.DBO.DBH.flush()

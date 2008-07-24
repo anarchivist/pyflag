@@ -47,7 +47,8 @@ def parse_inventory():
     try:
         inventory_path = "%s/inventory" % config.REPO
         fd = urllib2.urlopen(inventory_path)
-    except:
+    except Exception, e:
+        print e
         print "Unable to open %s - is this a real repository?" % inventory_path
         sys.exit(-1)
 
