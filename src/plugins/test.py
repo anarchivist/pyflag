@@ -361,7 +361,7 @@ class TableTest(PopUpTest):
         result.table(
                          ## Can use keyword args
             elements = [ TimestampType(name = 'Timestamp',
-                                       sql = 'time',
+                                       column = 'time',
                                        ),
                          
                          ## Or positional args
@@ -379,6 +379,24 @@ class TableTest(PopUpTest):
             table = "TestTable",
             )
 
+class LargeQueryTest(TableTest):
+    """ Test large requery response """
+    name = "Long Query"
+    def display(self, query, result):
+
+        class TestColumn(StringType):
+            def select(self):
+                return "concat(%s,sleep(0.8))" % self.column
+            
+        result.table(
+            elements = [ TestColumn(name='property',
+                                    column='property'),
+                         StringType(name='value',
+                                    column='value')
+                         ],
+            table = 'meta'
+            )
+        
 class FileSelectorTest(PopUpTest):
     """ Test the file selector widget """
     name = "File Selector"

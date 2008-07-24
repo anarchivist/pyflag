@@ -469,6 +469,8 @@ class CaseDBInit(FlagFramework.EventHandler):
         ## Make sure that the schema conforms
         dbh = DB.DBO()
         dbh.execute("select value from meta where property='flag_db'")
+        DB.check_column_in_table(None, 'sql_cache', 'status',
+                                 'enum("progress","dirty","cached")')
         for row in dbh:
             DB.check_column_in_table(row['value'], 'sql_cache', 'status',
                                      'enum("progress","dirty","cached")')

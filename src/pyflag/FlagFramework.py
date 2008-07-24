@@ -152,10 +152,6 @@ class query_type:
         tmp = self.clone()
         result = []
         
-        #if tmp.has_key('__mark__'):
-        #    mark='#'+ tmp.__getitem__('__mark__')
-        #    tmp.__delitem__('__mark__')
-
         for k in tmp.keys():
             if k.startswith("__"):
                 del tmp[k]

@@ -542,7 +542,7 @@ class DBO:
             ## Spin until its ready
             count = config.TABLE_QUERY_TIMEOUT
             while count>0:
-                self.execute("select * from sql_cache where id=%r and status!='pending' limit 1", row['id'])
+                self.execute("select * from sql_cache where id=%r and status!='progress' limit 1", row['id'])
                 row2=self.fetch()
                 if row2:
                     return self.execute("select * from cache_%s limit %s,%s",
@@ -550,6 +550,7 @@ class DBO:
 
                 time.sleep(1)
                 count -= 1
+                pyflaglog.log(pyflaglog.DEBUG,"Waiting for query to complete for %u" % count)
             raise DBError("Query still executing - try again soon")
 
     def _make_sql_cache_entry(self, sql, limit, length):
@@ -584,15 +585,20 @@ class DBO:
                         table_name = t,
                         _fast = True)
             
-        ## Now comes the tricky part - we fork to execute the query
+        ## Now comes the tricky part
         def run_query():
             dbh = DBO(self.case)
             dbh.discard = True
+            try:
+                dbh.execute("create table cache_%s %s limit %s,%s",
+                            (id,sql, lower_limit, config.DBCACHE_LENGTH))
+                dbh.execute("update sql_cache set status='cached' where id=%r" , id)
+            except Exception,e:
+                ## Make sure we remove the progress status from the
+                ## table
+                dbh.execute("delete from sql_cache where id=%r", id)
+                raise
             
-            dbh.execute("create table cache_%s %s limit %s,%s",
-                        (id,sql, lower_limit, config.DBCACHE_LENGTH))
-            dbh.execute("update sql_cache set status='cached' where id=%r" , id)
-
         ## We start by launching a worker thread
         worker = threading.Thread(target=run_query)
         worker.start()
