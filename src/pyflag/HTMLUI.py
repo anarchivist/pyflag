@@ -490,7 +490,7 @@ class HTMLUI(UI.GenericUI):
                 del link['xoffset']
                 cb = link.poparray('callback_stored')
 
-                link['open_tree'] = DB.escape(FlagFramework.normpath("/".join(branch[:depth] + [name])))
+                link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
                 open_tree = FlagFramework.urlencode(link['open_tree'])
                 sv=("%s" % value).replace(' ','&nbsp;')
 
@@ -517,7 +517,7 @@ class HTMLUI(UI.GenericUI):
                 else:
                     preamble += "<img class='PyFlagTreeVerticalLine' src='images/treenode_blank.gif'>"
 
-                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'],iri_to_uri(link), img_class, img_src)
+                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'], FlagFramework.iri_to_inline_js(link), img_class, img_src)
 
                 if len(branch)-1==depth and name == branch[depth]:
                     result+= u"&nbsp;<span class='PyFlagTreeSelected'>%s</span></a></span>\n" % unicode(sv)

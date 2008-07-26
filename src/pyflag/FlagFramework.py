@@ -147,7 +147,11 @@ class query_type:
 
     def __str__(self):
         """ Prints the query object as a url string. We encode ourself
-        into utf8 to cater for any unicode present."""
+        into utf8 to cater for any unicode present.
+
+        NOTE: A URI is build by joining all keys and values with
+        &. Both keys and values are properly escaped.
+        """
         mark=''
         tmp = self.clone()
         result = []
@@ -157,7 +161,7 @@ class query_type:
                 del tmp[k]
 
         for k,v in tmp.q:
-            result.append("%s=%s" % (iri_to_uri(k), iri_to_uri(v)))
+            result.append("%s=%s" % (escape_unicode_string(k), escape_unicode_string(v)))
 
         return "&".join(result)
 
@@ -1048,6 +1052,20 @@ def smart_str(s, encoding='utf-8', errors='strict'):
         return s
 
 import urllib
+def iri_to_inline_js(iri):
+    """ This converts an IRI to a form which can be included within
+    inline javascript. For example:
+
+    <a href='
+
+    """
+    result = iri_to_uri(iri).replace("%","%25")
+    return result
+
+def escape_unicode_string(string):
+    """ Returns a quoted unicode string """
+    return urllib.quote(smart_str(string), safe='')
+
 def iri_to_uri(iri):
     """
     Convert an Internationalized Resource Identifier (IRI) portion to a URI
@@ -1066,6 +1084,16 @@ def iri_to_uri(iri):
         return iri
 
     return urllib.quote(smart_str(iri), safe='/%[]=:;$&()+,!?*')
+
+def pyflag_escape_string(string):
+    result = []
+    for x in string:
+        if x.isalnum():
+            result.append(x)
+        else:
+            result.append("$%02X" % ord(x))
+
+    return ''.join(result)
 
 def calculate_offset_suffix(offset):
     base = 10
