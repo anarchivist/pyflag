@@ -4,7 +4,7 @@ import plugins.Images as Images
 ## This currently does not work.
 active = False
 
-class Remote(Images.Advanced):
+class Remote(Images.Standard):
     """ This IO Source provides for remote access """
     mandatory_parameters = ['host','device']
     def form(self, query, result):

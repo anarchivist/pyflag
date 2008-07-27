@@ -665,7 +665,7 @@ class LoadDataTests(unittest.TestCase):
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=first_image",
-                                   "subsys=Advanced",
+                                   "subsys=Standard",
                                    "filename=pyflag_stdimage_0.4.dd" ,
                                    "offset=16128s",
                                    ])

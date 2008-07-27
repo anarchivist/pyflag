@@ -350,7 +350,7 @@ def show_help(query, result, cls=None):
         result.result += docutils.core.publish_string(textwrap.dedent(cls.__doc__),
                                                       writer_name='html')
     except Exception,e:
-        pyflaglog.log(pyflaglog.ERROR,"Error running docutils: %s" % e)
+        pyflaglog.log(pyflaglog.ERROR,"Error running docutils: %s", e)
         result.heading("Help for %s" % cls.__name__)
         result.text(textwrap.dedent(cls.__doc__), font='typewriter')
 
@@ -387,7 +387,7 @@ class Flag:
         ## These are deliberate errors that reports raise with their own custom UI message:
         except Reports.ReportError,e:
             report.executing[thread_name]['error'] = e
-            pyflaglog.log(pyflaglog.ERROR, "Error executing analysis: %s" % e)
+            pyflaglog.log(pyflaglog.ERROR, "Error executing analysis: %s", e)
             return
 
         except Exception,e:

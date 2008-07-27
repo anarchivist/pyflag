@@ -513,6 +513,7 @@ pyfile_open(PyObject *fileobj) {
 	    Py_DECREF(tmp);
         }
         tmp = PyObject_CallMethod(fileobj, "seek", "(i)", 0);
+	if(!tmp) return tmp;
 	Py_DECREF(tmp);
     }
 

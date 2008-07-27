@@ -138,10 +138,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 qsl=qsl[qsl.find('?')+1:]
                 
             query = FlagFramework.query_type(cgi.parse_qsl(qsl),user=user, passwd=passwd)
-            pyflaglog.log(pyflaglog.DEBUG, "pseudo posted query is %s" % query)
+            pyflaglog.log(pyflaglog.DEBUG, "pseudo posted query is %s", query)
         except KeyError:
             if self.command=='POST':
-                pyflaglog.log(pyflaglog.DEBUG, "posted query is %s" % query)
+                pyflaglog.log(pyflaglog.DEBUG, "posted query is %s", query)
 
         for k,v in query.q:
             if v=='None':
@@ -328,7 +328,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
-                pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s: %s" % (cb_key,e))
+                pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s: %s", cb_key,e)
                 result.clear()
                 result.heading("Error")
                 result.text("%s" % e)
@@ -478,7 +478,7 @@ def Server(HandlerClass = FlagServerHandler,
     httpd = ServerClass(server_address, HandlerClass)
     httpd.socket.settimeout(1.0)
     sa = httpd.socket.getsockname()
-    pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s" % (sa,))
+    pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s", sa)
     httpd.serve_forever()
 
 config.add_option("HTTPSERVER_BINDIF", default='127.0.0.1',

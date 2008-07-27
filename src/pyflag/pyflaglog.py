@@ -33,6 +33,9 @@ import sys,traceback,time,threading,os
 config.add_option("LOG_LEVEL", default=10, type='int', short_option='v',
                   help="Logging level")
 
+config.add_option("LOGFILE", default="/dev/stderr",
+                  help="Send log messages to this file")
+
 ## These are predefined logging levels:
 ERRORS=1
 ERROR=1
@@ -110,11 +113,19 @@ def start_log_thread():
 
     atexit.register(kill_logging_thread)
 
-def log(level,message):
+def log(level,message, *args):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
     try:
-        string = "%s(%s): %s" % (os.getpid(),lookup[level],message)
+        log_fd = open(config.LOGFILE,"a")
     except:
+        log_fd = sys.stderr
+
+    import pyflag.DB as DB
+
+    try:
+        string = DB.expand("%s(%s): %s" % (os.getpid(),lookup[level],message), args)
+    except Exception,e:
+        print e
         string = message
 
     if config.LOG_LEVEL >= level:
@@ -125,8 +136,8 @@ def log(level,message):
             pass
         import pyflag.FlagFramework as FlagFramework
         
-        sys.stderr.write(FlagFramework.smart_str(string) + "\n")
-        sys.stderr.flush()
+        log_fd.write(FlagFramework.smart_str(string) + "\n")
+        log_fd.flush()
         
     if level<=ERRORS and level>0:
         print string

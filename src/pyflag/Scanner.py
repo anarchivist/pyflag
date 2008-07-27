@@ -169,7 +169,7 @@ class GenScanFactory:
         ## Here we do the default (clear scanner_cache field) and hope that inherited classes either deal with it or call us
         sql = fnmatch.translate(inode_glob)
         db = DB.DBO(self.case)
-        db.execute("update inode set scanner_cache = REPLACE(scanner_cache, %r, '') where inode rlike %r" % (self.__class__.__name__, sql))
+        db.execute("update inode set scanner_cache = REPLACE(scanner_cache, %r, '') where inode rlike %r", (self.__class__.__name__, sql))
                    
 
     def reset_entire_path(self, path_glob):
@@ -427,7 +427,8 @@ def scanfile(ddfs,fd,factories):
     ## scanners.
     metadata = {}
 
-    messages = "Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode'])
+    messages = DB.expand("Scanning file %s%s (inode %s)",
+                         (stat['path'],stat['name'],stat['inode']))
     global MESSAGE_COUNT
     MESSAGE_COUNT += 1
     if not MESSAGE_COUNT % 50:
@@ -469,14 +470,14 @@ def scanfile(ddfs,fd,factories):
         ## If none of the scanners are interested with this file, we
         ## stop right here
         if not interest:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "No interest for %s" % fd.inode)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "No interest for %s", fd.inode)
             break
         
         for o in objs:
             try:
                 if not o.ignore:
                     interest+=1
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Processing with %s" % o)
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Processing with %s", o)
                     o.process(data,metadata=metadata)
 
             except Exception,e:
@@ -485,7 +486,7 @@ def scanfile(ddfs,fd,factories):
                 #raise
 
         if not interest:
-            pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)
+            pyflaglog.log(pyflaglog.DEBUG, "No interest for %s", fd.inode)
             break
 
     # call slack method of each object. fd.slack must be reset after the call
@@ -639,14 +640,14 @@ def get_factories(case,scanners):
     ## First prepare the required factories:
     result = []
     for scanner in scanners:
-        key = "%s:%s" % (case,scanner)
+        key = DB.expand("%s:%s", (case,scanner))
         try:
             f=factories.get(key)
         except KeyError:
             try:
                 cls=Registry.SCANNERS.dispatch(scanner)
             except:
-                pyflaglog.log(pyflaglog.WARNING, "Unable to find scanner for %s" % scanner)
+                pyflaglog.log(pyflaglog.WARNING, "Unable to find scanner for %s", scanner)
                 continue
 
             #Instatiate it:
