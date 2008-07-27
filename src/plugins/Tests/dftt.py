@@ -18,7 +18,7 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
     """ Test DFTT image 2: FAT Keyword Test """
     test_case = 'dftt'
     test_file = "2-kwsrch-fat/fat-img-kw.dd"
-    subsystem = 'Advanced'
+    subsystem = 'Standard'
 
     ## Copied from DFTT page - id,string, sector, offset, file, note
     case_sensitive_keywords = [
@@ -110,7 +110,7 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
     """ Test DFTT image 8: Jpeg image search #1 """
     test_case = "dftt"
     test_file = "8-jpeg-search/8-jpeg-search.dd"
-    subsystem = 'Advanced'
+    subsystem = 'Standard'
 
     def check_for_file(self, sql='1'):
         dbh=DB.DBO(self.test_case)
@@ -131,7 +131,7 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
         """ Running scanners """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'CarveScan', 'ZipScan', 'TarScan', 'GZScan', 'TypeScan', 'IndexScan'])
+                             argv=["*",'JPEGCarver', 'ZipScan', 'TarScan', 'GZScan', 'TypeScan', 'IndexScan'])
 
     ## The following are just tests against the results:
     def test02(self):

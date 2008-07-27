@@ -190,7 +190,7 @@ class AdvancedLogTest(LogFile.LogDriverTester):
         query = query_type(datafile = self.test_file, log_preset=self.log_preset,
                            field_param_1_name="Timestamp",
                            field_param_1_column="time",
-                           field_param_1_format="%b +%d %H:%M:%S",
+                           field_param_1_format="%b %d %H:%M:%S",
                            field_param_1_override_year="2007",
                            field_types1="TimestampType",
 

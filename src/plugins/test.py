@@ -357,7 +357,7 @@ class TableTest(PopUpTest):
 
         def foobar_cb(value):
             return "foo %s" % value
-        
+
         result.table(
                          ## Can use keyword args
             elements = [ TimestampType(name = 'Timestamp',

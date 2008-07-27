@@ -7,6 +7,7 @@ HTML rendering is correct.
 import pyflag.DB as DB
 import pyflag.tests
 import pyflag.HTMLUI as HTMLUI
+import pyflag.UI as UI
 import pyflag.Registry as Registry
 import pyflag.FlagFramework as FlagFramework
 
@@ -50,22 +51,27 @@ class GUITester(pyflag.tests.ScannerTest):
         dbh=DB.DBO(self.test_case)
         ## For each column run all its test cases:
         elements = [ c for c in t.bind_columns(self.test_case) ]
+
+        ## Create a renderer:
+        r = UI.TableRenderer(elements = elements, table = tablename)
+        
         for c in elements:
             for operator, arg, e in c.tests:
                 try:
                     ## Get the SQL:
-                    filter_str = "'%s' %s '%s'" % (c.name, operator, arg)
-                    sql = result._make_sql(elements = elements, filter_elements = elements,
-                                           table = t.name, 
-                                           filter=filter_str)
+                    r.filter_str = "'%s' %s '%s'" % (c.name, operator, arg)
+                    query = FlagFramework.query_type(direction=1)
+                    sql = r._make_sql(query)
+                    
                     print "%s: Testing %s: %s" % (tablename,
                                                   c.__class__,
-                                                  filter_str)
+                                                  r.filter_str)
                     
-                    dbh.execute(sql)
+                    dbh.execute(sql + " limit 1")
+                    dbh.fetch()
                 except Exception:
                     if not e: raise
                     continue
                 
                 if e:
-                    raise Exception("Expected an exception but did not receive one on filter string %s. SQL was %s" %( filter_str,sql))
+                    raise Exception("Expected an exception but did not receive one on filter string %s. SQL was %s" %( r.filter_str,sql))

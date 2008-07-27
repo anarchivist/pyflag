@@ -246,7 +246,7 @@ class HTMLUI(UI.GenericUI):
         example if we show a pop up window, we dont actually render
         the window until the user pops it up.
         """
-
+        #print "pushing to store %s" % FlagFramework.STORE.size()
         cb_key = FlagFramework.STORE.put(callback, prefix="CB")
         return cb_key
     

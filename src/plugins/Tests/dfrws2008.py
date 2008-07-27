@@ -5,7 +5,7 @@ import pyflag.tests
 class DFRWS2008Test(pyflag.tests.ScannerTest):
     """ Test the DFRWS2008 Forensics Challenge """
     test_case = "dfrws2008 test"
-    test_file = "testimages/dfrws2008-challenge.zip"
+    test_file = "dfrws2008-challenge.zip"
     subsystem = "Standard"
     fstype = "Raw"
     TZ = "US/Eastern"

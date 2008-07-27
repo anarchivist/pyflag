@@ -260,7 +260,7 @@ class EWF(Standard):
         filenames = self.glob_filenames(query.getarray('filename'))
         print "Openning ewf file %s" % (filenames,)
         fd = pyewf.open(filenames)            
-        return OffsettedFDFile(fd, offset)
+        return OffsettedFDFile((fd,), offset)
 
 class AFF(Standard):
     """ Advanced Forensics Format, an open format for storage of forensic

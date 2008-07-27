@@ -667,48 +667,14 @@ class FTPTests(tests.ScannerTest):
 
     def test01FTPScanner(self):
         """ Test basic FTP scanning """
-        self.test_case = "Pyflagtest01FTPScannerTestCase"
         env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])   
-
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=FTPTest1", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers/"\
-                                   "FTP/FTP_Cap1_BasicSession.pcap"])
-
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=FTPTest1", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/FTPTest1"])
-
         pyflagsh.shell_execv(env=env,
                              command="scan",
                              argv=["*",                   ## Inodes (All)
                                    "FTPScanner"
                                   ])                   ## List of Scanners
 
-
-
-        ## What should we have found?
+        ## What should we have found? FIXME
         dbh = DB.DBO(self.test_case)
 
 

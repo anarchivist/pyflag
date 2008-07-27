@@ -365,7 +365,7 @@ class SimpleLogTest(LogFile.LogDriverTester):
     test_case = "PyFlag Test Case"
 
     test_table = "Test Table"
-    test_file = "net-acct.log"
+    test_file = "net-acct.log.gz"
     log_preset = "NetAcct"
 
     test_table_two = "Test Two Table"

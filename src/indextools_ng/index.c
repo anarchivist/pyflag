@@ -86,8 +86,8 @@ static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args, PyObj
   int unique=0;
   static char *kwlist[] = {"data","unique",NULL};
 
-  if(kwds && !PyArg_ParseTupleAndKeywords(args, kwds, "O|i", kwlist,
-					  &data, &unique)) 
+  if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|i", kwlist,
+				  &data, &unique)) 
     return NULL;
   
   if(unique) {

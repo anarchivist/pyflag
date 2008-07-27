@@ -179,7 +179,7 @@ class GenScanFactory:
         path = path_glob
         if not path.endswith("*"): path = path + "*"  
         db = DB.DBO(self.case)
-        db.execute("update inode join file on file.inode = inode.inode set scanner_cache = REPLACE(scanner_cache, %r, '') where file.path rlike %r" % (self.__class__.__name__, fnmatch.translate(path)))
+        db.execute("update inode join file on file.inode = inode.inode set scanner_cache = REPLACE(scanner_cache, %r, '') where file.path rlike %r",(self.__class__.__name__, fnmatch.translate(path)))
         
     ## Relative order of scanners - Higher numbers come later in the order
     order=10
@@ -448,7 +448,7 @@ def scanfile(ddfs,fd,factories):
 
             ## If there are not enough blocks to do a reasonable chunk of the file, we skip them as well...
             if c>0 and c*fd.block_size<fd.size:
-                pyflaglog.log(pyflaglog.WARNING,"Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size))
+                pyflaglog.log(pyflaglog.WARNING, "Skipping inode %s because there are not enough blocks %s < %s", fd.inode,c*fd.block_size,fd.size)
                 return
 
         except AttributeError:

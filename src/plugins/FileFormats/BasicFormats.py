@@ -446,6 +446,9 @@ class STRING(BYTE):
     def __str__(self):
         return "%s" % self.data
 
+    def __unicode__(self):
+        return ("%s" % self.data).decode("ascii","ignore")
+
     def substr(self,start,end):
         """ Truncates the string at a certain point """
         self.data=self.data[start:end]

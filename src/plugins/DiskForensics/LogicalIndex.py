@@ -1009,7 +1009,7 @@ class HashTrieIndexTests(unittest.TestCase):
                 data = fd.read(1024*1024)
                 if len(data)==0: break
 
-                for offset,matches in idx.index_buffer(data):
+                for offset,matches in idx.index_buffer(data, unique=False):
                     for id, length in matches:
                         count+=1
 

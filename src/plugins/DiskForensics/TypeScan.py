@@ -55,7 +55,7 @@ class TypeScan(Scanner.GenScanFactory):
         path = path_glob
         if not path.endswith("*"): path = path + "*"  
         db = DB.DBO(self.case)
-        db.execute("delete from type where inode_id in (select inode_id from file where file.path rlike %r)" % (fnmatch.translate(path)))
+        db.execute("delete from type where inode_id in (select inode_id from file where file.path rlike %r)", fnmatch.translate(path))
         Scanner.GenScanFactory.reset_entire_path(self, path_glob)
         
     def destroy(self):

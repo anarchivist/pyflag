@@ -653,18 +653,3 @@ class NetworkingSummary(Reports.report):
                 )
         except DB.DBError,args:
             result.para("No networking tables found, you probably haven't run the correct scanners: %s" % args)
-
-
-## UnitTests:
-import unittest
-import pyflag.pyflagsh as pyflagsh
-from pyflag.FileSystem import DBFS
-import pyflag.tests as tests
-
-class NetworkForensicTests(pyflag.tests.ScannerTest):
-    """ Tests network forensics """
-    test_case = "PyFlag Network Test Case"
-    test_file = "stdcapture_0.3.pcap.sgz"
-    subsystem = "SGZip"
-    fstype = 'PCAP Filesystem'
-        

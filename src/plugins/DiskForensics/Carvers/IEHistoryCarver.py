@@ -54,11 +54,13 @@ class IECarver(JPEGCarver.JPEGCarver):
             if event['size'].get_value() > 10:
                 return
 
+            url = event['url'].__str__()
+
             args = dict(inode_id = self.fd.inode_id,
                         offset = offset,
                         length = event['size'].get_value() * IECache.blocksize,
                         type  = event['type'].get_value().decode("ascii","ignore"),
-                        url = event['url'].get_value().decode("ascii","ignore"),
+                        url = url,
                         _modified = 'from_unixtime(%d)' % event['modified_time'].get_value(),
                         _accessed = 'from_unixtime(%d)' % event['accessed_time'].get_value(),
                         filename = event['filename'],)
