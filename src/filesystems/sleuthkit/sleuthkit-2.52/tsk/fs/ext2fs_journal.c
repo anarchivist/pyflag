@@ -94,8 +94,7 @@ ext2fs_jopen(TSK_FS_INFO * fs, TSK_INUM_T inum)
         return 1;
     }
 
-    ext2fs->jinfo = jinfo =
-        (EXT2FS_JINFO *) tsk_malloc(sizeof(EXT2FS_JINFO));
+    ext2fs->jinfo = jinfo = talloc(ext2fs, EXT2FS_JINFO);
     if (jinfo == NULL) {
         return 1;
     }
@@ -103,7 +102,7 @@ ext2fs_jopen(TSK_FS_INFO * fs, TSK_INUM_T inum)
 
     jinfo->fs_inode = fs->inode_lookup(fs, inum);
     if (!jinfo->fs_inode) {
-        free(jinfo);
+        talloc_free(jinfo);
         return 1;
 //      error("error finding journal inode %" PRIu32, inum);
     }
@@ -114,7 +113,7 @@ ext2fs_jopen(TSK_FS_INFO * fs, TSK_INUM_T inum)
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "Error loading ext3 journal");
         tsk_fs_inode_free(jinfo->fs_inode);
-        free(jinfo);
+        talloc_free(jinfo);
         return 1;
     }
 
@@ -165,14 +164,14 @@ ext2fs_jentry_walk(TSK_FS_INFO * fs, int flags,
 
     /* Load the journal into a buffer */
     buf1.left = buf1.total = (size_t) jinfo->fs_inode->size;
-    journ = buf1.cur = buf1.base = tsk_malloc(buf1.left);
+    journ = buf1.cur = buf1.base = talloc_size(fs, buf1.left);
     if (journ == NULL) {
         return 1;
     }
 
     if (fs->file_walk(fs, jinfo->fs_inode, 0, 0, TSK_FS_FILE_FLAG_NOID,
             tsk_fs_load_file_action, (void *) &buf1)) {
-        free(journ);
+        talloc_free(journ);
         return 1;
     }
 
@@ -181,7 +180,7 @@ ext2fs_jentry_walk(TSK_FS_INFO * fs, int flags,
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "ext2fs_jentry_walk: Buffer not fully copied");
-        free(journ);
+        talloc_free(journ);
         return 1;
     }
 
@@ -414,7 +413,7 @@ ext2fs_jentry_walk(TSK_FS_INFO * fs, int flags,
         }
     }
 
-    free(journ);
+    talloc_free(journ);
     return 0;
 }
 
@@ -478,14 +477,14 @@ ext2fs_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end, int flags
      * Only get the minimum needed
      */
     buf1.left = buf1.total = (size_t) ((end + 1) * jinfo->bsize);
-    journ = buf1.cur = buf1.base = tsk_malloc(buf1.left);
+    journ = buf1.cur = buf1.base = talloc_size(fs, buf1.left);
     if (journ == NULL) {
         return 1;
     }
 
     if (fs->file_walk(fs, jinfo->fs_inode, 0, 0, TSK_FS_FILE_FLAG_NOID,
             tsk_fs_load_file_action, (void *) &buf1)) {
-        free(journ);
+        talloc_free(journ);
         return 1;
     }
 
@@ -494,7 +493,7 @@ ext2fs_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end, int flags
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "ext2fs_jblk_walk: Buffer not fully copied");
-        free(journ);
+        talloc_free(journ);
         return 1;
     }
 
@@ -574,10 +573,10 @@ ext2fs_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end, int flags
         tsk_errno = TSK_ERR_FS_WRITE;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "ext2fs_jblk_walk: error writing buffer block");
-        free(journ);
+        talloc_free(journ);
         return 1;
     }
 
-    free(journ);
+    talloc_free(journ);
     return 0;
 }

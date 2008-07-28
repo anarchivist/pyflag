@@ -301,7 +301,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
         int retval;
 
         clen = TSTRLEN(tpath) * 4;
-        if ((cpath = (char *) tsk_malloc(clen)) == NULL) {
+        if ((cpath = (char *) talloc_size(fs, clen)) == NULL) {
             return -1;
         }
         ptr8 = (UTF8 *) cpath;
@@ -317,7 +317,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
             snprintf(tsk_errstr, TSK_ERRSTR_L,
                 "tsk_fs_ifind_path: Error converting path to UTF-8: %d",
                 retval);
-            free(cpath);
+            talloc_free(cpath);
             return -1;
         }
     }
@@ -325,7 +325,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
     {
         // copy to a buffer that we can modify
         size_t clen = strlen(tpath) + 1;
-        if ((cpath = (char *) tsk_malloc(clen)) == NULL) {
+        if ((cpath = (char *) talloc_size(fs, clen)) == NULL) {
             return -1;
         }
         strncpy(cpath, tpath, clen);
@@ -340,7 +340,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
 
     /* If there is no token, then only a '/' was given */
     if (!(ipd.cur_dir)) {
-        free(cpath);
+        talloc_free(cpath);
         *result = fs->root_inum;
         return 0;
     }
@@ -362,7 +362,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
         /* If we found files before the error was encountered, then 
          * ignore it */
         if (ipd.found == 0) {
-            free(cpath);
+            talloc_free(cpath);
             return -1;
         }
         else {
@@ -370,7 +370,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
         }
     }
 
-    free(cpath);
+    talloc_free(cpath);
 
     if (1 == ipd.badpath) {
         if (tsk_verbose)

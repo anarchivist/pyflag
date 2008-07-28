@@ -62,7 +62,7 @@ ffs_group_load(FFS_INFO * ffs, FFS_GRPNUM_T grp_num)
      * 4.4BSD <ufs/ffs/fs.h> include file).
      */
     if (ffs->grp_buf == NULL) {
-        if ((ffs->grp_buf = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL)
+        if ((ffs->grp_buf = tsk_data_buf_alloc(ffs, ffs->ffsbsize_b)) == NULL)
             return 1;
     }
 
@@ -130,7 +130,7 @@ ffs_dinode_load(FFS_INFO * ffs, TSK_INUM_T inum)
      * Allocate/read the inode table buffer on the fly.
      */
     if (ffs->itbl_buf == NULL) {
-        if ((ffs->itbl_buf = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL)
+        if ((ffs->itbl_buf = tsk_data_buf_alloc(ffs, ffs->ffsbsize_b)) == NULL)
             return 1;
     }
 
@@ -145,7 +145,7 @@ ffs_dinode_load(FFS_INFO * ffs, TSK_INUM_T inum)
         FFS_GRPNUM_T grp_num;
 
         if (ffs->dino_buf == NULL) {
-            ffs->dino_buf = (char *) tsk_malloc(sizeof(ffs_inode2));
+            ffs->dino_buf = (char *) talloc_size(ffs, sizeof(ffs_inode2));
             if (ffs->dino_buf == NULL)
                 return 1;
         }
@@ -200,7 +200,7 @@ ffs_dinode_load(FFS_INFO * ffs, TSK_INUM_T inum)
     }
     else {
         if (ffs->dino_buf == NULL) {
-            ffs->dino_buf = (char *) tsk_malloc(sizeof(ffs_inode1));
+            ffs->dino_buf = (char *) talloc_size(ffs, sizeof(ffs_inode1));
             if (ffs->dino_buf == NULL)
                 return 1;
         }
@@ -258,7 +258,7 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
 
     /* If the symlink field is set from a previous run, then free it */
     if (fs_inode->link) {
-        free(fs_inode->link);
+        talloc_free(fs_inode->link);
         fs_inode->link = NULL;
     }
 
@@ -302,7 +302,7 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
             && (fs_inode->size >= 0)) {
             int i;
 
-            fs_inode->link = tsk_malloc((size_t) fs_inode->size + 1);
+            fs_inode->link = talloc_size(fs_inode, (size_t) fs_inode->size + 1);
             if (fs_inode->link == NULL) {
                 return 1;
             }
@@ -343,7 +343,7 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
                 char *ptr = fs_inode->link;
 
                 if ((data_buf =
-                        tsk_data_buf_alloc(fs->block_size)) == NULL) {
+                        tsk_data_buf_alloc(fs_inode, fs->block_size)) == NULL) {
                     return 1;
                 }
 
@@ -462,11 +462,11 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
                 char *ptr;
 
                 if ((data_buf =
-                        tsk_data_buf_alloc(fs->block_size)) == NULL)
+                        tsk_data_buf_alloc(fs_inode, fs->block_size)) == NULL)
                     return 1;
 
                 fs_inode->link = ptr =
-                    tsk_malloc((size_t) fs_inode->size + 1);
+                    talloc_size(fs_inode, (size_t) fs_inode->size + 1);
                 if (fs_inode->link == NULL) {
                     tsk_data_buf_free(data_buf);
                     return 1;
@@ -548,7 +548,7 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
                 TSK_FS_INODE_MODE_LNK) && (fs_inode->size < FFS_MAXPATHLEN)
             && (fs_inode->size >= 0)) {
 
-            fs_inode->link = tsk_malloc((size_t) fs_inode->size + 1);
+            fs_inode->link = talloc_size(fs_inode, (size_t) fs_inode->size + 1);
             if (fs_inode->link == NULL) {
                 return 1;
             }
@@ -591,7 +591,7 @@ ffs_dinode_copy(FFS_INFO * ffs, TSK_FS_INODE * fs_inode)
                 char *ptr = fs_inode->link;
 
                 if ((data_buf =
-                        tsk_data_buf_alloc(fs->block_size)) == NULL) {
+                        tsk_data_buf_alloc(fs_inode, fs->block_size)) == NULL) {
                     return 1;
                 }
 
@@ -711,7 +711,7 @@ inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
 {
     if ((fs_dent->fsi)
         && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
-        if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+        if (tsk_list_add(fs, &fs->list_inum_named, fs_dent->fsi->addr))
             return TSK_WALK_STOP;
     }
     return TSK_WALK_CONT;
@@ -985,13 +985,13 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
      */
 
     if ((data_buf =
-            tsk_data_buf_alloc(fs->block_size * ffs->ffsbsize_f)) ==
+            tsk_data_buf_alloc(fs, fs->block_size * ffs->ffsbsize_f)) ==
         NULL) {
         return 1;
     }
 
     if (flags & TSK_FS_BLOCK_FLAG_ALIGN) {
-        null_block = tsk_malloc(fs->block_size);
+        null_block = talloc_size(data_buf, fs->block_size);
         if (null_block == NULL) {
             tsk_data_buf_free(data_buf);
             return 1;
@@ -1019,9 +1019,6 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
                 cg->cg_cgx) != grp_num) {
 
             if (ffs_group_load(ffs, grp_num)) {
-                if (flags & TSK_FS_BLOCK_FLAG_ALIGN)
-                    free(null_block);
-
                 tsk_data_buf_free(data_buf);
                 return 1;
             }
@@ -1084,12 +1081,10 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
                     int retval;
                     retval = action(fs, faddr, null_block, myflags, ptr);
                     if (retval == TSK_WALK_STOP) {
-                        free(null_block);
                         tsk_data_buf_free(data_buf);
                         return 0;
                     }
                     else if (retval == TSK_WALK_ERROR) {
-                        free(null_block);
                         tsk_data_buf_free(data_buf);
                         return 1;
                     }
@@ -1111,8 +1106,6 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
                         snprintf(tsk_errstr2, TSK_ERRSTR_L,
                             "ffs_block_walk: Block %" PRIuDADDR, addr);
                         tsk_data_buf_free(data_buf);
-                        if (flags & TSK_FS_BLOCK_FLAG_ALIGN)
-                            free(null_block);
                         return 1;
                     }
                 }
@@ -1122,14 +1115,10 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
                         data_buf->addr), myflags, ptr);
                 if (retval == TSK_WALK_STOP) {
                     tsk_data_buf_free(data_buf);
-                    if (flags & TSK_FS_BLOCK_FLAG_ALIGN)
-                        free(null_block);
                     return 0;
                 }
                 else if (retval == TSK_WALK_ERROR) {
                     tsk_data_buf_free(data_buf);
-                    if (flags & TSK_FS_BLOCK_FLAG_ALIGN)
-                        free(null_block);
                     return 1;
                 }
             }
@@ -1139,8 +1128,6 @@ ffs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
     /*
      * Cleanup.
      */
-    if (flags & TSK_FS_BLOCK_FLAG_ALIGN)
-        free(null_block);
     tsk_data_buf_free(data_buf);
     return 0;
 }
@@ -1449,12 +1436,12 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
      * indirect blocks.
      */
     if ((buf =
-            (TSK_DATA_BUF **) tsk_malloc(sizeof(*buf) *
+            (TSK_DATA_BUF **) talloc_size(inode, sizeof(*buf) *
                 (inode->indir_count + 1))) == NULL)
         return 1;
 
-    if ((buf[0] = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL) {
-        free(buf);
+    if ((buf[0] = tsk_data_buf_alloc(buf, ffs->ffsbsize_b)) == NULL) {
+        talloc_free(buf);
         return 1;
     }
 
@@ -1471,13 +1458,11 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             inode->direct_addr[n], flags, action, ptr);
 
         if (read_b == -1) {
-            tsk_data_buf_free(buf[0]);
-            free(buf);
+            talloc_free(buf);
             return 1;
         }
         else if (read_b == 0) {
-            tsk_data_buf_free(buf[0]);
-            free(buf);
+            talloc_free(buf);
             return 0;
         }
         length -= read_b;
@@ -1488,12 +1473,8 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
 
         /* allocate buffers */
         for (level = 1; level <= inode->indir_count; level++) {
-            if ((buf[level] = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL) {
-                int f;
-                for (f = 0; f < level; f++) {
-                    tsk_data_buf_free(buf[f]);
-                }
-                free(buf);
+            if ((buf[level] = tsk_data_buf_alloc(buf, ffs->ffsbsize_b)) == NULL) {
+                talloc_free(buf);
                 return 1;
             }
         }
@@ -1510,12 +1491,9 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
         /*
          * Cleanup.
          */
-        for (level = 1; level <= inode->indir_count; level++)
-            tsk_data_buf_free(buf[level]);
     }
 
-    tsk_data_buf_free(buf[0]);
-    free(buf);
+    talloc_free(buf);
 
     if (read_b == -1)
         return 1;
@@ -1686,7 +1664,7 @@ ffs_fsstat(TSK_FS_INFO * fs, FILE * hFile)
     if (tsk_getu32(fs->endian, sb1->cg_ssize_b)) {
         ssize_t cnt;
         csum1 =
-            (ffs_csum1 *) tsk_malloc(tsk_getu32(fs->endian,
+            (ffs_csum1 *) talloc_size(ffs, tsk_getu32(fs->endian,
                 sb1->cg_ssize_b));
         if (csum1 == NULL)
             return 1;
@@ -2000,7 +1978,7 @@ ffs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblock,
             char name[257];
             TSK_DATA_BUF *data_buf;
 
-            if ((data_buf = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL) {
+            if ((data_buf = tsk_data_buf_alloc(fs_inode, ffs->ffsbsize_b)) == NULL) {
                 tsk_fs_inode_free(fs_inode);
                 return 1;
             }
@@ -2181,24 +2159,8 @@ ffs_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end, int flags,
 static void
 ffs_close(TSK_FS_INFO * fs)
 {
-    FFS_INFO *ffs = (FFS_INFO *) fs;
-
-    if (ffs->grp_buf)
-        tsk_data_buf_free(ffs->grp_buf);
-
-    if (ffs->itbl_buf)
-        tsk_data_buf_free(ffs->itbl_buf);
-
-    if (ffs->dino_buf)
-        free(ffs->dino_buf);
-
-    if (fs->list_inum_named) {
-        tsk_list_free(fs->list_inum_named);
-        fs->list_inum_named = NULL;
-    }
-
-    free((char *) ffs->fs.sb1);
-    free(ffs);
+	talloc_free(fs);
+	return;
 }
 
 /**
@@ -2229,7 +2191,7 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         return NULL;
     }
 
-    ffs = (FFS_INFO *) tsk_malloc(sizeof(*ffs));
+    ffs = talloc(NULL, FFS_INFO);
     if (ffs == NULL)
         return NULL;
     fs = &(ffs->fs_info);
@@ -2244,9 +2206,9 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     /* Both sbs are the same size */
     len = roundup(sizeof(ffs_sb1), FFS_DEV_BSIZE);
-    ffs->fs.sb1 = (ffs_sb1 *) tsk_malloc(len);
+    ffs->fs.sb1 = (ffs_sb1 *) talloc_size(ffs, len);
     if (ffs->fs.sb1 == NULL) {
-        free(ffs);
+        talloc_free(ffs);
         return NULL;
     }
 
@@ -2264,8 +2226,7 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         }
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "%s: Superblock at %" PRIuDADDR, myname, (TSK_OFF_T) UFS2_SBOFF);
-        free(ffs->fs.sb1);
-        free(ffs);
+        talloc_free(ffs);
         return NULL;
     }
 
@@ -2282,8 +2243,7 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             snprintf(tsk_errstr2, TSK_ERRSTR_L,
                 "%s: Superblock at %" PRIuDADDR,
                 myname, (TSK_OFF_T) UFS2_SBOFF2);
-            free(ffs->fs.sb1);
-            free(ffs);
+            talloc_free(ffs);
             return NULL;
         }
 
@@ -2299,13 +2259,11 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
                 snprintf(tsk_errstr2, TSK_ERRSTR_L,
                     "%s: Superblock at %" PRIuDADDR,
                     myname, (TSK_OFF_T) UFS1_SBOFF);
-                free(ffs->fs.sb1);
-                free(ffs);
+                talloc_free(ffs);
                 return NULL;
             }
             if (tsk_fs_guessu32(fs, ffs->fs.sb1->magic, UFS1_FS_MAGIC)) {
-                free(ffs->fs.sb1);
-                free(ffs);
+                talloc_free(ffs);
                 tsk_error_reset();
                 tsk_errno = TSK_ERR_FS_MAGIC;
                 snprintf(tsk_errstr, TSK_ERRSTR_L, "No UFS Magic Found");
@@ -2356,8 +2314,7 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             (img_info->size - offset) / fs->block_size - 1;
 
     if ((fs->block_size % 512) || (ffs->ffsbsize_b % 512)) {
-        free(ffs->fs.sb1);
-        free(ffs);
+        talloc_free(ffs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -2366,8 +2323,7 @@ ffs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     }
 
     if ((ffs->ffsbsize_b / fs->block_size) != ffs->ffsbsize_f) {
-        free(ffs->fs.sb1);
-        free(ffs);
+        talloc_free(ffs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,

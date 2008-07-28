@@ -159,7 +159,7 @@ raw_close(TSK_IMG_INFO * img_info)
 #else
     close(raw_info->fd);
 #endif
-    free(raw_info);
+    talloc_free(raw_info);
 }
 
 
@@ -174,8 +174,7 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
     IMG_RAW_INFO *raw_info;
     TSK_IMG_INFO *img_info;
 
-    if ((raw_info =
-            (IMG_RAW_INFO *) tsk_malloc(sizeof(IMG_RAW_INFO))) == NULL)
+    if ((raw_info = talloc(NULL, IMG_RAW_INFO)) == NULL)
         return NULL;
 
     memset((void *) raw_info, 0, sizeof(IMG_RAW_INFO));

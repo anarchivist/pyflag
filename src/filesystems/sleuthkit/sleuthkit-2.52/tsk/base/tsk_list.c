@@ -25,10 +25,10 @@
  */
 
 static TSK_LIST *
-tsk_list_create(uint64_t key)
+tsk_list_create(void *context, uint64_t key)
 {
     TSK_LIST *ent;
-    if ((ent = (TSK_LIST *) tsk_malloc(sizeof(TSK_LIST))) == NULL) {
+    if ((ent = talloc(context, TSK_LIST)) == NULL) {
         return NULL;
     }
 
@@ -39,8 +39,9 @@ tsk_list_create(uint64_t key)
     return ent;
 }
 
+/* context is only used if list is NULL, else list is used. */
 uint8_t
-tsk_list_add(TSK_LIST ** list, uint64_t key)
+tsk_list_add(void *context, TSK_LIST ** list, uint64_t key)
 {
     TSK_LIST *tmp;
 
@@ -49,7 +50,7 @@ tsk_list_add(TSK_LIST ** list, uint64_t key)
         TSK_LIST *ent;
         if (tsk_verbose)
             fprintf(stderr, "entry %" PRIu64 " is first on list\n", key);
-        if ((ent = tsk_list_create(key)) == NULL)
+        if ((ent = tsk_list_create(context, key)) == NULL)
             return 1;
 
         *list = ent;
@@ -70,7 +71,7 @@ tsk_list_add(TSK_LIST ** list, uint64_t key)
         }
         else {
             TSK_LIST *ent;
-            if ((ent = tsk_list_create(key)) == NULL)
+            if ((ent = tsk_list_create(*list, key)) == NULL)
                 return 1;
             ent->next = *list;
             *list = ent;
@@ -110,7 +111,7 @@ tsk_list_add(TSK_LIST ** list, uint64_t key)
             if (tsk_verbose)
                 fprintf(stderr, "entry %" PRIu64 " added to tail\n", key);
 
-            if ((ent = tsk_list_create(key)) == NULL)
+            if ((ent = tsk_list_create(*list, key)) == NULL)
                 return 1;
             tmp->next = ent;
 
@@ -130,7 +131,7 @@ tsk_list_add(TSK_LIST ** list, uint64_t key)
                     "entry %" PRIu64 " added before %" PRIu64 "\n",
                     key, tmp->next->key);
 
-            if ((ent = tsk_list_create(key)) == NULL)
+            if ((ent = tsk_list_create(*list, key)) == NULL)
                 return 1;
 
             ent->next = tmp->next;
@@ -170,11 +171,5 @@ tsk_list_find(TSK_LIST * list, uint64_t key)
 void
 tsk_list_free(TSK_LIST * list)
 {
-    TSK_LIST *tmp;
-
-    while (list) {
-        tmp = list->next;
-        free(list);
-        list = tmp;
-    }
+	talloc_free(list);
 }

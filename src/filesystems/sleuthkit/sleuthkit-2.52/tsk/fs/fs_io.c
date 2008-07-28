@@ -178,7 +178,7 @@ tsk_fs_load_file(TSK_FS_INFO * fs, TSK_FS_INODE * fsi, uint32_t type,
 {
     TSK_FS_LOAD_FILE lf;
 
-    if (NULL == (lf.base = (char *) tsk_malloc((size_t) fsi->size))) {
+    if (NULL == (lf.base = (char *) talloc_size(fsi, (size_t) fsi->size))) {
         return NULL;
     }
     lf.left = lf.total = (size_t) fsi->size;
@@ -186,7 +186,7 @@ tsk_fs_load_file(TSK_FS_INFO * fs, TSK_FS_INODE * fsi, uint32_t type,
 
     if (fs->file_walk(fs, fsi, type, id, flags, fs_load_file_act,
             (void *) &lf)) {
-        free(lf.base);
+        talloc_free(lf.base);
         strncat(tsk_errstr2, " - tsk_fs_load_file",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
         return NULL;
@@ -198,7 +198,7 @@ tsk_fs_load_file(TSK_FS_INFO * fs, TSK_FS_INODE * fsi, uint32_t type,
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "tsk_fs_load_file: Error reading file %" PRIuINUM, fsi->addr);
-        free(lf.base);
+        talloc_free(lf.base);
         return NULL;
     }
 

@@ -70,6 +70,7 @@ void *global_talloc_context=NULL;
 
 /* tsk_malloc - allocate memory and set error values on error
  */
+/*
 char *
 tsk_malloc(size_t len)
 {
@@ -87,8 +88,10 @@ tsk_malloc(size_t len)
     }
     return (ptr);
 }
+ */
 
 /* tsk_realloc - reallocate memory and set error values if needed */
+/*
 char *
 tsk_realloc(char *ptr, size_t len)
 {
@@ -104,3 +107,4 @@ tsk_realloc(char *ptr, size_t len)
     }
     return (ptr);
 }
+*/

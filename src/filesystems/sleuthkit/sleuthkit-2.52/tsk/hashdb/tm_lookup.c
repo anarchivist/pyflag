@@ -40,7 +40,7 @@ hdb_setuphash(TSK_HDB_INFO * hdb_info, uint8_t htype)
     /* Make the name for the index file */
     flen = TSTRLEN(hdb_info->db_fname) + 32;
     hdb_info->idx_fname =
-        (TSK_TCHAR *) tsk_malloc(flen * sizeof(TSK_TCHAR));
+        (TSK_TCHAR *) talloc_size(hdb_info, flen * sizeof(TSK_TCHAR));
     if (hdb_info->idx_fname == NULL) {
         return 1;
     }
@@ -161,7 +161,7 @@ tsk_hdb_idxinitialize(TSK_HDB_INFO * hdb_info, TSK_TCHAR * htype)
     /* Make the name for the unsorted intermediate index file */
     flen = TSTRLEN(hdb_info->db_fname) + 32;
     hdb_info->uns_fname =
-        (TSK_TCHAR *) tsk_malloc(flen * sizeof(TSK_TCHAR));
+        (TSK_TCHAR *) talloc_size(hdb_info, flen * sizeof(TSK_TCHAR));
     if (hdb_info->uns_fname == NULL) {
         return 1;
     }
@@ -193,7 +193,7 @@ tsk_hdb_idxinitialize(TSK_HDB_INFO * hdb_info, TSK_TCHAR * htype)
             tsk_errno = TSK_ERR_HDB_OPEN;
             snprintf(tsk_errstr, TSK_ERRSTR_L,
                      "hdb_idxinitialize: Error converting Windows handle to C handle");
-            free(hdb_info);
+            talloc_free(hdb_info);
             return 1;
         }
     }
@@ -569,7 +569,7 @@ hdb_setupindex(TSK_HDB_INFO * hdb_info, uint8_t htype)
     }
 
     /* allocate a buffer for a row */
-    if ((hdb_info->idx_lbuf = tsk_malloc(hdb_info->idx_llen + 1)) == NULL)
+    if ((hdb_info->idx_lbuf = talloc_size(hdb_info, hdb_info->idx_llen + 1)) == NULL)
         return 1;
 
     return 0;
@@ -1052,8 +1052,7 @@ tsk_hdb_open(TSK_TCHAR * db_file, TSK_HDB_OPEN_ENUM flags)
         hDb = NULL;
     }
 
-    if ((hdb_info =
-         (TSK_HDB_INFO *) tsk_malloc(sizeof(TSK_HDB_INFO))) == NULL)
+    if ((hdb_info = talloc(NULL, TSK_HDB_INFO)) == NULL)
         return NULL;
 
     hdb_info->hDb = hDb;
@@ -1103,9 +1102,9 @@ tsk_hdb_open(TSK_TCHAR * db_file, TSK_HDB_OPEN_ENUM flags)
     flen = TSTRLEN(db_file) + 8;        // + 32;
 
     hdb_info->db_fname =
-        (TSK_TCHAR *) tsk_malloc(flen * sizeof(TSK_TCHAR));
+        (TSK_TCHAR *) talloc_size(hdb_info, flen * sizeof(TSK_TCHAR));
     if (hdb_info->db_fname == NULL) {
-        free(hdb_info);
+        talloc_free(hdb_info);
         return NULL;
     }
     TSTRNCPY(hdb_info->db_fname, db_file, flen);
@@ -1128,20 +1127,8 @@ tsk_hdb_close(TSK_HDB_INFO * hdb_info)
         fclose(hdb_info->hIdxTmp);
     // @@@ Could delete temp file too...
 
-    if (hdb_info->idx_lbuf != NULL)
-        free(hdb_info->idx_lbuf);
-
-    if (hdb_info->db_fname)
-        free(hdb_info->db_fname);
-
-    if (hdb_info->uns_fname)
-        free(hdb_info->uns_fname);
-
-    if (hdb_info->idx_fname)
-        free(hdb_info->idx_fname);
-
     if (hdb_info->hDb)
         fclose(hdb_info->hDb);
 
-    free(hdb_info);
+    talloc_free(hdb_info);
 }

@@ -36,7 +36,7 @@ tsk_printf_conv(WCHAR * wbuf, int wlen, const char *msg, va_list * args)
     wbuf[0] = '\0';
 
     clen = wlen * 3;
-    if (NULL == (cbuf = (char *) tsk_malloc(clen))) {
+    if (NULL == (cbuf = (char *) talloc_size(NULL, clen))) {
         return 1;
     }
     memset(cbuf, 0, clen);
@@ -56,7 +56,7 @@ tsk_printf_conv(WCHAR * wbuf, int wlen, const char *msg, va_list * args)
             tsk_fprintf(stderr,
                 "tsk_printf_conv: error converting string to UTF-16\n");
     }
-    free(cbuf);
+    talloc_free(cbuf);
 
     return 0;
 }

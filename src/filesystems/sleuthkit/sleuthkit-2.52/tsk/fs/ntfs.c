@@ -534,7 +534,7 @@ is_clustalloc(NTFS_INFO * ntfs, TSK_DADDR_T addr)
  * @returns A list of TSK_FS_DATA_RUN entries of len totlen bytes (only set if non-NULL). Returns NULL on error and for Bad clust: Check tsk_errno to test
  */
 static TSK_FS_DATA_RUN *
-ntfs_make_data_run(NTFS_INFO * ntfs, TSK_OFF_T start_vcn,
+ntfs_make_data_run(NTFS_INFO * ntfs, void *context, TSK_OFF_T start_vcn,
     ntfs_runlist * runlist_head, TSK_OFF_T * totlen)
 {
     TSK_FS_INFO *fs = (TSK_FS_INFO *) ntfs;
@@ -559,7 +559,7 @@ ntfs_make_data_run(NTFS_INFO * ntfs, TSK_OFF_T start_vcn,
         int64_t addr_offset = 0;
 
         /* allocate a new tsk_fs_data_run */
-        if ((data_run = tsk_fs_data_run_alloc()) == NULL) {
+        if ((data_run = tsk_fs_data_run_alloc(context)) == NULL) {
             return NULL;
         }
 
@@ -692,7 +692,7 @@ ntfs_make_data_run(NTFS_INFO * ntfs, TSK_OFF_T start_vcn,
         && (data_run_head->next == NULL)
         && (data_run_head->flags & TSK_FS_DATA_RUN_FLAG_SPARSE)
         && (data_run_head->len == fs->last_block + 1)) {
-        free(data_run_head);
+        talloc_free(data_run_head);
         data_run_head = NULL;
     }
 
@@ -806,7 +806,7 @@ ntfs_uncompress_setup(TSK_FS_INFO * fs, NTFS_COMP_INFO * comp,
     uint32_t compunit_size_c)
 {
     comp->uncomp_size_b = fs->block_size * compunit_size_c;
-    comp->uncomp_buf = tsk_malloc(comp->uncomp_size_b);
+    comp->uncomp_buf = talloc_size(comp, comp->uncomp_size_b);
     if (comp->uncomp_buf == NULL) {
         comp->uncomp_size_b = 0;
         return 1;
@@ -821,7 +821,7 @@ static void
 ntfs_uncompress_done(NTFS_COMP_INFO * comp)
 {
     if (comp->uncomp_buf)
-        free(comp->uncomp_buf);
+        talloc_free(comp->uncomp_buf);
     comp->uncomp_buf = NULL;
     comp->uncomp_size_b = 0;
 }
@@ -1434,7 +1434,7 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
     if (fs_data->flags & TSK_FS_DATA_RES) {
         char *buf = NULL;
         if ((flags & TSK_FS_FILE_FLAG_AONLY) == 0) {
-            if ((buf = tsk_malloc((size_t) fs_data->size)) == NULL) {
+            if ((buf = talloc_size(fs_data, (size_t) fs_data->size)) == NULL) {
                 return 1;
             }
             memcpy(buf, fs_data->buf, (size_t) fs_data->size);
@@ -1448,16 +1448,16 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
             (unsigned int) fs_data->size, myflags, ptr);
         if (retval == TSK_WALK_STOP) {
             if ((flags & TSK_FS_FILE_FLAG_AONLY) == 0)
-                free(buf);
+                talloc_free(buf);
             return 0;
         }
         else if (retval == TSK_WALK_ERROR) {
             if ((flags & TSK_FS_FILE_FLAG_AONLY) == 0)
-                free(buf);
+                talloc_free(buf);
             return 1;
         }
         if ((flags & TSK_FS_FILE_FLAG_AONLY) == 0)
-            free(buf);
+            talloc_free(buf);
     }
     /* Process the compressed buffer 
      *
@@ -1479,24 +1479,26 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
         TSK_FS_DATA_RUN *fs_data_run;
         TSK_DADDR_T *comp_unit;
         uint32_t comp_unit_idx = 0;
-        NTFS_COMP_INFO comp;
+        NTFS_COMP_INFO *comp;
+
+        comp = talloc(fs_data, NTFS_COMP_INFO);
 
         /* Allocate the buffers and state structure */
-        if (ntfs_uncompress_setup(fs, &comp, fs_data->compsize)) {
+        if (ntfs_uncompress_setup(fs, comp, fs_data->compsize)) {
             return 1;
         }
 
         comp_unit =
-            (TSK_DADDR_T *) tsk_malloc(fs_data->compsize * sizeof(TSK_DADDR_T));
+            (TSK_DADDR_T *) talloc_size(comp, fs_data->compsize * sizeof(TSK_DADDR_T));
         if (comp_unit == NULL) {
-            ntfs_uncompress_done(&comp);
+            talloc_free(comp);
             return 1;
         }
 
         fsize = fs_data->size;
 
-        if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
-            ntfs_uncompress_done(&comp);
+        if ((data_buf = tsk_data_buf_alloc(comp, fs->block_size)) == NULL) {
+            talloc_free(comp);
             return 1;
         }
 
@@ -1521,8 +1523,7 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
                         PRIuDADDR "@%" PRIuDADDR
                         " - type: %" PRIu32 "  id: %d", fs_data_run->len,
                         fs_data_run->addr, fs_data->type, fs_data->id);
-                    free(comp_unit);
-                    ntfs_uncompress_done(&comp);
+                    talloc_free(comp);
                     return 1;
                 }
                 else {
@@ -1547,17 +1548,15 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
                         "Invalid address in run (too large): %"
                         PRIuDADDR "", addr);
 
-                    free(comp_unit);
-                    ntfs_uncompress_done(&comp);
+                    talloc_free(comp);
                     return 1;
                 }
 
                 comp_unit[comp_unit_idx++] = addr;
                 if (comp_unit_idx == fs_data->compsize) {
-                    if (ntfs_proc_compunit(ntfs, &comp, flags, action, ptr,
+                    if (ntfs_proc_compunit(ntfs, comp, flags, action, ptr,
                             comp_unit, comp_unit_idx, &fsize, data_buf)) {
-                        free(comp_unit);
-                        ntfs_uncompress_done(&comp);
+                        talloc_free(comp);
                         return 1;
                     }
                     comp_unit_idx = 0;
@@ -1575,17 +1574,14 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
         }
 
         if (comp_unit_idx != 0) {
-            if (ntfs_proc_compunit(ntfs, &comp, flags, action, ptr,
+            if (ntfs_proc_compunit(ntfs, comp, flags, action, ptr,
                     comp_unit, comp_unit_idx, &fsize, data_buf)) {
-                ntfs_uncompress_done(&comp);
-                free(comp_unit);
+                talloc_free(comp);
                 return 1;
             }
         }
 
-        tsk_data_buf_free(data_buf);
-        ntfs_uncompress_done(&comp);
-        free(comp_unit);
+        talloc_free(comp);
     }
 
     /* non-resident */
@@ -1604,7 +1600,7 @@ ntfs_data_walk(NTFS_INFO * ntfs, TSK_INUM_T inum,
             fsize = fs_data->size;
 
         if ((flags & TSK_FS_FILE_FLAG_AONLY) == 0) {
-            if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+            if ((data_buf = tsk_data_buf_alloc(fs_data, fs->block_size)) == NULL) {
                 return 1;
             }
             buf = data_buf->data;
@@ -1878,7 +1874,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 
             /* Add this resident stream to the fs_inode->attr list */
             fs_inode->attr =
-                tsk_fs_data_put_str(fs_inode->attr, name, type,
+                tsk_fs_data_put_str(fs_inode, fs_inode->attr, name, type,
                 tsk_getu16(fs->endian, attr->id),
                 (void *) ((uintptr_t) attr +
                     tsk_getu16(fs->endian,
@@ -1911,7 +1907,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
                     name, tsk_getu64(fs->endian, attr->c.nr.start_vcn));
 
             /* convert the run to generic form */
-            if ((fs_data_run = ntfs_make_data_run(ntfs,
+            if ((fs_data_run = ntfs_make_data_run(ntfs, fs_inode,
                         tsk_getu64(fs->endian, attr->c.nr.start_vcn),
                         (ntfs_runlist *) ((uintptr_t)
                             attr + tsk_getu16(fs->endian,
@@ -1986,7 +1982,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 
             /* Add the run to the list */
             if ((fs_inode->attr =
-                    tsk_fs_data_put_run(fs_inode->attr,
+                    tsk_fs_data_put_run(fs_inode, fs_inode->attr,
                         run_totlen, fs_data_run, name,
                         type, id, tsk_getu64(fs->endian, attr->c.nr.ssize),
                         data_flag, compsize)) == NULL) {
@@ -2065,8 +2061,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
                 }
 
                 /* add to the end of the existing list */
-                fs_name->next = (TSK_FS_INODE_NAME_LIST *)
-                    tsk_malloc(sizeof(TSK_FS_INODE_NAME_LIST));
+                fs_name->next = talloc(fs_inode->name, TSK_FS_INODE_NAME_LIST);
                 if (fs_name->next == NULL) {
                     return TSK_ERR;
                 }
@@ -2075,8 +2070,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
             }
             else {
                 /* First name, so we start a list */
-                fs_inode->name = fs_name = (TSK_FS_INODE_NAME_LIST *)
-                    tsk_malloc(sizeof(TSK_FS_INODE_NAME_LIST));
+                fs_inode->name = fs_name = talloc(fs_inode, TSK_FS_INODE_NAME_LIST);
                 if (fs_name == NULL) {
                     return TSK_ERR;
                 }
@@ -2241,7 +2235,7 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
             "ntfs_proc_attrlist: Processing entry %"
             PRIuINUM "\n", fs_inode->addr);
 
-    if ((mft = (ntfs_mft *) tsk_malloc(ntfs->mft_rsize_b)) == NULL) {
+    if ((mft = (ntfs_mft *) talloc_size(fs_inode, ntfs->mft_rsize_b)) == NULL) {
         return 1;
     }
 
@@ -2254,9 +2248,9 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
     /* Get a copy of the attribute list stream using the above action */
     load_file.left = load_file.total = (size_t) fs_data_attrlist->size;
     load_file.base = load_file.cur = buf =
-        tsk_malloc((size_t) fs_data_attrlist->size);
+        talloc_size(mft, (size_t) fs_data_attrlist->size);
     if (buf == NULL) {
-        free(mft);
+        talloc_free(mft);
         return 1;
     }
     endaddr = (uintptr_t) buf + (uintptr_t) fs_data_attrlist->size;
@@ -2265,7 +2259,7 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
             (void *) &load_file)) {
         strncat(tsk_errstr2, " - processing attrlist",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
-        free(mft);
+        talloc_free(mft);
         return 1;
     }
 
@@ -2277,8 +2271,7 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr2, TSK_ERRSTR_L,
             "processing attrlist of entry %" PRIuINUM, ntfs->mnum);
-        free(mft);
-        free(buf);
+        talloc_free(mft);
         return 1;
     }
 
@@ -2348,8 +2341,7 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
                 continue;
             }
 
-            free(mft);
-            free(buf);
+            talloc_free(mft);
             strncat(tsk_errstr2, " - proc_attrlist",
                 TSK_ERRSTR_L - strlen(tsk_errstr2));
             return 1;
@@ -2375,8 +2367,7 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
                     ") is not for attribute list of %"
                     PRIuINUM "", mftnum, tsk_getu48(fs->endian,
                         mft->base_ref), ntfs->mnum);
-                free(mft);
-                free(buf);
+                talloc_free(mft);
                 return 1;
             }
         }
@@ -2400,14 +2391,12 @@ ntfs_proc_attrlist(NTFS_INFO * ntfs,
             }
             strncat(tsk_errstr2, "- proc_attrlist",
                 TSK_ERRSTR_L - strlen(tsk_errstr2));
-            free(mft);
-            free(buf);
+            talloc_free(mft);
             return 1;
         }
     }
 
-    free(mft);
-    free(buf);
+    talloc_free(mft);
     return 0;
 }
 
@@ -2444,7 +2433,7 @@ ntfs_dinode_copy(NTFS_INFO * ntfs, TSK_FS_INODE * fs_inode)
 
         while (fs_name1) {
             fs_name2 = fs_name1->next;
-            free(fs_name1);
+            talloc_free(fs_name1);
             fs_name1 = fs_name2;
         }
         fs_inode->name = NULL;
@@ -2600,7 +2589,7 @@ ntfs_load_attrdef(NTFS_INFO * ntfs)
 
     /* Get a copy of the attribute list stream using the above action */
     load_file.left = load_file.total = (size_t) fs_data->size;
-    load_file.base = load_file.cur = tsk_malloc((size_t) fs_data->size);
+    load_file.base = load_file.cur = talloc_size(ntfs, (size_t) fs_data->size);
     if (load_file.cur == NULL) {
         tsk_fs_inode_free(fs_inode);
         return 1;
@@ -2612,7 +2601,7 @@ ntfs_load_attrdef(NTFS_INFO * ntfs)
         strncat(tsk_errstr2, " - load_attrdef",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
         tsk_fs_inode_free(fs_inode);
-        free(ntfs->attrdef);
+        talloc_free(ntfs->attrdef);
         ntfs->attrdef = NULL;
         return 1;
     }
@@ -2622,7 +2611,7 @@ ntfs_load_attrdef(NTFS_INFO * ntfs)
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "load_attrdef: space still left after walking $Attr data");
         tsk_fs_inode_free(fs_inode);
-        free(ntfs->attrdef);
+        talloc_free(ntfs->attrdef);
         ntfs->attrdef = NULL;
         return 1;
     }
@@ -2730,7 +2719,7 @@ ntfs_load_bmap(NTFS_INFO * ntfs)
     }
 
     /* convert to generic form */
-    ntfs->bmap = ntfs_make_data_run(ntfs,
+    ntfs->bmap = ntfs_make_data_run(ntfs, ntfs,
         tsk_getu64(fs->endian, attr->c.nr.start_vcn),
         (ntfs_runlist
             *) ((uintptr_t) attr + tsk_getu16(fs->endian,
@@ -2740,7 +2729,7 @@ ntfs_load_bmap(NTFS_INFO * ntfs)
         return 1;
     }
 
-    ntfs->bmap_buf = tsk_data_buf_alloc(fs->block_size);
+    ntfs->bmap_buf = tsk_data_buf_alloc(ntfs, fs->block_size);
     if (ntfs->bmap_buf == NULL) {
         return 1;
     }
@@ -2891,11 +2880,16 @@ ntfs_load_sid(TSK_FS_INFO * fs, ntfs_attr_sds * sds)
             authority += (uint64_t) sid->ident_auth[i] << j;
 
         //tsk_fprintf(stderr, "NT Authority: %" PRIu64 "\n", authority);
+        
+        if ((sid_entry = talloc(ntfs, NTFS_SID_ENTRY)) == NULL) {
+            return 1;
+        }
 
         // "-XXXXXXXXXX"
         sid_str_len += (1 + 10) * sid->sub_auth_count;
 
-        if ((sid_str = (char *) tsk_malloc(sid_str_len)) == NULL) {
+        if ((sid_str = (char *) talloc_size(sid_entry, sid_str_len)) == NULL) {
+        	talloc_free(sid_entry);
             return 1;
         }
 
@@ -2909,21 +2903,13 @@ ntfs_load_sid(TSK_FS_INFO * fs, ntfs_attr_sds * sds)
         }
         //tsk_fprintf(stderr, "SID: %s\n\n", sid_str);
 
-        if ((sid_entry =
-                (NTFS_SID_ENTRY *) tsk_malloc(sizeof(NTFS_SID_ENTRY))) ==
-            NULL) {
-            free(sid_str);
-            return 1;
-        }
-
-        // malloc size of ntfs_sid plus extra for each sub_auth_count above 1 because
+        // talloc size of ntfs_sid plus extra for each sub_auth_count above 1 because
         // 1 is already expected as a minimum in the ntfs_sid struct.
         if ((sid_entry->data =
-                (ntfs_sid *) tsk_malloc(sizeof(ntfs_sid) +
+                (ntfs_sid *) talloc_size(sid_entry, sizeof(ntfs_sid) +
                     ((int) sid->sub_auth_count -
                         1) * (sizeof(uint32_t) * 10))) == NULL) {
-            free(sid_str);
-            free(sid_entry);
+            talloc_free(sid_entry);
             return 1;
         }
 
@@ -2985,14 +2971,12 @@ ntfs_proc_sds(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
 
             NTFS_SDS_ENTRY *sds_entry;
 
-            if ((sds_entry =
-                    (NTFS_SDS_ENTRY *) tsk_malloc(sizeof(NTFS_SDS_ENTRY)))
-                == NULL) {
+            if ((sds_entry = talloc(ntfs, NTFS_SDS_ENTRY)) == NULL) {
                 return 1;
             }
             if ((sds_entry->data =
-                    (uint8_t *) tsk_malloc(ent_len)) == NULL) {
-                free(sds_entry);
+                    (uint8_t *) talloc_size(sds_entry, ent_len)) == NULL) {
+                talloc_free(sds_entry);
                 return 1;
             }
             memcpy(sds_entry->data, sds, ent_len);
@@ -3203,7 +3187,7 @@ ntfs_load_secure(NTFS_INFO * ntfs)
 
     sds_buffer.size = (size_t) roundup(fs_data->size, fs->block_size);
     sds_buffer.used = 0;
-    if ((sds_buffer.buffer = tsk_malloc(sds_buffer.size)) == NULL) {
+    if ((sds_buffer.buffer = talloc_size(fs_inode, sds_buffer.size)) == NULL) {
         return 1;
     }
 
@@ -3214,12 +3198,10 @@ ntfs_load_secure(NTFS_INFO * ntfs)
     }
 
     if (ntfs_proc_sds(fs, &sds_buffer)) {
-        free(sds_buffer.buffer);
         tsk_fs_inode_free(fs_inode);
         return 1;
     }
 
-    free(sds_buffer.buffer);
     tsk_fs_inode_free(fs_inode);
     return 0;
 }
@@ -3249,17 +3231,14 @@ ntfs_secure_data_free(NTFS_INFO * ntfs)
     // Iterate of sds entries and free them
     while (ntfs->sds) {
         nsds = ntfs->sds->next;
-        free(ntfs->sds->data);
-        free(ntfs->sds);
+        talloc_free(ntfs->sds);
         ntfs->sds = nsds;
     }
 
     // Iterate of sid entries and free them
     while (ntfs->sid) {
         nsid = ntfs->sid->next;
-        free(ntfs->sid->data);
-        free(ntfs->sid->sid_str);
-        free(ntfs->sid);
+        talloc_free(ntfs->sid);
         ntfs->sid = nsid;
     }
 }
@@ -3434,7 +3413,7 @@ ntfs_block_walk(TSK_FS_INFO * fs,
     }
 
 
-    if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+    if ((data_buf = tsk_data_buf_alloc(fs, fs->block_size)) == NULL) {
         return 1;
     }
 
@@ -3494,7 +3473,7 @@ inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
 {
     if ((fs_dent->fsi)
         && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
-        if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+        if (tsk_list_add(fs, &fs->list_inum_named, fs_dent->fsi->addr))
             return TSK_WALK_STOP;
     }
     return TSK_WALK_CONT;
@@ -4239,7 +4218,7 @@ ntfs_istat(TSK_FS_INFO * fs, FILE * hFile,
         /* Get a copy of the attribute list stream  */
         load_file.total = load_file.left = (size_t) fs_data->size;
         load_file.cur = load_file.base = buf =
-            tsk_malloc((size_t) fs_data->size);
+            talloc_size(ntfs, (size_t) fs_data->size);
         if (buf == NULL) {
             return 1;
         }
@@ -4275,7 +4254,7 @@ ntfs_istat(TSK_FS_INFO * fs, FILE * hFile,
                 tsk_getu64(fs->endian, list->start_vcn));
         }
       egress:
-        free(buf);
+        talloc_free(buf);
     }
 
     /* Print all of the attributes */
@@ -4375,10 +4354,6 @@ static void
 ntfs_close(TSK_FS_INFO * fs)
 {
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
-    free((char *) ntfs->mft);
-    free((char *) ntfs->fs);
-    tsk_fs_data_run_free(ntfs->bmap);
-    tsk_data_buf_free(ntfs->bmap_buf);
     tsk_fs_inode_free(ntfs->mft_inode);
 #if TSK_USE_SID
     ntfs_secure_data_free(ntfs);
@@ -4389,7 +4364,7 @@ ntfs_close(TSK_FS_INFO * fs)
         fs->list_inum_named = NULL;
     }
 
-    free(fs);
+    talloc_free(fs);
 }
 
 
@@ -4422,10 +4397,10 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         return NULL;
     }
 
-    if ((ntfs = (NTFS_INFO *) tsk_malloc(sizeof(*ntfs))) == NULL) {
+    if ((ntfs = talloc(NULL, NTFS_INFO)) == NULL) {
         return NULL;
     }
-    fs = &(ntfs->fs_info);
+    fs = (TSK_FS_INFO *)ntfs;
 
     fs->ftype = ftype;
     fs->duname = "Cluster";
@@ -4439,9 +4414,9 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     /* Read the boot sector */
     len = roundup(sizeof(ntfs_sb), NTFS_DEV_BSIZE);
-    ntfs->fs = (ntfs_sb *) tsk_malloc(len);
+    ntfs->fs = (ntfs_sb *) talloc_size(ntfs, len);
     if (ntfs->fs == NULL) {
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
@@ -4453,15 +4428,13 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         }
         snprintf(tsk_errstr2, TSK_ERRSTR_L,
             "%s: Error reading boot sector.", myname);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
     /* Check the magic value */
     if (tsk_fs_guessu16(fs, ntfs->fs->magic, NTFS_FS_MAGIC)) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4477,8 +4450,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     ntfs->ssize_b = tsk_getu16(fs->endian, ntfs->fs->ssize);
     if ((ntfs->ssize_b == 0) || (ntfs->ssize_b % 512)) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4494,8 +4466,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         (ntfs->fs->csize != 0x20) && (ntfs->fs->csize != 0x40)
         && (ntfs->fs->csize != 0x80)) {
 
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4512,8 +4483,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         (TSK_DADDR_T) tsk_getu32(fs->endian,
         ntfs->fs->vol_size_s) / ntfs->fs->csize;
     if (fs->block_count == 0) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4537,8 +4507,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         ntfs->mft_rsize_b = 1 << -ntfs->fs->mft_rsize_c;
 
     if ((ntfs->mft_rsize_b == 0) || (ntfs->mft_rsize_b % 512)) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4553,8 +4522,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         ntfs->idx_rsize_b = 1 << -ntfs->fs->idx_rsize_c;
 
     if ((ntfs->idx_rsize_b == 0) || (ntfs->idx_rsize_b % 512)) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4565,8 +4533,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     ntfs->root_mft_addr =
         tsk_getu64(fs->endian, ntfs->fs->mft_clust) * ntfs->csize_b;
     if (tsk_getu64(fs->endian, ntfs->fs->mft_clust) > fs->last_block) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -4592,10 +4559,9 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
      */
 
     /* allocate the buffer to hold mft entries */
-    ntfs->mft = (ntfs_mft *) tsk_malloc(ntfs->mft_rsize_b);
+    ntfs->mft = (ntfs_mft *) talloc_size(ntfs, ntfs->mft_rsize_b);
     if (ntfs->mft == NULL) {
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
@@ -4608,24 +4574,18 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     /* load the data run for the MFT table into ntfs->mft */
     ntfs->loading_the_MFT = 1;
     if (ntfs_dinode_lookup(ntfs, ntfs->mft, NTFS_MFT_MFT) != TSK_OK) {
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
     ntfs->mft_inode = tsk_fs_inode_alloc(NTFS_NDADDR, NTFS_NIADDR);
     if (ntfs->mft_inode == NULL) {
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
     if (ntfs_dinode_copy(ntfs, ntfs->mft_inode) != TSK_OK) {
         tsk_fs_inode_free(ntfs->mft_inode);
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
@@ -4638,9 +4598,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         tsk_fs_data_lookup_noid(ntfs->mft_inode->attr, NTFS_ATYPE_DATA);
     if (!ntfs->mft_data) {
         tsk_fs_inode_free(ntfs->mft_inode);
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         strncat(tsk_errstr2, " - Data Attribute not found in $MFT",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
         return NULL;
@@ -4656,18 +4614,14 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     /* load the version of the file system */
     if (ntfs_load_ver(ntfs)) {
         tsk_fs_inode_free(ntfs->mft_inode);
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
     /* load the data block bitmap data run into ntfs_info */
     if (ntfs_load_bmap(ntfs)) {
         tsk_fs_inode_free(ntfs->mft_inode);
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 
@@ -4675,9 +4629,7 @@ ntfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 #if TSK_USE_SID
     if (ntfs_load_secure(ntfs)) {
         tsk_fs_inode_free(ntfs->mft_inode);
-        free(ntfs->mft);
-        free(ntfs->fs);
-        free(ntfs);
+        talloc_free(ntfs);
         return NULL;
     }
 #endif

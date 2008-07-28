@@ -310,7 +310,7 @@ ext2fs_dent_parse_block(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
 
             /* Make sure we do not get into an infinite loop */
             if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
-                if (tsk_list_add(list_seen, fs_dent->inode)) {
+                if (tsk_list_add(fs, list_seen, fs_dent->inode)) {
                     tsk_fs_dent_free(fs_dent);
                     return -1;
                 }
@@ -425,7 +425,7 @@ ext2fs_dent_walk_lcl(TSK_FS_INFO * fs, EXT2FS_DINFO * dinfo,
     }
 
     size = roundup(fs_inode->size, fs->block_size);
-    if ((dirbuf = tsk_malloc((size_t) size)) == NULL) {
+    if ((dirbuf = talloc_size(fs_inode, (size_t) size)) == NULL) {
         tsk_fs_inode_free(fs_inode);
         return 1;
     }
@@ -437,7 +437,6 @@ ext2fs_dent_walk_lcl(TSK_FS_INFO * fs, EXT2FS_DINFO * dinfo,
     if (fs->file_walk(fs, fs_inode, 0, 0,
             TSK_FS_FILE_FLAG_SLACK | TSK_FS_FILE_FLAG_NOID,
             tsk_fs_load_file_action, (void *) &load_file)) {
-        free(dirbuf);
         tsk_fs_inode_free(fs_inode);
         strncat(tsk_errstr2, " - extX_dent_walk_lcl",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
@@ -447,7 +446,6 @@ ext2fs_dent_walk_lcl(TSK_FS_INFO * fs, EXT2FS_DINFO * dinfo,
 
     /* Not all of the directory was copied, so we exit */
     if (load_file.left > 0) {
-        free(dirbuf);
         tsk_fs_inode_free(fs_inode);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_FWALK;
@@ -474,7 +472,6 @@ ext2fs_dent_walk_lcl(TSK_FS_INFO * fs, EXT2FS_DINFO * dinfo,
     }
 
     tsk_fs_inode_free(fs_inode);
-    free(dirbuf);
 
     if (retval == -1)
         return 1;

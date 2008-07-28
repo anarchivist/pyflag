@@ -74,6 +74,12 @@ void
 iso9660_inode_list_free(TSK_FS_INFO * fs)
 {
     ISO_INFO *iso = (ISO_INFO *) fs;
+    if(iso->in_list) {
+	    talloc_free(iso->in_list);
+	    iso->in_list = NULL;
+	}
+
+	/*
     iso9660_inode_node *tmp;
 
     while (iso->in_list) {
@@ -82,6 +88,7 @@ iso9660_inode_list_free(TSK_FS_INFO * fs)
         free(tmp);
     }
     iso->in_list = NULL;
+    */
 }
 
 
@@ -96,7 +103,7 @@ iso9660_inode_list_free(TSK_FS_INFO * fs)
  * @returns NULL on error
  */
 rockridge_ext *
-parse_susp(TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
+parse_susp(void *context, TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
 {
     rockridge_ext *rr;
     ISO_INFO *iso = (ISO_INFO *) fs;
@@ -107,7 +114,7 @@ parse_susp(TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
         tsk_fprintf(stderr, "parse_susp: count is: %d\n", count);
 
     // allocate the output data structure
-    rr = (rockridge_ext *) tsk_malloc(sizeof(rockridge_ext));
+    rr = talloc(context, rockridge_ext);
     if (rr == NULL) {
         return NULL;
     }
@@ -148,7 +155,7 @@ parse_susp(TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
                     ce->blk_m) * fs->block_size + tsk_getu32(fs->endian,
                     ce->offset_m);
                 buf2 =
-                    (char *) tsk_malloc(tsk_getu32(fs->endian,
+                    (char *) talloc_size(rr, tsk_getu32(fs->endian,
                         ce->celen_m));
 
                 if (buf2 != NULL) {
@@ -156,7 +163,7 @@ parse_susp(TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
                         tsk_fs_read_random(fs, buf2,
                         tsk_getu32(fs->endian, ce->celen_m), off);
                     if (cnt == tsk_getu32(fs->endian, ce->celen_m)) {
-                        parse_susp(fs, buf2, (int) cnt, hFile);
+                        parse_susp(rr, fs, buf2, (int) cnt, hFile);
                     }
                     else if (tsk_verbose) {
                         fprintf(stderr,
@@ -164,7 +171,7 @@ parse_susp(TSK_FS_INFO * fs, char *buf, int count, FILE * hFile)
                         tsk_error_print(stderr);
                         tsk_error_reset();
                     }
-                    free(buf2);
+                    talloc_free(buf2);
                 }
                 else {
                     if (tsk_verbose)
@@ -403,8 +410,11 @@ iso9660_load_inodes_dir(TSK_FS_INFO * fs, TSK_OFF_T a_offs, int count,
             b_offs += sizeof(iso9660_dentry);
 
             // allocate a node for this entry
-            in_node = (iso9660_inode_node *)
-                tsk_malloc(sizeof(iso9660_inode_node));
+            if(iso->in_list)
+                in_node = talloc(iso->in_list, iso9660_inode_node);
+            else
+            	in_node = talloc(iso, iso9660_inode_node);
+
             if (in_node == NULL) {
                 return -1;
             }
@@ -538,7 +548,7 @@ iso9660_load_inodes_dir(TSK_FS_INFO * fs, TSK_OFF_T a_offs, int count,
                     extra_bytes--;
 
                 in_node->inode.rr =
-                    parse_susp(fs, &buf[b_offs], extra_bytes, NULL);
+                    parse_susp(in_node, fs, &buf[b_offs], extra_bytes, NULL);
                 in_node->inode.susp_off = b_offs + s_offs;
                 in_node->inode.susp_len = extra_bytes;
 
@@ -573,9 +583,9 @@ iso9660_load_inodes_dir(TSK_FS_INFO * fs, TSK_OFF_T a_offs, int count,
                         in_node->inode.rr = NULL;
                     }
                     if (in_node->inode.rr)
-                        free(in_node->inode.rr);
+                        talloc_free(in_node->inode.rr);
 
-                    free(in_node);
+                    talloc_free(in_node);
                     count--;
 
                 }
@@ -1104,7 +1114,7 @@ iso9660_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T last,
     }
 
 
-    if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+    if ((data_buf = tsk_data_buf_alloc(fs, fs->block_size)) == NULL) {
         return 1;
     }
 
@@ -1203,7 +1213,7 @@ iso9660_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
 
     myflags = TSK_FS_BLOCK_FLAG_CONT;
 
-    data_buf = tsk_malloc(fs->block_size);
+    data_buf = talloc_size(inode, fs->block_size);
     if (data_buf == NULL) {
         return 1;
     };
@@ -1253,7 +1263,7 @@ iso9660_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             retval = action(fs, addr, data_buf, size, myflags, ptr);
 
         if (retval == TSK_WALK_ERROR) {
-            free(data_buf);
+            talloc_free(data_buf);
             return 1;
         }
         else if (retval == TSK_WALK_STOP) {
@@ -1262,7 +1272,7 @@ iso9660_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
         addr++;
         length -= bytes_read;
     }
-    free(data_buf);
+    talloc_free(data_buf);
     return 0;
 }
 
@@ -1671,11 +1681,14 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum,
     tsk_error_reset();
 
     fs_inode = iso9660_inode_lookup(fs, inum);
+    if(fs_inode == NULL)
+    	return 1;
 
     tsk_fprintf(hFile, "Entry: %"PRIuINUM"\n", inum);
 
     if (iso9660_dinode_load(iso, inum)) {
         snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso9660_istat");
+        tsk_fs_inode_free(fs_inode);
         return 1;
     }
     memcpy(&dd, &iso->dinode->dr, sizeof(iso9660_dentry));
@@ -1731,7 +1744,7 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum,
         tsk_fprintf(hFile, "Mode: %s\n", make_unix_perm(fs, &dd));
     }
     else if (iso->dinode->susp_off) {
-        char *buf2 = (char *) tsk_malloc((size_t) iso->dinode->susp_len);
+        char *buf2 = (char *) talloc_size(fs_inode, (size_t) iso->dinode->susp_len);
         if (buf2 != NULL) {
             ssize_t cnt;
             fprintf(hFile, "\nRock Ridge Extension Data\n");
@@ -1739,7 +1752,7 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum,
                 tsk_fs_read_random(fs, buf2,
                 (size_t)iso->dinode->susp_len, iso->dinode->susp_off);
             if (cnt == iso->dinode->susp_len) {
-                parse_susp(fs, buf2, (int) cnt, hFile);
+                parse_susp(fs_inode, fs, buf2, (int) cnt, hFile);
             }
             else {
                 fprintf(hFile, "Error reading Rock Ridge Location\n");
@@ -1750,7 +1763,7 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum,
                 }
                 tsk_error_reset();
             }
-            free(buf2);
+            talloc_free(buf2);
         }
         else {
             if (tsk_verbose)
@@ -1811,6 +1824,7 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum,
         }
         tsk_fprintf(hFile, "\n");
     }
+    tsk_fs_inode_free(fs_inode);
     return 0;
 }
 
@@ -1849,30 +1863,8 @@ iso9660_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end, int flag
 static void
 iso9660_close(TSK_FS_INFO * fs)
 {
-    ISO_INFO *iso = (ISO_INFO *) fs;
-    iso9660_pvd_node *p;
-    iso9660_svd_node *s;
-
-    while (iso->pvd != NULL) {
-        p = iso->pvd;
-        iso->pvd = iso->pvd->next;
-        free(p);
-    }
-
-    while (iso->svd != NULL) {
-        s = iso->svd;
-        iso->svd = iso->svd->next;
-        free(s);
-    }
-
-    free((char *) iso->dinode);
-
-    if (fs->list_inum_named) {
-        tsk_list_free(fs->list_inum_named);
-        fs->list_inum_named = NULL;
-    }
-
-    free(fs);
+	talloc_free(fs);
+	return;
 }
 
 /** Load the volume descriptors into save the raw data structures in
@@ -1915,8 +1907,7 @@ load_vol_desc(TSK_FS_INFO * fs)
         iso9660_gvd *vd;
 
         // allocate a buffer the size of the nodes in the linked list
-        if ((vd =
-                (iso9660_gvd *) tsk_malloc(sizeof(iso9660_pvd_node))) ==
+        if ((vd = (iso9660_gvd *) talloc_size(iso, sizeof(iso9660_pvd_node))) ==
             NULL) {
             return -1;
         }
@@ -1960,7 +1951,7 @@ load_vol_desc(TSK_FS_INFO * fs)
                     ptmp = ptmp->next;
 
                 if (p->pvd.pt_loc_l == ptmp->pvd.pt_loc_l) {
-                    free(p);
+                    talloc_free(p);
                     p = NULL;
                 }
                 else {
@@ -1991,7 +1982,7 @@ load_vol_desc(TSK_FS_INFO * fs)
                     stmp = stmp->next;
 
                 if (s->svd.pt_loc_l == stmp->svd.pt_loc_l) {
-                    free(s);
+                    talloc_free(s);
                     s = NULL;
                 }
                 else {
@@ -2052,7 +2043,7 @@ load_vol_desc(TSK_FS_INFO * fs)
                     ptmp->next = p->next;
                 }
                 p->next = NULL;
-                free(p);
+                talloc_free(p);
                 p = NULL;
                 count--;
                 break;
@@ -2102,7 +2093,7 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             ftype, test);
     }
 
-    if ((iso = (ISO_INFO *) tsk_malloc(sizeof(ISO_INFO))) == NULL) {
+    if ((iso = talloc(NULL, ISO_INFO)) == NULL) {
         return NULL;
     }
     fs = &(iso->fs_info);
@@ -2127,7 +2118,7 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     /* load_vol_descs checks magic value */
     if (load_vol_desc(fs) == -1) {
-        free(iso);
+        talloc_free(iso);
         if (test)
             return NULL;
         else {
@@ -2159,6 +2150,7 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     fs->inum_count = iso9660_load_inodes_pt(iso);
     if ((int) fs->inum_count == -1) {
+    	talloc_free(iso);
         return NULL;
     }
 
@@ -2184,8 +2176,9 @@ iso9660_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     /* allocate buffers */
     /* dinode */
-    iso->dinode = (iso9660_inode *) tsk_malloc(sizeof(iso9660_inode));
+    iso->dinode = talloc(iso, iso9660_inode);
     if (iso->dinode == NULL) {
+    	talloc_free(iso);
         return NULL;
     }
     iso->dinum = -1;

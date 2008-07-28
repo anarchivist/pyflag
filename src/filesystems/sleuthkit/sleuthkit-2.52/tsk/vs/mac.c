@@ -114,24 +114,30 @@ mac_load_table(TSK_MM_INFO * mm)
         }
 
 
-        if ((str = tsk_malloc(sizeof(part.name))) == NULL)
+        if ((str = talloc_size(NULL, sizeof(part.name))) == NULL)
             return 1;
 
         strncpy(str, (char *) part.type, sizeof(part.name));
 
         if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) part_start,
-                (TSK_DADDR_T) part_size, TSK_MM_PART_TYPE_VOL, str, -1, idx))
+                (TSK_DADDR_T) part_size, TSK_MM_PART_TYPE_VOL, str, -1, idx)) {
+            talloc_free(str);
             return 1;
+        }
+        talloc_free(str);
     }
 
     /* Add an entry for the table length */
-    if ((table_str = tsk_malloc(16)) == NULL)
+    if ((table_str = talloc_size(NULL, 16)) == NULL)
         return 1;
 
     snprintf(table_str, 16, "Table");
     if (NULL == tsk_mm_part_add(mm, taddr, max_part, TSK_MM_PART_TYPE_DESC,
-            table_str, -1, -1))
+            table_str, -1, -1)) {
+        talloc_free(table_str);
         return 1;
+    }
+    talloc_free(table_str);
 
     return 0;
 }
@@ -187,8 +193,7 @@ mac_part_walk(TSK_MM_INFO * mm, TSK_PNUM_T start, TSK_PNUM_T last, int flags,
 void
 mac_close(TSK_MM_INFO * mm)
 {
-    tsk_mm_part_free(mm);
-    free(mm);
+    talloc_free(mm);
 }
 
 /* 
@@ -203,7 +208,7 @@ tsk_mm_mac_open(TSK_IMG_INFO * img_info, TSK_DADDR_T offset)
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
+    mm = talloc(NULL, TSK_MM_INFO);
     if (mm == NULL)
         return NULL;
 

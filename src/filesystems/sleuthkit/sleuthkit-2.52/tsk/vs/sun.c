@@ -25,7 +25,7 @@
 static char *
 sun_get_desc(uint16_t fstype)
 {
-    char *str = tsk_malloc(64);
+    char *str = talloc_size(NULL, 64);
     if (str == NULL)
         return "";
     switch (fstype) {
@@ -80,6 +80,7 @@ static uint8_t
 sun_load_table_i386(TSK_MM_INFO * mm, sun_dlabel_i386 * dlabel_x86)
 {
     uint32_t idx = 0;
+    char *desc;
     TSK_DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
     if (tsk_verbose)
@@ -121,15 +122,17 @@ sun_load_table_i386(TSK_MM_INFO * mm, sun_dlabel_i386 * dlabel_x86)
             ptype = TSK_MM_PART_TYPE_DESC;
 
         /* Add the partition to the internal sorted list */
+        desc = sun_get_desc(tsk_getu16(mm->endian, dlabel_x86->part[idx].type));
         if (NULL == tsk_mm_part_add(mm,
                 (TSK_DADDR_T) tsk_getu32(mm->endian,
                     dlabel_x86->part[idx].start_sec),
                 (TSK_DADDR_T) tsk_getu32(mm->endian,
                     dlabel_x86->part[idx].size_sec), ptype,
-                sun_get_desc(tsk_getu16(mm->endian,
-                        dlabel_x86->part[idx].type)), -1, idx)) {
+                desc, -1, idx)) {
+            talloc_free(desc);
             return 1;
         }
+        talloc_free(desc);
     }
 
     return 0;
@@ -144,6 +147,7 @@ sun_load_table_sparc(TSK_MM_INFO * mm, sun_dlabel_sparc * dlabel_sp)
 {
     uint32_t idx = 0;
     uint32_t cyl_conv;
+    char *desc;
     TSK_DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
     /* The value to convert cylinders to sectors */
@@ -188,11 +192,14 @@ sun_load_table_sparc(TSK_MM_INFO * mm, sun_dlabel_sparc * dlabel_sp)
             ptype = TSK_MM_PART_TYPE_DESC;
 
         /* Add the partition to the internal sorted list */
+        desc = sun_get_desc(tsk_getu16(mm->endian, dlabel_sp->part_meta[idx].type));
         if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) part_start,
                 (TSK_DADDR_T) part_size, ptype,
-                sun_get_desc(tsk_getu16(mm->endian,
-                        dlabel_sp->part_meta[idx].type)), -1, idx))
+                desc, -1, idx)) {
+            talloc_free(desc);
             return 1;
+        }
+        talloc_free(desc);
 
     }
 
@@ -364,8 +371,7 @@ sun_part_walk(TSK_MM_INFO * mm, TSK_PNUM_T start, TSK_PNUM_T last, int flags,
 void
 sun_close(TSK_MM_INFO * mm)
 {
-    tsk_mm_part_free(mm);
-    free(mm);
+    talloc_free(mm);
 }
 
 TSK_MM_INFO *
@@ -376,7 +382,7 @@ tsk_mm_sun_open(TSK_IMG_INFO * img_info, TSK_DADDR_T offset)
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
+    mm = talloc(NULL, TSK_MM_INFO);
     if (mm == NULL)
         return NULL;
 

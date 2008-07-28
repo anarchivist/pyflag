@@ -480,7 +480,7 @@ fatfs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk,
                 "fatfs_block_walk: Walking non-data area (pre %"
                 PRIuDADDR "\n", fatfs->firstclustsect);
 
-        if ((data_buf = tsk_data_buf_alloc(fs->block_size * 8)) == NULL) {
+        if ((data_buf = tsk_data_buf_alloc(fatfs, fs->block_size * 8)) == NULL) {
             return 1;
         }
 
@@ -557,7 +557,7 @@ fatfs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk,
     addr = FATFS_CLUST_2_SECT(fatfs, (FATFS_SECT_2_CLUST(fatfs, addr)));
 
     if ((data_buf =
-            tsk_data_buf_alloc(fs->block_size * fatfs->csize)) == NULL) {
+            tsk_data_buf_alloc(fatfs, fs->block_size * fatfs->csize)) == NULL) {
         return 1;
     }
 
@@ -839,8 +839,7 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
 
     /* We will be copying a name, so allocate a structure */
     if (fs_inode->name == NULL) {
-        if ((fs_inode->name = (TSK_FS_INODE_NAME_LIST *)
-                tsk_malloc(sizeof(TSK_FS_INODE_NAME_LIST))) == NULL)
+        if ((fs_inode->name = talloc(fs_inode, TSK_FS_INODE_NAME_LIST)) == NULL)
             return TSK_ERR;
         fs_inode->name->next = NULL;
     }
@@ -1015,7 +1014,7 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
                             "Loop found while determining directory size\n");
                     break;
                 }
-                if (tsk_list_add(&list_seen, clust)) {
+                if (tsk_list_add(fs_inode, &list_seen, clust)) {
                     tsk_list_free(list_seen);
                     list_seen = NULL;
                     return TSK_ERR;
@@ -1078,8 +1077,7 @@ fatfs_make_root(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode)
     fs_inode->mtime = fs_inode->atime = fs_inode->ctime = 0;
 
     if (fs_inode->name == NULL) {
-        if ((fs_inode->name = (TSK_FS_INODE_NAME_LIST *)
-                tsk_malloc(sizeof(TSK_FS_INODE_NAME_LIST))) == NULL)
+        if ((fs_inode->name = talloc(fs_inode, TSK_FS_INODE_NAME_LIST)) == NULL)
             return 1;
         fs_inode->name->next = NULL;
     }
@@ -1125,7 +1123,7 @@ fatfs_make_root(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode)
                         "Loop found while determining root directory size\n");
                 break;
             }
-            if (tsk_list_add(&list_seen, clust)) {
+            if (tsk_list_add(fs_inode, &list_seen, clust)) {
                 tsk_list_free(list_seen);
                 list_seen = NULL;
                 return 1;
@@ -1262,7 +1260,7 @@ inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
 {
     if ((fs_dent->fsi)
         && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
-        if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+        if (tsk_list_add(fs, &fs->list_inum_named, fs_dent->fsi->addr))
             return TSK_WALK_STOP;
     }
     return TSK_WALK_CONT;
@@ -1398,7 +1396,7 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
      * dentries.  First, run dent_walk to find all sectors that are 
      * from allocated directories.  We'll be make sure to print those */
     if ((sect_alloc =
-            (uint8_t *) tsk_malloc((size_t) ((fs->block_count +
+            (uint8_t *) talloc_size(fs_inode, (size_t) ((fs->block_count +
                         7) / 8))) == NULL) {
         tsk_fs_inode_free(fs_inode);
         return 1;
@@ -1413,7 +1411,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
     /* We need to make a special run of the Root directory to get its sectors */
     if (fatfs_make_root(fatfs, fs_inode)) {
         tsk_fs_inode_free(fs_inode);
-        free(sect_alloc);
         return 1;
     }
 
@@ -1422,7 +1419,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
             TSK_FS_FILE_FLAG_RECOVER, inode_walk_file_act,
             (void *) sect_alloc)) {
         tsk_fs_inode_free(fs_inode);
-        free(sect_alloc);
         return 1;
     }
 
@@ -1432,7 +1428,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
         strncat(tsk_errstr2, " - fatfs_inode_walk: mapping directories",
             TSK_ERRSTR_L);
         tsk_fs_inode_free(fs_inode);
-        free(sect_alloc);
         return 1;
     }
 
@@ -1461,7 +1456,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
             "fatfs_inode_walk: Starting inode in sector too big for image: %"
             PRIuDADDR, ssect);
         tsk_fs_inode_free(fs_inode);
-        free(sect_alloc);
         return 1;
     }
     else if (lsect > fs->last_block) {
@@ -1471,7 +1465,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
             "fatfs_inode_walk: Ending inode in sector too big for image: %"
             PRIuDADDR, lsect);
         tsk_fs_inode_free(fs_inode);
-        free(sect_alloc);
         return 1;
     }
 
@@ -1499,7 +1492,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                 snprintf(tsk_errstr2, TSK_ERRSTR_L,
                     "fatfs_inode_walk: sector: %" PRIuDADDR, sect);
                 tsk_fs_inode_free(fs_inode);
-                free(sect_alloc);
                 return 1;
             }
 
@@ -1527,7 +1519,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                 /* If we are done, then return  */
                 if (inum > end_inum) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 0;
                 }
 
@@ -1582,7 +1573,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                     }
                     else {
                         tsk_fs_inode_free(fs_inode);
-                        free(sect_alloc);
                         return 1;
                     }
                 }
@@ -1596,12 +1586,10 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                 retval = action(fs, fs_inode, ptr);
                 if (retval == TSK_WALK_STOP) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 0;
                 }
                 else if (retval == TSK_WALK_ERROR) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 1;
                 }
             }                   /* dentries */
@@ -1610,7 +1598,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
         /* We are done */
         if (sect >= lsect) {
             tsk_fs_inode_free(fs_inode);
-            free(sect_alloc);
             return 0;
         }
     }
@@ -1638,7 +1625,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
         clustalloc = is_sectalloc(fatfs, sect);
         if (clustalloc == -1) {
             tsk_fs_inode_free(fs_inode);
-            free(sect_alloc);
             return 1;
         }
         else if ((clustalloc == 0)
@@ -1671,7 +1657,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
             snprintf(tsk_errstr2, TSK_ERRSTR_L,
                 "fatfs_inode_walk: sector: %" PRIuDADDR, sect);
             tsk_fs_inode_free(fs_inode);
-            free(sect_alloc);
             return 1;
         }
 
@@ -1715,7 +1700,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                 /* If we are done, then return  */
                 if (inum > end_inum) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 0;
                 }
 
@@ -1782,7 +1766,6 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                     }
                     else {
                         tsk_fs_inode_free(fs_inode);
-                        free(sect_alloc);
                         return 1;
                     }
                 }
@@ -1796,19 +1779,16 @@ fatfs_inode_walk(TSK_FS_INFO * fs, TSK_INUM_T start_inum,
                 retval = action(fs, fs_inode, ptr);
                 if (retval == TSK_WALK_STOP) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 0;
                 }
                 else if (retval == TSK_WALK_ERROR) {
                     tsk_fs_inode_free(fs_inode);
-                    free(sect_alloc);
                     return 1;
                 }
             }
         }                       /* dentries */
     }                           /* clusters */
 
-    free(sect_alloc);
     tsk_fs_inode_free(fs_inode);
     return 0;
 }                               /* end of inode_walk */
@@ -2088,7 +2068,7 @@ fatfs_make_data_run(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
             // see if we need a new run
             if ((data_run == NULL)
                 || (data_run->addr + data_run->len != clust)) {
-                TSK_FS_DATA_RUN *data_run_tmp = tsk_fs_data_run_alloc();
+                TSK_FS_DATA_RUN *data_run_tmp = tsk_fs_data_run_alloc(fs_inode);
                 if (data_run_tmp == NULL) {
                     tsk_fs_data_run_free(data_run_head);
                     return 1;
@@ -2117,7 +2097,7 @@ fatfs_make_data_run(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
         /* If we got this far, then we can recover the file */
         // add the run list to the inode structure
         if ((fs_inode->attr =
-                tsk_fs_data_put_run(NULL, full_len_s * fs->block_size,
+                tsk_fs_data_put_run(fs_inode, NULL, full_len_s * fs->block_size,
                     data_run_head, "", 0, 0, full_len_s * fs->block_size,
                     0, 0)) == NULL) {
             return 1;
@@ -2159,7 +2139,7 @@ fatfs_make_data_run(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
             // see if we need a new run
             if ((data_run == NULL)
                 || (data_run->addr + data_run->len != clust)) {
-                TSK_FS_DATA_RUN *data_run_tmp = tsk_fs_data_run_alloc();
+                TSK_FS_DATA_RUN *data_run_tmp = tsk_fs_data_run_alloc(fs_inode);
                 if (data_run_tmp == NULL) {
                     tsk_fs_data_run_free(data_run_head);
                     return 1;
@@ -2204,7 +2184,7 @@ fatfs_make_data_run(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
                     break;
                 }
 
-                if (tsk_list_add(&list_seen, clust)) {
+                if (tsk_list_add(fs_inode, &list_seen, clust)) {
                     tsk_list_free(list_seen);
                     list_seen = NULL;
                     return 1;
@@ -2214,7 +2194,7 @@ fatfs_make_data_run(FATFS_INFO * fatfs, TSK_FS_INODE * fs_inode,
 
         // add the run list to the inode structure
         if ((fs_inode->attr =
-                tsk_fs_data_put_run(NULL, full_len_s * fs->block_size,
+                tsk_fs_data_put_run(fs_inode, NULL, full_len_s * fs->block_size,
                     data_run_head, "", 0, 0, full_len_s * fs->block_size,
                     0, 0)) == NULL) {
             return 1;
@@ -2304,7 +2284,7 @@ fatfs_file_walk_off(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode,
     }
     else {
         if ((data_buf =
-                tsk_data_buf_alloc(fatfs->csize << fatfs->ssize_sh)) ==
+                tsk_data_buf_alloc(fs_inode, fatfs->csize << fatfs->ssize_sh)) ==
             NULL)
             return 1;
     }
@@ -2605,7 +2585,7 @@ fatfs_fsstat(TSK_FS_INFO * fs, FILE * hFile)
     // clean up any error messages that are lying around
     tsk_error_reset();
 
-    if ((data_buf = tsk_data_buf_alloc(fatfs->ssize)) == NULL) {
+    if ((data_buf = tsk_data_buf_alloc(fs, fatfs->ssize)) == NULL) {
         return 1;
     }
 
@@ -2693,7 +2673,7 @@ fatfs_fsstat(TSK_FS_INFO * fs, FILE * hFile)
         fatfs_fsinfo *fat_info;
 
         if ((fat_fsinfo_buf =
-                tsk_data_buf_alloc(sizeof(fatfs_fsinfo))) == NULL) {
+                tsk_data_buf_alloc(fs, sizeof(fatfs_fsinfo))) == NULL) {
             tsk_data_buf_free(data_buf);
             return 1;
         }
@@ -2842,7 +2822,7 @@ fatfs_fsstat(TSK_FS_INFO * fs, FILE * hFile)
                         "Loop found while determining root directory size\n");
                 break;
             }
-            if (tsk_list_add(&list_seen, clust)) {
+            if (tsk_list_add(fs, &list_seen, clust)) {
                 tsk_list_free(list_seen);
                 list_seen = NULL;
                 return 1;
@@ -3180,12 +3160,7 @@ fatfs_jblk_walk(TSK_FS_INFO * fs, TSK_DADDR_T start, TSK_DADDR_T end,
 static void
 fatfs_close(TSK_FS_INFO * fs)
 {
-    FATFS_INFO *fatfs = (FATFS_INFO *) fs;
-    tsk_data_buf_free(fatfs->dinodes);
-    tsk_list_free(fs->list_inum_named);
-    fs->list_inum_named = NULL;
-    free(fatfs->sb);
-    free(fs);
+	talloc_free(fs);
 }
 
 
@@ -3222,7 +3197,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         return NULL;
     }
 
-    if ((fatfs = (FATFS_INFO *) tsk_malloc(sizeof(*fatfs))) == NULL)
+    if ((fatfs = talloc(NULL, FATFS_INFO)) == NULL)
         return NULL;
 
     fs = &(fatfs->fs_info);
@@ -3235,9 +3210,9 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
      * Read the super block.
      */
     len = sizeof(fatfs_sb);
-    fatsb = fatfs->sb = (fatfs_sb *) tsk_malloc(len);
+    fatsb = fatfs->sb = talloc(fatfs, fatfs_sb);
     if (fatsb == NULL) {
-        free(fatfs);
+        talloc_free(fatfs);
         return NULL;
     }
 
@@ -3248,15 +3223,13 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             tsk_errno = TSK_ERR_FS_READ;
         }
         snprintf(tsk_errstr2, TSK_ERRSTR_L, "%s: boot sector", myname);
-        free(fatfs->sb);
-        free(fatfs);
+        talloc_free(fatfs);
         return NULL;
     }
 
     /* Check the magic value  and ID endian ordering */
     if (tsk_fs_guessu16(fs, fatsb->magic, FATFS_FS_MAGIC)) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3285,8 +3258,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "Error: sector size (%d) is not a multiple of device size (%d)\nDo you have a disk image instead of a partition image?",
             fatfs->ssize, fs->dev_bsize);
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         return NULL;
     }
 
@@ -3298,8 +3270,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         (fatfs->csize != 0x10) &&
         (fatfs->csize != 0x20) &&
         (fatfs->csize != 0x40) && (fatfs->csize != 0x80)) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3309,8 +3280,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     fatfs->numfat = fatsb->numfat;      /* number of tables */
     if ((fatfs->numfat == 0) || (fatfs->numfat > 8)) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3334,8 +3304,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             tsk_getu32(fs->endian, fatsb->a.f32.sectperfat32);
 
     if (fatfs->sectperfat == 0) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3350,8 +3319,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "Not a FATFS file system (invalid first FAT sector %"
             PRIuDADDR ")", fatfs->firstfatsect);
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         return NULL;
     }
 
@@ -3407,8 +3375,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     else {
         if ((ftype == TSK_FS_INFO_TYPE_FAT_12)
             && (fatfs->clustcnt >= 4085)) {
-            free(fatsb);
-            free(fatfs);
+            talloc_free(fatfs);
             tsk_error_reset();
             tsk_errno = TSK_ERR_FS_MAGIC;
             snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3418,8 +3385,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     }
 
     if ((ftype == TSK_FS_INFO_TYPE_FAT_32) && (fatfs->numroot != 0)) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3428,8 +3394,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     }
 
     if ((ftype != TSK_FS_INFO_TYPE_FAT_32) && (fatfs->numroot == 0)) {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3449,8 +3414,7 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         fatfs->mask = FATFS_32_MASK;
     }
     else {
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_ARG;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -3475,10 +3439,9 @@ fatfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     /* allocate a cluster-sized buffer for inodes */
     if ((fatfs->dinodes =
-            tsk_data_buf_alloc(fatfs->csize << fatfs->ssize_sh)) == NULL) {
+            tsk_data_buf_alloc(fatfs, fatfs->csize << fatfs->ssize_sh)) == NULL) {
 
-        free(fatsb);
-        free(fatfs);
+        talloc_free(fatfs);
         return NULL;
     }
 

@@ -138,7 +138,7 @@ tsk_parse_inum(const TSK_TCHAR * str, TSK_INUM_T * inum, uint32_t * type,
 
     /* Make a copy of the input string */
     tmpstr =
-        (TSK_TCHAR *) tsk_malloc((TSTRLEN(str) + 1) * sizeof(TSK_TCHAR));
+        (TSK_TCHAR *) talloc_size(NULL, (TSTRLEN(str) + 1) * sizeof(TSK_TCHAR));
     if (tmpstr == NULL)
         return 1;
 
@@ -151,7 +151,7 @@ tsk_parse_inum(const TSK_TCHAR * str, TSK_INUM_T * inum, uint32_t * type,
 
     *inum = TSTRTOULL(tmpstr, &cp, 10);
     if (*cp || *cp == *tmpstr) {
-        free(tmpstr);
+        talloc_free(tmpstr);
         return 1;
     }
 
@@ -167,7 +167,7 @@ tsk_parse_inum(const TSK_TCHAR * str, TSK_INUM_T * inum, uint32_t * type,
 
         ttmp = (uint32_t) TSTRTOUL(tdash, &cp, 10);
         if (*cp || *cp == *tdash) {
-            free(tmpstr);
+            talloc_free(tmpstr);
             return 1;
         }
 
@@ -180,7 +180,7 @@ tsk_parse_inum(const TSK_TCHAR * str, TSK_INUM_T * inum, uint32_t * type,
 
             itmp = (uint16_t) TSTRTOUL(idash, &cp, 0);
             if (*cp || *cp == *idash) {
-                free(tmpstr);
+                talloc_free(tmpstr);
                 return 1;
             }
 
@@ -192,7 +192,7 @@ tsk_parse_inum(const TSK_TCHAR * str, TSK_INUM_T * inum, uint32_t * type,
         }
     }
 
-    free(tmpstr);
+    talloc_free(tmpstr);
     return 0;
 }
 

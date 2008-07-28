@@ -101,7 +101,7 @@ tsk_fs_dcat(TSK_FS_INFO * fs, uint8_t lclflags, TSK_DADDR_T addr,
     if ((lclflags & TSK_FS_DCAT_HEX) && (lclflags & TSK_FS_DCAT_HTML))
         tsk_printf("<table border=0>\n");
 
-    if ((buf = tsk_data_buf_alloc(fs->block_size)) == NULL)
+    if ((buf = tsk_data_buf_alloc(fs, fs->block_size)) == NULL)
         return 1;
 
     for (i = 0; i < read_num_units; i++) {
@@ -115,6 +115,7 @@ tsk_fs_dcat(TSK_FS_INFO * fs, uint8_t lclflags, TSK_DADDR_T addr,
             }
             snprintf(tsk_errstr2, TSK_ERRSTR_L,
                 "dcat: Error reading block at %" PRIuDADDR, addr);
+            tsk_data_buf_free(buf);
             return 1;
         }
 

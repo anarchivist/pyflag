@@ -224,7 +224,7 @@ aff_close(TSK_IMG_INFO * img_info)
 {
     IMG_AFF_INFO *aff_info = (IMG_AFF_INFO *) img_info;
     af_close(aff_info->af_file);
-    free(aff_info);
+    talloc_free(aff_info);
 }
 
 
@@ -242,7 +242,7 @@ aff_open(const char **images, TSK_IMG_INFO * next)
         return NULL;
     }
 
-    aff_info = (IMG_AFF_INFO *) tsk_malloc(sizeof(IMG_AFF_INFO));
+    aff_info = talloc(NULL, IMG_AFF_INFO);
     if (aff_info == NULL) {
         return NULL;
     }
@@ -269,7 +269,7 @@ aff_open(const char **images, TSK_IMG_INFO * next)
             "aff_open file: %" PRIttocTSK ": Error checking type",
             images[0]);
         tsk_errstr2[0] = '\0';
-        free(aff_info);
+        talloc_free(aff_info);
         return NULL;
     }
     else if (type == AF_IDENTIFY_AFF) {
@@ -289,7 +289,7 @@ aff_open(const char **images, TSK_IMG_INFO * next)
         tsk_errno = TSK_ERR_IMG_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "aff_open: Not an AFF, AFD, or AFM file");
-        free(aff_info);
+        talloc_free(aff_info);
         if (tsk_verbose)
             tsk_fprintf(stderr, "Not an AFF/AFD/AFM file\n");
 
@@ -303,7 +303,7 @@ aff_open(const char **images, TSK_IMG_INFO * next)
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "aff_open file: %" PRIttocTSK ": Error opening - %s",
             images[0], strerror(errno));
-        free(aff_info);
+        talloc_free(aff_info);
         if (tsk_verbose) {
             tsk_fprintf(stderr, "Error opening AFF/AFD/AFM file\n");
             perror("aff_open");

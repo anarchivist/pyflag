@@ -49,15 +49,15 @@
  * @return NULL on error
  */
 TSK_DATA_BUF *
-tsk_data_buf_alloc(size_t size)
+tsk_data_buf_alloc(void *context, size_t size)
 {
     TSK_DATA_BUF *buf;
 
-    if ((buf = (TSK_DATA_BUF *) tsk_malloc(sizeof(*buf))) == NULL)
+    if ((buf = talloc(context, TSK_DATA_BUF)) == NULL)
         return NULL;
 
-    if ((buf->data = tsk_malloc(size)) == NULL) {
-        free(buf);
+    if ((buf->data = talloc_size(buf, size)) == NULL) {
+        talloc_free(buf);
         return NULL;
     }
     buf->size = size;
@@ -75,6 +75,5 @@ tsk_data_buf_alloc(size_t size)
 void
 tsk_data_buf_free(TSK_DATA_BUF * buf)
 {
-    free(buf->data);
-    free((char *) buf);
+    talloc_free(buf);
 }

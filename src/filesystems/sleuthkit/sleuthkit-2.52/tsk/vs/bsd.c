@@ -23,7 +23,7 @@
 static char *
 bsd_get_desc(uint8_t fstype)
 {
-    char *str = tsk_malloc(64);
+    char *str = talloc_size(NULL, 64);
     if (str == NULL)
         return "";
 
@@ -96,6 +96,7 @@ bsd_load_table(TSK_MM_INFO * mm)
     ssize_t cnt;
     TSK_DADDR_T laddr = mm->offset / mm->block_size + BSD_PART_SOFFSET;     // used for printing only
     TSK_DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
+    char *desc;
 
     if (tsk_verbose)
         tsk_fprintf(stderr,
@@ -162,13 +163,15 @@ bsd_load_table(TSK_MM_INFO * mm)
             return 1;
         }
 
-
         /* Add the partition to the internal sorted list */
+        desc = bsd_get_desc(dlabel.part[idx].fstype);
         if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) part_start,
                 (TSK_DADDR_T) part_size, TSK_MM_PART_TYPE_VOL,
-                bsd_get_desc(dlabel.part[idx].fstype), -1, idx)) {
+                desc, -1, idx)) {
+            talloc_free(desc);
             return 1;
         }
+        talloc_free(desc);
     }
 
     return 0;
@@ -228,8 +231,7 @@ bsd_part_walk(TSK_MM_INFO * mm, TSK_PNUM_T start, TSK_PNUM_T last, int flags,
 void
 bsd_close(TSK_MM_INFO * mm)
 {
-    tsk_mm_part_free(mm);
-    free(mm);
+    talloc_free(mm);
 }
 
 /*
@@ -246,7 +248,7 @@ tsk_mm_bsd_open(TSK_IMG_INFO * img_info, TSK_DADDR_T offset)
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
+    mm = talloc(NULL, TSK_MM_INFO);
     if (mm == NULL)
         return NULL;
 

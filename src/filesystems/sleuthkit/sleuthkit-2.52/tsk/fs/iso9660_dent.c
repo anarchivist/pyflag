@@ -139,7 +139,7 @@ iso9660_dent_walk_lcl(TSK_FS_INFO * fs, ISO9660_DINFO * dinfo,
     if ((fs_dent = tsk_fs_dent_alloc(ISO9660_MAXNAMLEN + 1, 0)) == NULL)
         return 1;
 
-    if ((buf = tsk_malloc(length)) == NULL)
+    if ((buf = talloc_size(fs_dent, length)) == NULL)
         return 1;
 
     cnt = tsk_fs_read_random(fs, buf, length, offs);
@@ -150,6 +150,7 @@ iso9660_dent_walk_lcl(TSK_FS_INFO * fs, ISO9660_DINFO * dinfo,
             tsk_errstr[0] = '\0';
         }
         snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_dent_walk:");
+        tsk_fs_dent_free(fs_dent);
         return 1;
     }
 
@@ -230,6 +231,7 @@ iso9660_dent_walk_lcl(TSK_FS_INFO * fs, ISO9660_DINFO * dinfo,
                         in->inode.dr.ext_loc_m) != tsk_getu32(fs->endian,
                         dd->ext_loc_m))) {
                 // @@@ 
+                tsk_fs_dent_free(fs_dent);
                 return 0;
             }
 
@@ -274,7 +276,7 @@ iso9660_dent_walk_lcl(TSK_FS_INFO * fs, ISO9660_DINFO * dinfo,
 
                 /* Make sure we do not get into an infinite loop */
                 if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
-                    if (tsk_list_add(list_seen, fs_dent->inode)) {
+                    if (tsk_list_add(fs, list_seen, fs_dent->inode)) {
                         tsk_fs_dent_free(fs_dent);
                         return -1;
                     }
@@ -336,7 +338,6 @@ iso9660_dent_walk_lcl(TSK_FS_INFO * fs, ISO9660_DINFO * dinfo,
         }
     }
 
-    free(buf);
     tsk_fs_dent_free(fs_dent);
     return 0;
 }

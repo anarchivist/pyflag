@@ -280,7 +280,7 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo,
 
             /* Make sure we do not get into an infinite loop */
             if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
-                if (tsk_list_add(list_seen, fs_dent->inode)) {
+                if (tsk_list_add(ffs, list_seen, fs_dent->inode)) {
                     tsk_fs_dent_free(fs_dent);
                     return -1;
                 }
@@ -400,7 +400,7 @@ ffs_dent_walk_lcl(TSK_FS_INFO * fs, FFS_DINFO * dinfo,
     /* make a copy of the directory contents that we can process */
     /* round up cause we want the slack space too */
     size = roundup(fs_inode->size, FFS_DIRBLKSIZ);
-    if ((dirbuf = tsk_malloc((size_t) size)) == NULL) {
+    if ((dirbuf = talloc_size(fs_inode, (size_t) size)) == NULL) {
         tsk_fs_inode_free(fs_inode);
         return 1;
     }
@@ -411,7 +411,6 @@ ffs_dent_walk_lcl(TSK_FS_INFO * fs, FFS_DINFO * dinfo,
     if (fs->file_walk(fs, fs_inode, 0, 0,
             TSK_FS_FILE_FLAG_SLACK | TSK_FS_FILE_FLAG_NOID,
             tsk_fs_load_file_action, (void *) &load_file)) {
-        free(dirbuf);
         tsk_fs_inode_free(fs_inode);
         strncat(tsk_errstr2, " - ffs_dent_walk_lcl",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
@@ -424,7 +423,6 @@ ffs_dent_walk_lcl(TSK_FS_INFO * fs, FFS_DINFO * dinfo,
         tsk_errno = TSK_ERR_FS_FWALK;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "ffs_dent_walk: Error reading directory %" PRIuINUM, inode);
-        free(dirbuf);
         tsk_fs_inode_free(fs_inode);
         return 1;
     }
@@ -452,7 +450,6 @@ ffs_dent_walk_lcl(TSK_FS_INFO * fs, FFS_DINFO * dinfo,
     }
 
     tsk_fs_inode_free(fs_inode);
-    free(dirbuf);
     if (retval == -1)
         return 1;
     else

@@ -240,7 +240,7 @@ tsk_fs_fls(TSK_FS_INFO * fs, uint8_t lclflags, TSK_INUM_T inode, int flags,
 
         if (tpre != NULL) {
             clen = TSTRLEN(tpre) * 4;
-            cpre = (char *) tsk_malloc(clen);
+            cpre = (char *) talloc_size(fs, clen);
             if (cpre == NULL) {
                 return 1;
             }
@@ -270,7 +270,7 @@ tsk_fs_fls(TSK_FS_INFO * fs, uint8_t lclflags, TSK_INUM_T inode, int flags,
         retval = fs->dent_walk(fs, inode, flags, print_dent_act, NULL);
 
         if (cpre)
-            free(cpre);
+            talloc_free(cpre);
 
         return retval;
     }

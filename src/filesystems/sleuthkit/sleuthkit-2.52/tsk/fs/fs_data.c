@@ -44,15 +44,15 @@
  * @returns NULL on error
  */
 TSK_FS_DATA *
-tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM type)
+tsk_fs_data_alloc(void *context, TSK_FS_DATA_FLAG_ENUM type)
 {
-    TSK_FS_DATA *fs_data = (TSK_FS_DATA *) tsk_malloc(sizeof(TSK_FS_DATA));
+    TSK_FS_DATA *fs_data = talloc(context, TSK_FS_DATA);
     if (fs_data == NULL) {
         return NULL;
     }
     fs_data->nsize = 128;
-    if ((fs_data->name = (char *) tsk_malloc(fs_data->nsize)) == NULL) {
-        free(fs_data);
+    if ((fs_data->name = (char *) talloc_size(fs_data, fs_data->nsize)) == NULL) {
+        talloc_free(fs_data);
         return NULL;
     }
 
@@ -71,9 +71,9 @@ tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM type)
     }
     else if (type == TSK_FS_DATA_RES) {
         fs_data->buflen = 1024;
-        fs_data->buf = (uint8_t *) tsk_malloc(fs_data->buflen);
+        fs_data->buf = (uint8_t *) talloc_size(fs_data, fs_data->buflen);
         if (fs_data->buf == NULL) {
-            free(fs_data->name);
+            talloc_free(fs_data);
             return NULL;
         }
         fs_data->flags = (TSK_FS_DATA_RES | TSK_FS_DATA_INUSE);
@@ -96,10 +96,9 @@ tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM type)
  * @returns NULL on error
  */
 TSK_FS_DATA_RUN *
-tsk_fs_data_run_alloc()
+tsk_fs_data_run_alloc(void *context)
 {
-    TSK_FS_DATA_RUN *fs_data_run =
-        (TSK_FS_DATA_RUN *) tsk_malloc(sizeof(TSK_FS_DATA_RUN));
+    TSK_FS_DATA_RUN *fs_data_run = talloc(context, TSK_FS_DATA_RUN);
     if (fs_data_run == NULL)
         return NULL;
 
@@ -116,13 +115,17 @@ tsk_fs_data_run_alloc()
 void
 tsk_fs_data_run_free(TSK_FS_DATA_RUN * fs_data_run)
 {
+	if(fs_data_run)
+	    talloc_free(fs_data_run);
+	/*
     TSK_FS_DATA_RUN *fs_data_run_prev;
     while (fs_data_run) {
         fs_data_run_prev = fs_data_run;
         fs_data_run = fs_data_run->next;
         fs_data_run_prev->next = NULL;
-        free(fs_data_run_prev);
+        talloc_free(fs_data_run_prev);
     }
+    */
 }
 
 /**
@@ -143,17 +146,18 @@ tsk_fs_data_free(TSK_FS_DATA * fs_data_head)
 
         if (fs_data_head->run)
             tsk_fs_data_run_free(fs_data_head->run);
+
         fs_data_head->run = NULL;
 
         if (fs_data_head->buf)
-            free(fs_data_head->buf);
+            talloc_free(fs_data_head->buf);
         fs_data_head->buf = NULL;
 
         if (fs_data_head->name)
-            free(fs_data_head->name);
+            talloc_free(fs_data_head->name);
         fs_data_head->name = NULL;
 
-        free(fs_data_head);
+        talloc_free(fs_data_head);
 
         fs_data_head = fs_data_tmp;
     }
@@ -193,7 +197,7 @@ tsk_fs_data_clear_list(TSK_FS_DATA * fs_data_head)
  * @return NULL on error or attribute in list to use
  */
 TSK_FS_DATA *
-tsk_fs_data_getnew_attr(TSK_FS_DATA * fs_data_head,
+tsk_fs_data_getnew_attr(void *context, TSK_FS_DATA * fs_data_head,
     TSK_FS_DATA_FLAG_ENUM type)
 {
     TSK_FS_DATA *fs_data_tmp = NULL, *fs_data = fs_data_head;
@@ -231,7 +235,7 @@ tsk_fs_data_getnew_attr(TSK_FS_DATA * fs_data_head,
             fs_data = fs_data_tmp;
         else {
             /* make a new one */
-            if ((fs_data = tsk_fs_data_alloc(type)) == NULL)
+            if ((fs_data = tsk_fs_data_alloc(context, type)) == NULL)
                 return NULL;
 
             /* find the end of the list to add this to */
@@ -357,7 +361,7 @@ static uint8_t
 fs_data_put_name(TSK_FS_DATA * fs_data, const char *name)
 {
     if (fs_data->nsize < (strlen(name) + 1)) {
-        fs_data->name = tsk_realloc(fs_data->name, strlen(name) + 1);
+        fs_data->name = talloc_realloc_size(fs_data, fs_data->name, strlen(name) + 1);
         if (fs_data->name == NULL)
             return 1;
         fs_data->nsize = strlen(name) + 1;
@@ -381,14 +385,17 @@ fs_data_put_name(TSK_FS_DATA * fs_data, const char *name)
  * @return NULL on error or head of attribute list
  */
 TSK_FS_DATA *
-tsk_fs_data_put_str(TSK_FS_DATA * fs_data_head, const char *name, uint32_t type,
+tsk_fs_data_put_str(void *context, TSK_FS_DATA * fs_data_head, const char *name, uint32_t type,
     uint16_t id, void *res_data, unsigned int len)
 {
     TSK_FS_DATA *fs_data;
 
+    if(fs_data_head)
+    	context = fs_data_head;
+
     /* get a new attribute entry in the list */
     if ((fs_data =
-            tsk_fs_data_getnew_attr(fs_data_head,
+            tsk_fs_data_getnew_attr(context, fs_data_head,
                 TSK_FS_DATA_RES)) == NULL)
         return NULL;
 
@@ -407,7 +414,7 @@ tsk_fs_data_put_str(TSK_FS_DATA * fs_data_head, const char *name, uint32_t type,
     }
 
     if (fs_data->buflen < len) {
-        fs_data->buf = (uint8_t *) tsk_realloc((char *) fs_data->buf, len);
+        fs_data->buf = (uint8_t *) talloc_realloc_size(fs_data, (char *) fs_data->buf, len);
         if (fs_data->buf == NULL)
             return NULL;
         fs_data->buflen = len;
@@ -442,7 +449,7 @@ tsk_fs_data_put_str(TSK_FS_DATA * fs_data_head, const char *name, uint32_t type,
  * @returns The head of the list or NULL on error
  */
 TSK_FS_DATA *
-tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
+tsk_fs_data_put_run(void *context, TSK_FS_DATA * fs_data_head,
     TSK_OFF_T runlen, TSK_FS_DATA_RUN * data_run_new,
     const char *name, uint32_t type, uint16_t id, TSK_OFF_T size,
     TSK_FS_DATA_FLAG_ENUM flags, uint32_t compsize)
@@ -451,6 +458,9 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
     TSK_FS_DATA_RUN *data_run_cur, *data_run_prev;
 
     tsk_error_reset();
+
+    if(fs_data_head)
+    	context = fs_data_head;
 
     /* First thing is to find the existing data attribute */
     fs_data = NULL;
@@ -467,7 +477,7 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
 
         /* get a new attribute entry in the list */
         if ((fs_data =
-                tsk_fs_data_getnew_attr(fs_data_head,
+                tsk_fs_data_getnew_attr(context, fs_data_head,
                     TSK_FS_DATA_NONRES)) == NULL)
             return NULL;
 
@@ -510,7 +520,7 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
          * data_run_new->offset.  
          */
         if (data_run_new->offset != 0) {
-            TSK_FS_DATA_RUN *fill_run = tsk_fs_data_run_alloc();
+            TSK_FS_DATA_RUN *fill_run = tsk_fs_data_run_alloc(fs_data);
             fill_run->flags = TSK_FS_DATA_RUN_FLAG_FILLER;
             fill_run->offset = 0;
             fill_run->addr = 0;
@@ -595,7 +605,7 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
                  * the filler, so make a new start filler
                  */
                 else {
-                    TSK_FS_DATA_RUN *newfill = tsk_fs_data_run_alloc();
+                    TSK_FS_DATA_RUN *newfill = tsk_fs_data_run_alloc(fs_data);
                     if (newfill == NULL)
                         return NULL;
 
@@ -628,7 +638,7 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
                     if (endrun->next == NULL)
                         fs_data->run_end = endrun;
 
-                    free(data_run_cur);
+                    talloc_free(data_run_cur);
                 }
                 /* else adjust the last filler entry */
                 else {
@@ -694,7 +704,7 @@ tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
     }
     /* we need to make a filler before it */
     else {
-        TSK_FS_DATA_RUN *tmprun = tsk_fs_data_run_alloc();
+        TSK_FS_DATA_RUN *tmprun = tsk_fs_data_run_alloc(fs_data);
         if (tmprun == NULL)
             return NULL;
 

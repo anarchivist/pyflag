@@ -59,7 +59,7 @@ typedef enum {
         uint64_t len;   ///< Length value (of run)
     };
 
-    extern uint8_t tsk_list_add(TSK_LIST ** list, uint64_t key);
+    extern uint8_t tsk_list_add(void *context, TSK_LIST ** list, uint64_t key);
     extern uint8_t tsk_list_find(TSK_LIST * list, uint64_t key);
     extern void tsk_list_free(TSK_LIST * list);
 //@}
@@ -412,7 +412,7 @@ typedef enum {
         TSK_DADDR_T addr;   ///< Address of data source
     } TSK_DATA_BUF;
 
-    extern TSK_DATA_BUF *tsk_data_buf_alloc(size_t);
+    extern TSK_DATA_BUF *tsk_data_buf_alloc(void *context, size_t);
     extern void tsk_data_buf_free(TSK_DATA_BUF *);
 
 

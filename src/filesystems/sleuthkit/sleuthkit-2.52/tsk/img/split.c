@@ -336,8 +336,7 @@ split_close(TSK_IMG_INFO * img_info)
             close(split_info->cache[i].fd);
 #endif
     }
-    free(split_info->cptr);
-    free(split_info);
+    talloc_free(split_info);
 }
 
 
@@ -364,8 +363,7 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         return NULL;
     }
 
-    if ((split_info =
-            (IMG_SPLIT_INFO *) tsk_malloc(sizeof(IMG_SPLIT_INFO))) == NULL)
+    if ((split_info = talloc(NULL, IMG_SPLIT_INFO)) == NULL)
         return NULL;
 
     memset((void *) split_info, 0, sizeof(IMG_SPLIT_INFO));
@@ -380,9 +378,9 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
     img_info->next = NULL;
 
     /* Open the files */
-    split_info->cptr = (int *) tsk_malloc(num_img * sizeof(int));
+    split_info->cptr = (int *) talloc_size(split_info, num_img * sizeof(int));
     if (split_info->cptr == NULL) {
-        free(split_info);
+        talloc_free(split_info);
         return NULL;
     }
 
@@ -390,11 +388,9 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         SPLIT_CACHE * sizeof(IMG_SPLIT_CACHE));
     split_info->next_slot = 0;
 
-    split_info->max_off =
-        (TSK_OFF_T *) tsk_malloc(num_img * sizeof(TSK_OFF_T));
+    split_info->max_off = (TSK_OFF_T *) talloc_size(split_info, num_img * sizeof(TSK_OFF_T));
     if (split_info->max_off == NULL) {
-        free(split_info->cptr);
-        free(split_info);
+        talloc_free(split_info);
         return NULL;
     }
     img_info->size = 0;
@@ -416,9 +412,7 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
             snprintf(tsk_errstr, TSK_ERRSTR_L,
                 "split_open - %" PRIttocTSK " - %s", images[i],
                 strerror(errno));
-            free(split_info->max_off);
-            free(split_info->cptr);
-            free(split_info);
+            talloc_free(split_info);
             return NULL;
         }
         else if ((sb.st_mode & S_IFMT) == S_IFDIR) {
@@ -431,6 +425,7 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
             tsk_errno = TSK_ERR_IMG_MAGIC;
             snprintf(tsk_errstr, TSK_ERRSTR_L,
                 "split_open: Image is a directory");
+            talloc_free(split_info);
             return NULL;
         }
 

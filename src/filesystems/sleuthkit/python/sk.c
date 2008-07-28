@@ -18,7 +18,7 @@
 #include "tsk/libtsk.h"
 #include "tsk/fs/tsk_ntfs.h"
 
-#define SK_TALLOC_HACK 1
+//#define SK_TALLOC_HACK 0
 
 static int TSK_IMG_INFO_TYPE_PYFILE_TYPE	=	0x40;
 
@@ -513,7 +513,7 @@ pyfile_open(PyObject *fileobj) {
 	    Py_DECREF(tmp);
         }
         tmp = PyObject_CallMethod(fileobj, "seek", "(i)", 0);
-	if(!tmp) return tmp;
+	if(!tmp) return NULL;
 	Py_DECREF(tmp);
     }
 
@@ -1390,7 +1390,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 	  start += (self->readptr - count * fs->block_size);
 
         /* do a direct block read from the filesystem */
-        blockbuf = tsk_data_buf_alloc(overread);
+        blockbuf = tsk_data_buf_alloc(buf, overread);
         len = tsk_fs_read_random(fs, blockbuf->data, to_read, start);
         if(len > 0) {
             memcpy(buf+written, blockbuf->data, len);

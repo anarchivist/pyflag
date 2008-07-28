@@ -32,7 +32,6 @@
 #include "tsk_fs_i.h"
 #include "tsk_ext2fs.h"
 
-
 /* ext2fs_group_load - load block group descriptor into cache 
  *
  * return 1 on error and 0 on success
@@ -60,8 +59,7 @@ ext2fs_group_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 
 
     if (ext2fs->grp_buf == NULL) {
-        if ((ext2fs->grp_buf =
-                (ext2fs_gd *) tsk_malloc(sizeof(ext2fs_gd))) == NULL) {
+        if ((ext2fs->grp_buf = talloc(ext2fs, ext2fs_gd)) == NULL) {
             return 1;
         }
     }
@@ -158,7 +156,7 @@ ext2fs_bmap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 
     if (ext2fs->bmap_buf == NULL) {
         if ((ext2fs->bmap_buf =
-                (uint8_t *) tsk_malloc(fs->block_size)) == NULL) {
+                (uint8_t *) talloc_size(ext2fs, fs->block_size)) == NULL) {
             return 1;
         }
     }
@@ -226,7 +224,7 @@ ext2fs_imap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
     /* Allocate the cache buffer and exit if map is already loaded */
     if (ext2fs->imap_buf == NULL) {
         if ((ext2fs->imap_buf =
-                (uint8_t *) tsk_malloc(fs->block_size)) == NULL) {
+                (uint8_t *) talloc_size(ext2fs, fs->block_size)) == NULL) {
             return 1;
         }
     }
@@ -300,7 +298,7 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, TSK_INUM_T inum)
     /* Allocate the buffer or return if already loaded */
     if (ext2fs->dino_buf == NULL) {
         if ((ext2fs->dino_buf =
-                (ext2fs_inode *) tsk_malloc(ext2fs->inode_size)) == NULL) {
+                (ext2fs_inode *) talloc_size(ext2fs, ext2fs->inode_size)) == NULL) {
             return 1;
         }
     }
@@ -425,7 +423,7 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, TSK_FS_INODE * fs_inode)
     fs_inode->seq = 0;
 
     if (fs_inode->link) {
-        free(fs_inode->link);
+        talloc_free(fs_inode->link);
         fs_inode->link = NULL;
     }
 
@@ -456,7 +454,7 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, TSK_FS_INODE * fs_inode)
         int i;
 
         if ((fs_inode->link =
-                tsk_malloc((size_t) (fs_inode->size + 1))) == NULL)
+                talloc_size(fs_inode, (size_t) (fs_inode->size + 1))) == NULL)
             return 1;
 
         /* it is located directly in the pointers */
@@ -485,7 +483,7 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, TSK_FS_INODE * fs_inode)
             TSK_DATA_BUF *data_buf;
             char *ptr = fs_inode->link;
 
-            if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL)
+            if ((data_buf = tsk_data_buf_alloc(ext2fs, fs->block_size)) == NULL)
                 return 1;
 
             /* we only need to do the direct blocks due to the limit 
@@ -599,7 +597,7 @@ inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
 {
     if ((fs_dent->fsi)
         && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
-        if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+        if (tsk_list_add(fs, &fs->list_inum_named, fs_dent->fsi->addr))
             return TSK_WALK_STOP;
     }
     return TSK_WALK_CONT;
@@ -833,7 +831,7 @@ ext2fs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
     }
 
 
-    if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+    if ((data_buf = tsk_data_buf_alloc(ext2fs, fs->block_size)) == NULL) {
         return 1;
     }
 
@@ -1271,13 +1269,13 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
      * indirect blocks.
      */
     if ((buf =
-            (TSK_DATA_BUF **) tsk_malloc(sizeof(*buf) *
+            (TSK_DATA_BUF **) talloc_size(inode, sizeof(*buf) *
                 (inode->indir_count + 1))) == NULL) {
         return 1;
     }
 
-    if ((buf[0] = tsk_data_buf_alloc(fs->block_size)) == NULL) {
-        free(buf);
+    if ((buf[0] = tsk_data_buf_alloc(buf, fs->block_size)) == NULL) {
+        talloc_free(buf);
         return 1;
     }
 
@@ -1296,8 +1294,7 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             inode->direct_addr[n], flags, action, ptr);
 
         if (read_b == -1) {
-            tsk_data_buf_free(buf[0]);
-            free(buf);
+            talloc_free(buf);
             return 1;
         }
         else if (read_b == 0) {
@@ -1309,11 +1306,8 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
 
     if (length > 0) {
         for (level = 1; level <= inode->indir_count; level++) {
-            if ((buf[level] = tsk_data_buf_alloc(fs->block_size)) == NULL) {
-                int f;
-                for (f = 0; f < level; f++)
-                    tsk_data_buf_free(buf[f]);
-                free(buf);
+            if ((buf[level] = tsk_data_buf_alloc(buf, fs->block_size)) == NULL) {
+                talloc_free(buf);
                 return 1;
             }
         }
@@ -1330,15 +1324,9 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
 
             length -= read_b;
         }
-        /*
-         * Cleanup.
-         */
-        for (level = 1; level <= inode->indir_count; level++)
-            tsk_data_buf_free(buf[level]);
     }
 
-    tsk_data_buf_free(buf[0]);
-    free(buf);
+    talloc_free(buf);
 
     if (read_b == -1)
         return 1;
@@ -1956,7 +1944,7 @@ ext2fs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblo
         ext2fs_ea_entry *ea_entry;
         ssize_t cnt;
 
-        if ((buf = tsk_malloc(fs->block_size)) == NULL) {
+        if ((buf = talloc_size(fs_inode, fs->block_size)) == NULL) {
             tsk_fs_inode_free(fs_inode);
             return 1;
         }
@@ -1985,7 +1973,6 @@ ext2fs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblo
                 "ext2fs_istat: ACL block %" PRIu32,
                 tsk_getu32(fs->endian, ext2fs->dino_buf->i_file_acl));
             tsk_fs_inode_free(fs_inode);
-            free(buf);
             return 1;
         }
 
@@ -2164,7 +2151,7 @@ ext2fs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblo
         }
       egress_ea:
 
-        free(buf);
+        talloc_free(buf);
     }
 
     if (sec_skew != 0) {
@@ -2250,27 +2237,8 @@ ext2fs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblo
 static void
 ext2fs_close(TSK_FS_INFO * fs)
 {
-    EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
-
-    free((char *) ext2fs->fs);
-    if (ext2fs->dino_buf != NULL)
-        free((char *) ext2fs->dino_buf);
-
-    if (ext2fs->grp_buf != NULL)
-        free((char *) ext2fs->grp_buf);
-
-    if (ext2fs->bmap_buf != NULL)
-        free((char *) ext2fs->bmap_buf);
-
-    if (ext2fs->imap_buf != NULL)
-        free((char *) ext2fs->imap_buf);
-
-    if (fs->list_inum_named) {
-        tsk_list_free(fs->list_inum_named);
-        fs->list_inum_named = NULL;
-    }
-
-    free(ext2fs);
+	talloc_free(fs);
+	return;
 }
 
 /**
@@ -2302,7 +2270,7 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         return NULL;
     }
 
-    if ((ext2fs = (EXT2FS_INFO *) tsk_malloc(sizeof(*ext2fs))) == NULL)
+    if ((ext2fs = talloc(NULL, EXT2FS_INFO)) == NULL)
         return NULL;
 
     fs = &(ext2fs->fs_info);
@@ -2316,8 +2284,8 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     fs->img_info = img_info;
     fs->offset = offset;
     len = sizeof(ext2fs_sb);
-    if ((ext2fs->fs = (ext2fs_sb *) tsk_malloc(len)) == NULL) {
-        free(ext2fs);
+    if ((ext2fs->fs = talloc(ext2fs, ext2fs_sb)) == NULL) {
+        talloc_free(ext2fs);
         return NULL;
     }
 
@@ -2330,8 +2298,7 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             tsk_errno = TSK_ERR_FS_READ;
         }
         snprintf(tsk_errstr2, TSK_ERRSTR_L, "ext2fs_open: superblock");
-        free(ext2fs->fs);
-        free(ext2fs);
+        talloc_free(ext2fs);
         return NULL;
     }
 
@@ -2339,8 +2306,7 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
      * Verify we are looking at an EXTxFS image
      */
     if (tsk_fs_guessu16(fs, ext2fs->fs->s_magic, EXT2FS_FS_MAGIC)) {
-        free(ext2fs->fs);
-        free(ext2fs);
+        talloc_free(ext2fs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -2385,8 +2351,7 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     fs->root_inum = EXT2FS_ROOTINO;
 
     if (fs->inum_count < 10) {
-        free(ext2fs->fs);
-        free(ext2fs);
+        talloc_free(ext2fs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -2415,8 +2380,7 @@ ext2fs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
 
     if (tsk_getu32(fs->endian, ext2fs->fs->s_log_block_size) !=
         tsk_getu32(fs->endian, ext2fs->fs->s_log_frag_size)) {
-        free(ext2fs->fs);
-        free(ext2fs);
+        talloc_free(ext2fs);
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_FUNC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,

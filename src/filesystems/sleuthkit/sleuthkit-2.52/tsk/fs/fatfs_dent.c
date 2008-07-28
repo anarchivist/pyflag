@@ -576,7 +576,7 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
                 // save the inode info -- if the setup is right
                 if ((dinfo->save_inum_named) && (fs_dent->fsi)
                     && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
-                    if (tsk_list_add(&fs->list_inum_named,
+                    if (tsk_list_add(fs, &fs->list_inum_named,
                             fs_dent->fsi->addr)) {
 
                         // if there is an error, then clear the list
@@ -599,7 +599,7 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 
                 /* Make sure we do not get into an infinite loop */
                 if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
-                    if (tsk_list_add(list_seen, fs_dent->inode)) {
+                    if (tsk_list_add(fs, list_seen, fs_dent->inode)) {
                         tsk_fs_dent_free(fs_dent);
                         return -1;
                     }
@@ -851,7 +851,7 @@ fatfs_dent_walk_lcl(TSK_FS_INFO * fs, FATFS_DINFO * dinfo,
     dinfo->curdir_inode = inode;
 
     /* Make a copy of the directory contents using file_walk */
-    if ((dirbuf = tsk_malloc((size_t) len)) == NULL) {
+    if ((dirbuf = talloc_size(fs_inode, (size_t) len)) == NULL) {
         tsk_fs_inode_free(fs_inode);
         return 1;
     }
@@ -863,10 +863,9 @@ fatfs_dent_walk_lcl(TSK_FS_INFO * fs, FATFS_DINFO * dinfo,
      * in a stack - they are needed to determine the inode address.  
      */
     load.addrsize = (size_t) (len / fatfs->ssize);
-    addrbuf = (TSK_DADDR_T *) tsk_malloc(load.addrsize * sizeof(TSK_DADDR_T));
+    addrbuf = (TSK_DADDR_T *) talloc_size(fs_inode, load.addrsize * sizeof(TSK_DADDR_T));
     if (addrbuf == NULL) {
         tsk_fs_inode_free(fs_inode);
-        free(dirbuf);
         return 1;
     }
 
@@ -879,7 +878,6 @@ fatfs_dent_walk_lcl(TSK_FS_INFO * fs, FATFS_DINFO * dinfo,
             TSK_FS_FILE_FLAG_SLACK | TSK_FS_FILE_FLAG_RECOVER |
             TSK_FS_FILE_FLAG_NOID, fatfs_dent_action, (void *) &load)) {
         tsk_fs_inode_free(fs_inode);
-        free(dirbuf);
         strncat(tsk_errstr2, " - fatfs_dent_walk",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
         return 1;
@@ -894,8 +892,6 @@ fatfs_dent_walk_lcl(TSK_FS_INFO * fs, FATFS_DINFO * dinfo,
 
         /* Free the local buffers */
         tsk_fs_inode_free(fs_inode);
-        free(dirbuf);
-        free(addrbuf);
 
         return 1;
     }
@@ -906,8 +902,6 @@ fatfs_dent_walk_lcl(TSK_FS_INFO * fs, FATFS_DINFO * dinfo,
 
 
     tsk_fs_inode_free(fs_inode);
-    free(dirbuf);
-    free(addrbuf);
 
     return (retval == -1) ? 1 : 0;
 }

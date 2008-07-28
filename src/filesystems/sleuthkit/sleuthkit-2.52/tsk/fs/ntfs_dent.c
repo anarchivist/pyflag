@@ -373,7 +373,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 
             /* Make sure we do not get into an infinite loop */
             if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
-                if (tsk_list_add(list_seen, fs_dent->inode)) {
+                if (tsk_list_add(ntfs, list_seen, fs_dent->inode)) {
                     tsk_fs_dent_free(fs_dent);
                     return -1;
                 }
@@ -875,7 +875,7 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
      * Copy the index allocation run into a big buffer
      */
     idxalloc_len = tsk_fs_data_alloc->allocsize;
-    if ((idxalloc = tsk_malloc((size_t) idxalloc_len)) == NULL) {
+    if ((idxalloc = talloc_size(fs_inode, (size_t) idxalloc_len)) == NULL) {
         tsk_fs_inode_free(fs_inode);
         return TSK_ERR;
     }
@@ -891,7 +891,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
     if (ntfs_data_walk(ntfs, fs_inode->addr, tsk_fs_data_alloc,
             TSK_FS_FILE_FLAG_SLACK, tsk_fs_load_file_action,
             (void *) &load_file)) {
-        free(idxalloc);
         tsk_fs_inode_free(fs_inode);
         strncat(tsk_errstr2, " - ntfs_dent_walk",
             TSK_ERRSTR_L - strlen(tsk_errstr2));
@@ -900,7 +899,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
 
     /* Not all of the directory was copied, so we exit */
     if (load_file.left > 0) {
-        free(idxalloc);
         tsk_fs_inode_free(fs_inode);
 
         tsk_error_reset();
@@ -963,7 +961,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
 
         /* remove the update sequence in the index record */
         if (ntfs_fix_idxrec(ntfs, idxrec_p, rec_len)) {
-            free(idxalloc);
             tsk_fs_inode_free(fs_inode);
             return TSK_COR;
         }
@@ -991,7 +988,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
                 "Error: Index list offsets are invalid on entry: %"
                 PRIuINUM, fs_inode->addr);
             tsk_fs_inode_free(fs_inode);
-            free(idxalloc);
             return TSK_COR;
         }
 
@@ -1003,7 +999,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
             ptr);
         if (retval != 0) {
             tsk_fs_inode_free(fs_inode);
-            free(idxalloc);
             return (retval == -1) ? TSK_ERR : TSK_OK;
         }
 
@@ -1030,7 +1025,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
         /* remove the update sequence */
         if (ntfs_fix_idxrec(ntfs, idxrec_p, rec_len)) {
             tsk_fs_inode_free(fs_inode);
-            free(idxalloc);
             return TSK_COR;
         }
 
@@ -1054,7 +1048,6 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
                 "Error: Index list offsets are invalid on entry: %"
                 PRIuINUM, fs_inode->addr);
             tsk_fs_inode_free(fs_inode);
-            free(idxalloc);
             return TSK_COR;
         }
 
@@ -1065,13 +1058,11 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
             ptr);
         if (retval != 0) {
             tsk_fs_inode_free(fs_inode);
-            free(idxalloc);
             return (retval == -1) ? TSK_ERR : TSK_OK;
         }
     }
 
     tsk_fs_inode_free(fs_inode);
-    free(idxalloc);
 
     return TSK_OK;
     // DOUBLY CHECK RETURN VALUE S

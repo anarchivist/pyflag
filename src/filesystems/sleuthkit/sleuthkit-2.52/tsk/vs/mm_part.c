@@ -27,7 +27,7 @@ tsk_mm_part_add(TSK_MM_INFO * mm, TSK_DADDR_T start, TSK_DADDR_T len,
     TSK_MM_PART *part;
     TSK_MM_PART *cur_part = mm->part_list;
 
-    if ((part = (TSK_MM_PART *) tsk_malloc(sizeof(TSK_MM_PART))) == NULL) {
+    if ((part = talloc(mm, TSK_MM_PART)) == NULL) {
         return NULL;
     }
 
@@ -36,7 +36,7 @@ tsk_mm_part_add(TSK_MM_INFO * mm, TSK_DADDR_T start, TSK_DADDR_T len,
     part->prev = NULL;
     part->start = start;
     part->len = len;
-    part->desc = desc;
+    part->desc = talloc_strdup(part, desc);
     part->table_num = table;
     part->slot_num = slot;
     part->type = type;
@@ -112,16 +112,17 @@ tsk_mm_part_unused(TSK_MM_INFO * mm)
 
         if (part->start > prev_end) {
             char *str;
-            if ((str = tsk_malloc(12)) == NULL)
+            if ((str = talloc_size(NULL, 12)) == NULL)
                 return 1;
 
             snprintf(str, 12, "Unallocated");
             if (NULL == tsk_mm_part_add(mm, prev_end,
                     part->start - prev_end, TSK_MM_PART_TYPE_DESC, str, -1,
                     -1)) {
-                free(str);
+                talloc_free(str);
                 return 1;
             }
+            talloc_free(str);
         }
 
         prev_end = part->start + part->len;
@@ -131,16 +132,17 @@ tsk_mm_part_unused(TSK_MM_INFO * mm)
     /* Is there unallocated space at the end? */
     if (prev_end < (TSK_DADDR_T)(mm->img_info->size / mm->block_size)) {
         char *str;
-        if ((str = tsk_malloc(12)) == NULL)
+        if ((str = talloc_size(NULL, 12)) == NULL)
             return 1;
 
         snprintf(str, 12, "Unallocated");
         if (NULL == tsk_mm_part_add(mm, prev_end,
                 mm->img_info->size / mm->block_size - prev_end,
                 TSK_MM_PART_TYPE_DESC, str, -1, -1)) {
-            free(str);
+            talloc_free(str);
             return 1;
         }
+        talloc_free(str);
     }
 
     return 0;
@@ -157,10 +159,10 @@ tsk_mm_part_free(TSK_MM_INFO * mm)
 
     while (part) {
         if (part->desc)
-            free(part->desc);
+            talloc_free(part->desc);
 
         part2 = part->next;
-        free(part);
+        talloc_free(part);
         part = part2;
     }
     mm->part_list = NULL;

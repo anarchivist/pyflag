@@ -27,6 +27,7 @@
 #endif
 
 #include "tsk_base.h"
+#include "talloc.h"
 
 // most of the local files need this, so we include it here
 #include <string.h>
@@ -46,8 +47,8 @@
 #define malloc tsk_malloc
 #endif
 
-    extern char *tsk_malloc(size_t);
-    extern char *tsk_realloc(char *, size_t);
+//    extern char *tsk_malloc(size_t);
+//    extern char *tsk_realloc(char *, size_t);
 
 
 

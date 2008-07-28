@@ -590,16 +590,16 @@ extern "C" {
 
 
 
-    extern TSK_FS_DATA *tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM);
-    extern TSK_FS_DATA_RUN *tsk_fs_data_run_alloc();
-    extern TSK_FS_DATA *tsk_fs_data_getnew_attr(TSK_FS_DATA *,
+    extern TSK_FS_DATA *tsk_fs_data_alloc(void *context, TSK_FS_DATA_FLAG_ENUM);
+    extern TSK_FS_DATA_RUN *tsk_fs_data_run_alloc(void *context);
+    extern TSK_FS_DATA *tsk_fs_data_getnew_attr(void *context, TSK_FS_DATA *,
         TSK_FS_DATA_FLAG_ENUM);
     extern void tsk_fs_data_clear_list(TSK_FS_DATA *);
 
-    extern TSK_FS_DATA *tsk_fs_data_put_str(TSK_FS_DATA *, const char *,
+    extern TSK_FS_DATA *tsk_fs_data_put_str(void *context, TSK_FS_DATA *, const char *,
         uint32_t, uint16_t, void *, unsigned int);
 
-    extern TSK_FS_DATA *tsk_fs_data_put_run(TSK_FS_DATA *, TSK_OFF_T,
+    extern TSK_FS_DATA *tsk_fs_data_put_run(void *context, TSK_FS_DATA *, TSK_OFF_T,
         TSK_FS_DATA_RUN *, const char *, uint32_t, uint16_t, TSK_OFF_T,
         TSK_FS_DATA_FLAG_ENUM, uint32_t);
 

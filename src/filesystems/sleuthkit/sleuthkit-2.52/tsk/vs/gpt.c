@@ -73,13 +73,16 @@ gpt_load_table(TSK_MM_INFO * mm)
         return 1;
     }
 
-    if ((safe_str = tsk_malloc(16)) == NULL)
+    if ((safe_str = talloc_size(NULL, 16)) == NULL)
         return 1;
 
     snprintf(safe_str, 16, "Safety Table");
     if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) 0, (TSK_DADDR_T) 1,
-            TSK_MM_PART_TYPE_DESC, safe_str, -1, -1))
+            TSK_MM_PART_TYPE_DESC, safe_str, -1, -1)) {
+        talloc_free(safe_str);
         return 1;
+    }
+    talloc_free(safe_str);
 
 
     /* Read the GPT header */
@@ -105,15 +108,18 @@ gpt_load_table(TSK_MM_INFO * mm)
         return 1;
     }
 
-    if ((head_str = tsk_malloc(16)) == NULL)
+    if ((head_str = talloc_size(NULL, 16)) == NULL)
         return 1;
 
     snprintf(head_str, 16, "GPT Header");
     if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) 1,
             (TSK_DADDR_T) ((tsk_getu32(mm->endian,
                         &head.head_size_b) + 511) / 512),
-            TSK_MM_PART_TYPE_DESC, head_str, -1, -1))
+            TSK_MM_PART_TYPE_DESC, head_str, -1, -1)) {
+        talloc_free(head_str);
         return 1;
+    }
+    talloc_free(head_str);
 
     /* Allocate a buffer for each table entry */
     ent_size = tsk_getu32(mm->endian, &head.tab_size_b);
@@ -126,7 +132,7 @@ gpt_load_table(TSK_MM_INFO * mm)
         return 1;
     }
 
-    if ((tab_str = tsk_malloc(20)) == NULL)
+    if ((tab_str = talloc_size(NULL, 20)) == NULL)
         return 1;
 
     snprintf(tab_str, 20, "Partition Table");
@@ -134,12 +140,15 @@ gpt_load_table(TSK_MM_INFO * mm)
                 &head.tab_start_lba),
             (TSK_DADDR_T) ((ent_size * tsk_getu32(mm->endian,
                         &head.tab_num_ent) + 511) / 512),
-            TSK_MM_PART_TYPE_DESC, tab_str, -1, -1))
+            TSK_MM_PART_TYPE_DESC, tab_str, -1, -1)) {
+        talloc_free(tab_str);
         return 1;
+    }
+    talloc_free(tab_str);
 
 
     /* Process the partition table */
-    if ((ent_buf = tsk_malloc(mm->block_size)) == NULL)
+    if ((ent_buf = talloc_size(mm, mm->block_size)) == NULL)
         return 1;
 
     i = 0;
@@ -158,6 +167,7 @@ gpt_load_table(TSK_MM_INFO * mm)
                 "Error reading GPT partition table sector : %"
                 PRIuDADDR, tsk_getu64(mm->endian,
                     &head.tab_start_lba) + a);
+            talloc_free(ent_buf);
             return 1;
         }
 
@@ -189,12 +199,15 @@ gpt_load_table(TSK_MM_INFO * mm)
                 tsk_errno = TSK_ERR_MM_BLK_NUM;
                 snprintf(tsk_errstr, TSK_ERRSTR_L,
                     "gpt_load_table: Starting sector too large for image");
+                talloc_free(ent_buf);
                 return 1;
             }
 
 
-            if ((name = tsk_malloc(256)) == NULL)
+            if ((name = talloc_size(NULL, 256)) == NULL) {
+            	talloc_free(ent_buf);
                 return 1;
+            }
 
             name16 = (UTF16 *) ((uintptr_t) ent->name);
             name8 = (UTF8 *) name;
@@ -218,12 +231,17 @@ gpt_load_table(TSK_MM_INFO * mm)
                     (TSK_DADDR_T) (tsk_getu64(mm->endian,
                             ent->end_lba) - tsk_getu64(mm->endian,
                             ent->start_lba) + 1), TSK_MM_PART_TYPE_VOL,
-                    name, -1, i))
+                    name, -1, i)) {
+                talloc_free(ent_buf);
+                talloc_free(name);
                 return 1;
+            }
+            talloc_free(name);
 
             ent++;
         }
     }
+    talloc_free(ent_buf);
 
     return 0;
 }
@@ -279,8 +297,7 @@ gpt_part_walk(TSK_MM_INFO * mm, TSK_PNUM_T start, TSK_PNUM_T last, int flags,
 void
 gpt_close(TSK_MM_INFO * mm)
 {
-    tsk_mm_part_free(mm);
-    free(mm);
+    talloc_free(mm);
 }
 
 TSK_MM_INFO *
@@ -291,7 +308,7 @@ tsk_mm_gpt_open(TSK_IMG_INFO * img_info, TSK_DADDR_T offset)
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
+    mm = talloc(NULL, TSK_MM_INFO);
     if (mm == NULL)
         return NULL;
 

@@ -41,13 +41,13 @@ TSK_FS_DENT *
 tsk_fs_dent_alloc(size_t norm_namelen, size_t shrt_namelen)
 {
     TSK_FS_DENT *fs_dent;
-    fs_dent = (TSK_FS_DENT *) tsk_malloc(sizeof(*fs_dent));
+    fs_dent = talloc(NULL, TSK_FS_DENT);
     if (fs_dent == NULL)
         return NULL;
 
-    fs_dent->name = (char *) tsk_malloc(norm_namelen + 1);
+    fs_dent->name = (char *) talloc_size(fs_dent, norm_namelen + 1);
     if (fs_dent->name == NULL) {
-        free(fs_dent);
+        talloc_free(fs_dent);
         return NULL;
     }
     fs_dent->name_max = norm_namelen;
@@ -59,10 +59,9 @@ tsk_fs_dent_alloc(size_t norm_namelen, size_t shrt_namelen)
         fs_dent->shrt_name = NULL;
     }
     else {
-        fs_dent->shrt_name = (char *) tsk_malloc(shrt_namelen + 1);
+        fs_dent->shrt_name = (char *) talloc_size(fs_dent, shrt_namelen + 1);
         if (fs_dent->shrt_name == NULL) {
-            free(fs_dent->name);
-            free(fs_dent);
+            talloc_free(fs_dent);
             return NULL;
         }
     }
@@ -81,15 +80,12 @@ tsk_fs_dent_realloc(TSK_FS_DENT * fs_dent, size_t namelen)
     if (fs_dent->name_max == namelen)
         return fs_dent;
 
-    fs_dent->name = (char *) tsk_realloc(fs_dent->name, namelen + 1);
+    fs_dent->name = (char *) talloc_realloc_size(fs_dent, fs_dent->name, namelen + 1);
     if (fs_dent->name == NULL) {
         if (fs_dent->fsi)
             tsk_fs_inode_free(fs_dent->fsi);
 
-        if (fs_dent->shrt_name)
-            free(fs_dent->shrt_name);
-
-        free(fs_dent);
+        talloc_free(fs_dent);
         return NULL;
     }
 
@@ -108,11 +104,7 @@ tsk_fs_dent_free(TSK_FS_DENT * fs_dent)
     if (fs_dent->fsi)
         tsk_fs_inode_free(fs_dent->fsi);
 
-    free(fs_dent->name);
-    if (fs_dent->shrt_name)
-        free(fs_dent->shrt_name);
-
-    free(fs_dent);
+    talloc_free(fs_dent);
 }
 
 

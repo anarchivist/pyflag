@@ -83,7 +83,7 @@ ewf_image_close(TSK_IMG_INFO * img_info)
     IMG_EWF_INFO *ewf_info = (IMG_EWF_INFO *) img_info;
 
     libewf_close(ewf_info->handle);
-    free(img_info);
+    talloc_free(img_info);
 }
 
 /* Tests if the image file header against the
@@ -146,7 +146,7 @@ ewf_open(int num_img, const char **images, TSK_IMG_INFO * next)
         return NULL;
     }
 
-    ewf_info = (IMG_EWF_INFO *) tsk_malloc(sizeof(IMG_EWF_INFO));
+    ewf_info = talloc(NULL, IMG_EWF_INFO);
     if (ewf_info == NULL) {
         return NULL;
     }
@@ -161,7 +161,7 @@ ewf_open(int num_img, const char **images, TSK_IMG_INFO * next)
         tsk_error_reset();
         tsk_errno = TSK_ERR_IMG_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "ewf_open: Not an EWF file");
-        free(ewf_info);
+        talloc_free(ewf_info);
         if (tsk_verbose)
             tsk_fprintf(stderr, "Not an EWF file\n");
 

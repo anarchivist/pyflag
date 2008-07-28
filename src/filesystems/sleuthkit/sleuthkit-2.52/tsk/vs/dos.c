@@ -33,7 +33,7 @@ static char *
 dos_get_desc(uint8_t ptype)
 {
 #define DESC_LEN 64
-    char *str = tsk_malloc(DESC_LEN);
+    char *str = talloc_size(NULL, DESC_LEN);
     if (str == NULL)
         return "";
 
@@ -676,7 +676,7 @@ dos_load_ext_table(TSK_MM_INFO * mm, TSK_DADDR_T sect_cur,
 {
     dos_sect sect;
     int i;
-    char *table_str;
+    char *table_str, *desc;
     ssize_t cnt;
     TSK_DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
@@ -711,14 +711,16 @@ dos_load_ext_table(TSK_MM_INFO * mm, TSK_DADDR_T sect_cur,
     }
 
     /* Add an entry of 1 length for the table  to the internal structure */
-    if ((table_str = tsk_malloc(32)) == NULL)
+    if ((table_str = talloc_size(NULL, 32)) == NULL)
         return 1;
 
     snprintf(table_str, 32, "Extended Table (#%d)", table);
     if (NULL == tsk_mm_part_add(mm, (TSK_DADDR_T) sect_cur, (TSK_DADDR_T) 1,
             TSK_MM_PART_TYPE_DESC, table_str, table, -1)) {
+        talloc_free(table_str);
         return 1;
     }
+    talloc_free(table_str);
 
     /* Cycle through the four partitions in the table 
      *
@@ -762,13 +764,16 @@ dos_load_ext_table(TSK_MM_INFO * mm, TSK_DADDR_T sect_cur,
                         sect_ext_base + part_start);
                 return 1;
             }
-
+            
+            desc = dos_get_desc(part->ptype);
             if (NULL == tsk_mm_part_add(mm,
                     (TSK_DADDR_T) (sect_ext_base + part_start),
                     (TSK_DADDR_T) part_size, TSK_MM_PART_TYPE_DESC,
-                    dos_get_desc(part->ptype), table, i))
+                    dos_get_desc(part->ptype), table, i)) {
+                talloc_free(desc);
                 return 1;
-
+            }
+            talloc_free(desc);
 
             /* Process the extended partition */
             if (dos_load_ext_table(mm, sect_ext_base + part_start,
@@ -895,13 +900,16 @@ dos_load_prim_table(TSK_MM_INFO * mm, uint8_t test)
     }
 
     /* Add an entry of 1 sector for the table  to the internal structure */
-    if ((table_str = tsk_malloc(32)) == NULL)
+    if ((table_str = talloc_size(NULL, 32)) == NULL)
         return 1;
 
     snprintf(table_str, 32, "Primary Table (#0)");
     if (NULL == tsk_mm_part_add(mm, DOS_PART_SOFFSET, (TSK_DADDR_T) 1,
-            TSK_MM_PART_TYPE_DESC, table_str, -1, -1))
+            TSK_MM_PART_TYPE_DESC, table_str, -1, -1)) {
+        talloc_free(table_str);
         return 1;
+    }
+    talloc_free(table_str);
 
     /* Cycle through the partition table */
     for (i = 0; i < 4; i++) {
@@ -1029,8 +1037,7 @@ dos_part_walk(TSK_MM_INFO * mm, TSK_PNUM_T start, TSK_PNUM_T last, int flags,
 void
 dos_close(TSK_MM_INFO * mm)
 {
-    tsk_mm_part_free(mm);
-    free(mm);
+    talloc_free(mm);
 }
 
 
@@ -1051,7 +1058,7 @@ tsk_mm_dos_open(TSK_IMG_INFO * img_info, TSK_DADDR_T offset, uint8_t test)
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
+    mm = talloc(NULL, TSK_MM_INFO);
     if (mm == NULL)
         return NULL;
 

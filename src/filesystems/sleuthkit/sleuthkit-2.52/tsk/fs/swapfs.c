@@ -104,7 +104,7 @@ swapfs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
         return 0;
     }
 
-    if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+    if ((data_buf = tsk_data_buf_alloc(fs, fs->block_size)) == NULL) {
         return 1;
     }
 
@@ -264,7 +264,7 @@ swapfs_jblk_walk(TSK_FS_INFO * fs, TSK_INUM_T start, TSK_INUM_T end, int flags,
 static void
 swapfs_close(TSK_FS_INFO * fs)
 {
-    free(fs);
+    talloc_free(fs);
 }
 
 
@@ -285,7 +285,7 @@ swapfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset)
     // clean up any error messages that are lying around
     tsk_error_reset();
 
-    fs = (TSK_FS_INFO *) tsk_malloc(sizeof(*fs));
+    fs = talloc(NULL, TSK_FS_INFO);
     if (fs == NULL)
         return NULL;
 

@@ -430,8 +430,7 @@ hfs_catalog_get_header(HFS_INFO * hfs)
     if (hfs->hdr)
         return 0;
 
-    hfs->hdr = (hfs_btree_header_record *)
-        tsk_malloc(sizeof(hfs_btree_header_record));
+    hfs->hdr = talloc(hfs, hfs_btree_header_record);
 
     /* find first extent with data in it */
     i = 0;
@@ -474,7 +473,7 @@ hfs_blockmap_build(HFS_INFO * hfs)
         tsk_fprintf(stderr, "hfs_blockmap_build: called\n");
 
     bitmap_size = (size_t)roundup(fs->block_count / 8, fs->block_size);
-    hfs->block_map = (uint8_t *) tsk_malloc(bitmap_size);
+    hfs->block_map = (uint8_t *) talloc_size(hfs, bitmap_size);
 
     h = hfs->fs->alloc_file.extents;
 
@@ -516,7 +515,7 @@ hfs_leafmap_build(HFS_INFO * hfs)
 
     leafmap_size = roundup(nodes / 8, 8);
 
-    hfs->leaf_map = (uint8_t *) tsk_malloc(leafmap_size);
+    hfs->leaf_map = (uint8_t *) talloc_size(hfs, leafmap_size);
 
     for (i = 0; i < nodes; i++) {
         addr = hfs_cat_find_node_offset(hfs, i);
@@ -558,7 +557,7 @@ hfs_deleted_map_build(HFS_INFO * hfs)
 
     deleted_size = roundup(nodes / 8, 8);
 
-    hfs->del_map = (uint8_t *) tsk_malloc(deleted_size);
+    hfs->del_map = (uint8_t *) talloc_size(hfs, deleted_size);
 
     /* get initial bitmap of what are leaf nodes */
     memcpy(hfs->del_map, hfs->leaf_map, deleted_size);
@@ -682,7 +681,7 @@ hfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
     if (tsk_getu16(fs->endian, hfs->cat->rec_type) != HFS_FILE_RECORD)
         return 0;
 
-    data_buf = tsk_malloc(fs->block_size);
+    data_buf = talloc_size(inode, fs->block_size);
 
     length = inode->size;
 
@@ -721,7 +720,7 @@ hfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             if (TSK_WALK_STOP ==
                 action(fs, addr, data_buf, size, myflags, ptr)) {
 
-                free(data_buf);
+                talloc_free(data_buf);
                 return 0;
             }
             addr++;
@@ -729,7 +728,7 @@ hfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
         }
     }
 
-    free(data_buf);
+    talloc_free(data_buf);
     return 0;
 }
 
@@ -740,7 +739,7 @@ hfs_block_walk(TSK_FS_INFO * fs, TSK_DADDR_T start_blk, TSK_DADDR_T end_blk,
 {
     char *myname = "hfs_block_walk";
     HFS_INFO *hfs = (HFS_INFO *) fs;
-    TSK_DATA_BUF *data_buf = tsk_data_buf_alloc(fs->block_size);
+    TSK_DATA_BUF *data_buf = tsk_data_buf_alloc(fs, fs->block_size);
     TSK_DADDR_T addr;
     int myflags = 0;
 
@@ -1040,12 +1039,7 @@ hfs_istat(TSK_FS_INFO * fs, FILE * hFile, TSK_INUM_T inum, TSK_DADDR_T numblock,
 static void
 hfs_close(TSK_FS_INFO * fs)
 {
-    HFS_INFO *hfs = (HFS_INFO *) fs;
-
-    free((char *) hfs->cat);
-    free((char *) hfs->fs);
-    free((char *) hfs->inodes);
-    free(hfs);
+	talloc_free(fs);
 }
 
 /* hfs_open - open an hfs file system 
@@ -1069,7 +1063,7 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
         return NULL;
     }
 
-    if ((hfs = (HFS_INFO *) tsk_malloc(sizeof(HFS_INFO))) == NULL)
+    if ((hfs = talloc(NULL, HFS_INFO)) == NULL)
         return NULL;
 
     fs = &(hfs->fs_info);
@@ -1083,8 +1077,8 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     fs->img_info = img_info;
     fs->offset = offset;
     len = sizeof(hfs_sb);
-    if ((hfs->fs = (hfs_sb *) tsk_malloc(len)) == NULL) {
-        free(hfs);
+    if ((hfs->fs = (hfs_sb *) talloc_size(hfs, len)) == NULL) {
+        talloc_free(hfs);
         return NULL;
     }
 
@@ -1095,8 +1089,7 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
             tsk_errstr[0] = '\0';
         }
         snprintf(tsk_errstr2, TSK_ERRSTR_L, "hfs_open: superblock");
-        free(hfs->fs);
-        free(hfs);
+        talloc_free(hfs);
         return NULL;
     }
 
@@ -1105,8 +1098,7 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
      * Verify we are looking at an HFS+ image
      */
     if (tsk_fs_guessu16(fs, hfs->fs->signature, HFSPLUS_MAGIC)) {
-        free(hfs->fs);
-        free(hfs);
+        talloc_free(hfs);
         tsk_errno = TSK_ERR_FS_MAGIC;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "not an HFS+ file system (magic)");
@@ -1150,7 +1142,7 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     fs->last_inum = hfs_find_highest_inum(hfs);
     // @@@ BC THIS is bad, we need some sanity checks on the size here...
     hfs->inodes = (htsk_fs_inode_mode_struct *)
-        tsk_malloc(((size_t)fs->last_inum +
+        talloc_size(hfs, ((size_t)fs->last_inum +
             1) * sizeof(htsk_fs_inode_mode_struct));
     memset(hfs->inodes, 0,
         ((size_t)fs->last_inum + 1) * sizeof(htsk_fs_inode_mode_struct));
@@ -1171,7 +1163,7 @@ hfs_open(TSK_IMG_INFO * img_info, TSK_OFF_T offset,
     /* dinode */
 
     /* allocate the buffer to hold catalog file entries */
-    hfs->cat = (hfs_file *) tsk_malloc(sizeof(hfs_file));
+    hfs->cat = talloc(hfs, hfs_file);
     hfs->inum = -1;
 
     return fs;
