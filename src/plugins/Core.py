@@ -472,8 +472,10 @@ class CaseDBInit(FlagFramework.EventHandler):
         DB.check_column_in_table(None, 'sql_cache', 'status',
                                  'enum("progress","dirty","cached")')
         for row in dbh:
-            DB.check_column_in_table(row['value'], 'sql_cache', 'status',
-                                     'enum("progress","dirty","cached")')
+            try:
+                DB.check_column_in_table(row['value'], 'sql_cache', 'status',
+                                         'enum("progress","dirty","cached")')
+            except: continue
         
     def exit(self, dbh, case):
         IO.IO_Cache.flush()

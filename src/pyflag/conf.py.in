@@ -224,8 +224,11 @@ class ConfObject(object):
         self.optparser.final = final
         
         ## Parse the command line options:
-        (opts, args) = self.optparser.parse_args()
-
+        try:
+            (opts, args) = self.optparser.parse_args()
+        except UnboundLocalError:
+            raise RuntimeError("Unknown option - use -h to see help")
+        
         self.opts.clear()
         
         ## Update our cmdline dict:
@@ -266,6 +269,15 @@ class ConfObject(object):
         if option in self.options: return
         
         self.options.append(option)
+        
+        ## If this is read only we store it in a special dict
+        try:
+            if args['readonly']:
+                self.readonly[option] = args['default']
+            del args['readonly']
+        except KeyError:
+            pass
+
         ## If there is a default specified, we update our defaults dict:
         try:
             default = args['default']
@@ -275,12 +287,6 @@ class ConfObject(object):
             
             self.default_opts[option] = default
             del args['default']
-        except KeyError:
-            pass
-
-        try:
-            self.readonly[option] = args['readonly']
-            del args['readonly']
         except KeyError:
             pass
 
@@ -315,6 +321,12 @@ class ConfObject(object):
         try:
             return super(ConfObject, self).__getattribute__(attr)
         except AttributeError: pass
+
+        ## Is it a ready only parameter (i.e. can not be overridden by
+        ## the config file)
+        try:
+            return self.readonly[attr.lower()]
+        except KeyError: pass
 
         ## Try to find the attribute in the command line options:
         try:

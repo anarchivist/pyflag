@@ -745,7 +745,7 @@ class HTTPFile(Core.OffsetFile):
         return names,cbs
 
     def http(self, query, result):
-        inode_id = self.lookup_id()
+        inode_id = query.get("inode_id", self.lookup_id())
         if inode_id:
             result.table(
                 elements = [ StringType('Property', 'key'),
