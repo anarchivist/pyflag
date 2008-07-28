@@ -123,7 +123,7 @@ affile_read(affile *self, PyObject *args, PyObject *kwds) {
     	readlen = self->size;
 
     retdata = PyString_FromStringAndSize(NULL, readlen);
-    written = af_read(self->af, PyString_AsString(retdata), readlen);
+    written = af_read(self->af, (unsigned char *)PyString_AsString(retdata), readlen);
 
     if(readlen != written) {
         return PyErr_Format(PyExc_IOError, "Failed to read all data: wanted %d, got %d", readlen, written);
@@ -160,7 +160,6 @@ affile_close(affile *self) {
 }
 
 static PyObject *affile_get_seg(affile *self, PyObject *args, PyObject *kwds) {
-	int ret;
 	PyObject *retdata;
 	char *buf;
 	size_t buflen=0;
@@ -179,7 +178,7 @@ static PyObject *affile_get_seg(affile *self, PyObject *args, PyObject *kwds) {
     retdata = PyString_FromStringAndSize(NULL, buflen);
     buf = PyString_AsString(retdata);
 
-    if(af_get_seg(self->af, segname, 0, buf, &buflen) != 0) {
+    if(af_get_seg(self->af, segname, 0, (unsigned char *)buf, &buflen) != 0) {
         Py_DECREF(retdata);
         return PyErr_Format(PyExc_IOError, "error reading libaff segment\n");
     }
