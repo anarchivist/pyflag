@@ -189,7 +189,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             except AttributeError: pass
 
             try:
-                date = header.find("div", {"id":"message_view_date"}).text()
+                date = header.find("div", {"id":"message_view_date"}).innerHTML()
                 #result['sent'] = ColumnTypes.guess_date(date).__str__()
                 result['sent'] = Time.parse(date, case=self.case, evidence_tz=None)
             except AttributeError: pass
@@ -206,7 +206,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                     context = None
 
                 if cls == "label":
-                    a = div.text().strip()
+                    a = div.innerHTML().strip()
                     if a.startswith("To:"):
                         context = "To"
                     elif a.startswith("From:"):

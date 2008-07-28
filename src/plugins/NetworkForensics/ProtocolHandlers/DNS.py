@@ -192,7 +192,7 @@ class DNSHandler(Packets.PacketHandler):
                                            name = answer['Name'],
                                            ip_addr = struct.unpack('>I',possible_a['IP Address'].data)[0])
 
-        except (AttributeError,KeyError),e:
+        except (AttributeError,KeyError,IOError),e:
             pass
         
 # FIXME: this does not have an InodeID
