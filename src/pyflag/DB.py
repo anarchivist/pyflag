@@ -194,6 +194,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         ## Maximum size of client cache
         self.py_cache_size = 10
         self._last_executed = None
+        self._last_executed_sequence = []
 
         ## By default queries are allowed to take a long time
         self.timeout = 0
@@ -209,6 +210,8 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         self.py_row_cache = []
         self.py_cache_size = 10
         self._last_executed = string
+        self._last_executed_sequence.append(string)
+        self._last_executed_sequence = self._last_executed_sequence[:-3]
 
         def cancel():
             pyflaglog.log(pyflaglog.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
@@ -258,7 +261,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         
         ## We have warnings to show
         if self._warnings:
-            last_executed = self._last_executed
+            last_executed = [ x[:500] for x in self._last_executed_sequence]
 
             results = list(self._fetch_row(1000))
             if len(results)<1000:
@@ -266,7 +269,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                 while 1:
                     a=self.fetchone()
                     if not a: break
-                    pyflaglog.log(pyflaglog.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
+                    pyflaglog.log(pyflaglog.DEBUG,"Mysql warnings: query %r: %s" % (last_executed,a))
                 else:
                     pyflaglog.log(pyflaglog.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
@@ -476,7 +479,7 @@ class DBO:
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
-                pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
+                pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed_sequence))
                                 
                 self.cursor.kill_connection()
                 del self.dbh

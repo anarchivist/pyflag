@@ -54,10 +54,10 @@ True
 
 # Module defined Exceptions
 global BufferTooLong
-global ScanError
-BufferTooLong = 'BufferTooLong'
-ScanError = 'ScanError'
 
+BufferTooLong = 'BufferTooLong'
+class ScanError(Exception):
+    pass
 
 # Some global variables
 global use_socket
@@ -381,7 +381,8 @@ def scan_stream(buffer):
             filenm = result.strip().split(':')[0]
             virusname = result.strip().split(':')[1].strip()
             if virusname[-5:]=='ERROR':
-                raise ScanError, virusname
+                print virusname
+                raise ScanError(virusname)
             elif virusname!='OK':
                 dr[filenm]=virusname
     s.close()
