@@ -20,7 +20,7 @@ config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
 
 class HTMLDirectoryRenderer(UI.TableRenderer):
     exportable = True
-    name = "HTML Diretory"
+    name = "HTML Directory"
     distributable = True
 
     ## An option to control adding extra files linked from the html
