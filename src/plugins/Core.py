@@ -476,6 +476,10 @@ class CaseDBInit(FlagFramework.EventHandler):
                 DB.check_column_in_table(row['value'], 'sql_cache', 'status',
                                          'enum("progress","dirty","cached")')
             except: continue
+
+
+        ## We now spawn the cache manager thread TODO
+        
         
     def exit(self, dbh, case):
         IO.IO_Cache.flush()

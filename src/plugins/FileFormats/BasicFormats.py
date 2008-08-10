@@ -607,7 +607,10 @@ class TIMESTAMP(ULONG):
     visible = True
     
     def __str__(self):
-        return time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(self.data))
+        try:
+            return time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(self.data))
+        except:
+            return "Invalid time 0x%08X" % self.data
 
 class WIN_FILETIME(SimpleStruct):
     """ A FileTime 8 byte time commonly see in windows.

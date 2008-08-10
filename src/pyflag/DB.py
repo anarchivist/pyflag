@@ -1079,3 +1079,6 @@ def convert_to_unicode(case, table):
     except:
         pass
 
+class CacheManager(threading.Thread):
+    """ A thread which checks the consistency of tables """
+    pass

@@ -40,9 +40,9 @@ from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerTy
 import pyflag.parser as parser
 import pyflag.Indexing as Indexing
 
-config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
-                  help="A list of unicode encodings to mutate the "
-                  "dictionary through for indexing")
+config.add_option("INDEX_ENCODINGS", default="UTF-8,UTF-16LE",
+                  help="A comma seperated list of unicode encodings to mutate the"
+                  " dictionary through for indexing")
 
 class IndexStatsTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -606,16 +606,14 @@ def reindex():
         elif t=='word':
             try:
                 word = row['word'].decode("UTF-8").lower()
-                for e in config.INDEX_ENCODINGS:
+                for e in config.INDEX_ENCODINGS.split(","):
                     w = word.encode(e)
                     if len(w)>3:
                         INDEX.add_word(w,id, index.WORD_ENGLISH)
-            except UnicodeDecodeError:
-                pass
+            except UnicodeDecodeError,error:
+                pyflaglog.log(pyflaglog.ERROR, "Unable to encode in encoding %e: %s" % (e,error))
 
     pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
-
-
 
 ## This is how we can add new words to the dictionary and facilitate scanning:
 class AddWords(Reports.report):

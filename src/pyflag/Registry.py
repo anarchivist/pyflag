@@ -376,6 +376,10 @@ class TaskRegistry(ScannerRegistry):
 class CarverRegistry(ScannerRegistry):
     pass
 
+## These are some base classes which will be used by plugins to be
+## registered:
+class Action: pass
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -393,6 +397,7 @@ FILE_HANDLERS = None
 STATS_HANDLERS = None
 CASE_TABLES = None
 TABLE_RENDERERS = None
+ACTIONS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -492,6 +497,9 @@ def Init():
     import pyflag.UI as UI
 
     TABLE_RENDERERS = ScannerRegistry(UI.TableRendererBaseClass)
+
+    global ACTIONS
+    ACTIONS = ScannerRegistry(Action)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

@@ -25,6 +25,7 @@ import pyflag.Indexing as Indexing
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
+import pyflag.Registry as Registry
 
 PALETTE = [
     ('editfc','white', 'dark blue', 'bold'),
@@ -40,9 +41,10 @@ PALETTE = [
     ('overread','black', 'dark blue',),
     ('buttn','black','dark cyan'),
     ('buttnf','white','dark blue','bold'),
+    ('element','dark red','default'),
     ]
 
-class Action:
+class Action(Registry.Action):
     """ An action handler base class """
     ## This is the order we will be called when highlighting
     order = 10
@@ -55,6 +57,7 @@ class Action:
         """ The constructor - The most important thing to do here is
         to call ui.set_event() to ensure we get fired. """
         ui.set_event(self.event, self.mode)
+        self.ui = ui
     
     def handle_key(self, ui, key):
         """ This is called to process keys as the come in.  Note that
@@ -135,7 +138,7 @@ class SearchAction(Action):
                 old_mark = ui.mark
                 for row in Indexing.list_hits(ui.case, ui.inode_id, self.previous_search,
                                               ui.mark + 1):
-                    ui.mark = row['offset']
+                    ui.set_mark(row['offset'])
                     break
 
                 if old_mark==ui.mark:
@@ -186,14 +189,26 @@ class Goto(Action):
             if key=='enter':
                 ui.mode = None
                 self.state = None
+                relative = None
                 offset = ui.status_bar.get_edit_text()
+                if offset.startswith("+"):
+                    relative = +1
+                    offset = offset[1:]
+                elif offset.startswith("-"):
+                    relative = -1
+                    offset = offset[1:]
+
                 ui.status_bar = urwid.Text('')
                 try:
                     offset = FlagFramework.calculate_offset_suffix(offset)
                 except Exception,e:
                     ui.message = "Cant parse %s as offset" % offset
                     return True
-                ui.mark = offset
+
+                if relative==None:
+                    ui.set_mark(offset)
+                else:
+                    ui.set_mark(ui.mark + offset * relative)
             else:
             ## Pass key strokes to the text box:
                 ui.status_bar.keypress( (ui.width, ), key)
@@ -202,7 +217,7 @@ class Goto(Action):
     
 class Navigate(Action):
     """ This allows us to navigate around the hex editor GUI """
-    def __init__(self):
+    def __init__(self, ui=None):
         self.events = {}
 
     def handle_key(self, ui, k):
@@ -237,6 +252,10 @@ class Navigate(Action):
             ui.mark = 0
         elif k=='>' or k=='end' or k=='meta >':
             ui.mark = ui.size
+        elif k=="backspace":
+            try:
+                ui.mark = ui.history_positions.pop(-1)
+            except: pass
         else:
             return False
 
@@ -340,7 +359,7 @@ class IncrementalSearch(Action):
             m = expr.search(data)
             if m:
                 ## Found it
-                ui.mark = offset + m.start()
+                ui.set_mark(offset + m.start())
                 ui.status_bar.set_edit_text("%s" % self.previous_search)
                 return
 
@@ -480,7 +499,7 @@ class AnnotateOffset(Action):
 class Hexeditor:
     row_size = 25
     
-    def __init__(self, fd, highlights = None):
+    def __init__(self, fd, query=None, highlights = None):
         """ An interactive Hex editor based on the Urwid library.
         
         fd: The file descriptor to dump.
@@ -490,6 +509,7 @@ class Hexeditor:
         """
         self.fd = fd
         self.case = fd.case
+        self.query = query
         self.inode_id = fd.lookup_id()
         fd.seek(0)
         ## We try to set the size to the maximum we can have:
@@ -514,10 +534,13 @@ class Hexeditor:
 
         ## These are the actions hooked to this gui
         self.actions = {None: Navigate()}
-        for action in [Help, SearchAction, Goto, IncrementalSearch,
-                       SlackAction, AnnotateOffset]:
-            a = action(self)
-            self.actions[a.mode] = a
+        for action in Registry.ACTIONS.classes:
+            try:
+                a = action(self)
+                self.actions[a.mode] = a
+            except Exception,e:
+                print e
+                pass
 
         self.mode = None
         
@@ -529,6 +552,14 @@ class Hexeditor:
 
         ## Constant highlights.
         self.highlights = highlights
+        
+        ## This is a stack of positions we can use to go back
+        self.history_positions = []
+
+    def set_mark(self, mark):
+        ## Maintain a history of marks
+        self.history_positions.append(self.mark)
+        self.mark = mark
 
     def clear_overlay(self):
         self.overlay = [0, ] *(self.width * self.height + 10)
@@ -543,6 +574,11 @@ class Hexeditor:
     def set_event(self, key, mode):
         """ Sets the mode which will be fired when key is pressed. """
         self.actions[None].events[key] = mode
+
+    def reset(self):
+        """ return the ui object to a default view """
+        self.actions[self.mode].state = None
+        self.mode = None
 
     def cache_screen(self):
         ## This flag indicates if the cache was refreshed - this
@@ -695,8 +731,12 @@ class Hexeditor:
                 
                 if urwid.is_mouse_event(key):
                     event, button, col, row = key
-                    self.process_mouse_event(self.width, self.height,
-                                             event, button, col, row)
+                    try:
+                        self.actions[self.mode].process_mouse_event(self.width, self.height,
+                                                                    event, button, col, row)
+                    except AttributeError:
+                        self.process_mouse_event(self.width, self.height,
+                                                 event, button, col, row)
                 else:
                     self.actions[self.mode].handle_key(self, key)
                                     
@@ -733,13 +773,13 @@ class Hexeditor:
 ## Over ride the File hexeditor method:
 def hexedit(self, query, result):
     ## Create the application
-    screen = Hexeditor(self)
+    screen = Hexeditor(self, query)
     generator = screen.run()
     generator.next()
 
     ## We need to set the initial offset
     screen.mark = int(query.get('offset',0))
-
+    
     ## And any highlights required
     h = query.getarray('highlight')
     l = query.getarray('highlight_length')
@@ -784,6 +824,8 @@ try:
         """ A specialised edit box which supports highlighting of the
         edited text
         """
+        highlight = None
+        
         def __init__(self, text, edit_pos=0):
             urwid.Edit.__init__(self, multiline = True, wrap = 'any')
             self.set_edit_text(text)

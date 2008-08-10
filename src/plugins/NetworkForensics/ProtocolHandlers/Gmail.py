@@ -216,10 +216,13 @@ class GmailScanner(LiveCom.HotmailScanner):
                     message = i[13]
                     try: result['From'] = gmail_unescape(i[4])
                     except IndexError: pass
-                    to = message[1]
-                    if type(to)==list:
-                        to = ",".join(to)
-                    try: result['To'] = gmail_unescape(to)
+                    
+                    try:
+                        to = message[1]
+                        if type(to)==list:
+                            to = ",".join(to)
+                            
+                        result['To'] = gmail_unescape(to)
                     except IndexError: pass
                     try: result['Subject'] = gmail_unescape(message[5])
                     except IndexError: pass
