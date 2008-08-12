@@ -110,7 +110,7 @@ class RegistryScan(GenScanFactory):
                 regi_handle.mass_insert(dirname=path,
                                         basename=key_name)
 
-                new_path="%s/%s/" % (path,nk_key['key_name'])
+                new_path=DB.expand("%s/%s/",(path,nk_key['key_name']))
                 new_path=FlagFramework.normpath(new_path)
                 
                 ## Store all the values:
@@ -223,7 +223,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                                  StringType('Type','type'),
                                  StringType('Value','value', callback = callback) ],
                     table='reg',
-                    where="path=%r" % path,
+                    where=DB.expand("path=%r", path),
                     case=query['case'],
                     filter = "filter2"
                     )
@@ -255,7 +255,7 @@ class BrowseRegistryKey(BrowseRegistry):
         path=query['path']
         key=query['key']
         result.heading("Registry Key Contents")
-        result.text("Key %s/%s:" % (path,key),style='red',font='typewriter')
+        result.text(DB.expand("Key %s/%s:", (path,key),style='red',font='typewriter'))
         dbh=DB.DBO(query['case'])
 
         def hexdump(query,out):
