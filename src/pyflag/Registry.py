@@ -380,6 +380,24 @@ class CarverRegistry(ScannerRegistry):
 ## registered:
 class Action: pass
 
+## A Precanned report
+class PreCanned:
+    report = None
+    family = None
+    args = None
+    description = None
+
+    def display(self, query, result):
+        import pyflag.FlagFramework
+
+        tmp = result.__class__(result)
+        tmp.link(self.description, pyflag.FlagFramework.query_type( \
+            case = query['case'],
+            report = self.report,
+            family = self.family,
+            **self.args))
+        result.row(tmp)
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -398,6 +416,7 @@ STATS_HANDLERS = None
 CASE_TABLES = None
 TABLE_RENDERERS = None
 ACTIONS = None
+PRECANNED = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -500,6 +519,9 @@ def Init():
 
     global ACTIONS
     ACTIONS = ScannerRegistry(Action)
+
+    global PRECANNED
+    PRECANNED = ScannerRegistry(PreCanned)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

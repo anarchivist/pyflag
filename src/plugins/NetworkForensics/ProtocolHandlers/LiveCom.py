@@ -83,6 +83,7 @@ import re,cgi
 import pyflag.pyflaglog as pyflaglog
 import textwrap
 import pyflag.HTMLUI as HTMLUI
+import pyflag.Registry as Registry
 
 class WebMailTable(FlagFramework.CaseTable):
     """ Table to store Web mail related information """
@@ -600,6 +601,16 @@ class LiveMailViewer(FileSystem.StringIOFile):
         result.iframe(callback = frame_cb)
         result.toolbar(cb = print_cb, text="Print", icon="printer.png", pane='new')
         
+## PreCanned reports
+class AllWebMail(Registry.PreCanned):
+    report="Browse WebMail Messages"
+    family="Network Forensics"
+    args = {"order":0, "direction":1}
+    description = "View all Webmail messages"
+
+class WebMailByService(AllWebMail):
+    args = {"groupby":"Service"}
+    description = "View all Web mail by Service"
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh
