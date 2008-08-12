@@ -468,7 +468,7 @@ def _make_join_clause(total_elements):
     ## widget automatically.
     tables = []
     for e in total_elements:
-        if e.table not in tables: tables.append(e.table)
+        if e.table and e.table not in tables: tables.append(e.table)
 
     ## Now generate the join clause:
     query_str += " from %s " % tables[0]
@@ -574,15 +574,10 @@ class TableRenderer:
         """  This returns the total number of rows in this table - it
         could take a while which is why its a popup."""
         def count_cb(query, result):
-            try:
-                filter_str = query[self.filter]
-                sql = parser.parse_to_sql(filter_str, self.elements, ui=None)
-            except KeyError:
-                sql = 1
+            sql = self._make_sql(query).split("from",1)[1]
 
             dbh=DB.DBO(self.case)
-            dbh.execute("select count(*) as total from %s where (%s and %s)", (
-                self.table, self.where, sql))
+            dbh.execute("select count(*) as total from " + sql)
             row=dbh.fetch()
             result.heading("Total rows")
             result.para("%s rows" % row['total'])

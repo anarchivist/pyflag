@@ -26,7 +26,6 @@ class JumpToVA(Hexeditor.Action):
         return 'j                        Jump to Virtual Address'
 
     def handle_key(self, ui ,key):
-        print "Got key %s" % key
         if self.state == None:
             self.state = 'prompt'
             ## Read the current bytes off the memory image
@@ -96,6 +95,9 @@ class InodeStruct(format.DataType):
     """ An Inode Type struct which depends on the version of the kernel """
     urwid_capable = True
     volatility_object = 'inode'
+    ## This dict maps certain fields to be parsed by special parsers
+    ## rather than the default ones
+    overrides = {}
 
     def urwid_output(self, ui, offset):
         ## Get the profile for this case:
@@ -139,7 +141,6 @@ class InodeStruct(format.DataType):
             ],2)
 
     def render_pointer(self, ctx, target_obj, offset, ui):
-        print "Will render pointer to %s" % target_obj
         ## If this is a pointer to a volatility object we can link
         ## to it
         def next_cb(widget):
@@ -181,15 +182,16 @@ class InodeStruct(format.DataType):
             output = urwid.Text("")
             try:
                 offset = members[f][0]
-                obj_name = maps[members[f][1][0]]
+                field_type = members[f][1][0]
+                obj_name = self.overrides.get(f, maps[field_type])
                 obj = Registry.FILEFORMATS.formats[obj_name](buf[offset:])
                 output = obj.urwid_output(ui, offset + buf.offset)
                 offsets.append(obj.buffer.offset - ui.mark)
                 
-                if members[f][1][0]=='list_head':
+                if field_type=='list_head':
                     output = self.render_list_head(ctx, obj,offset, ui)
                     
-                elif members[f][1][0]=='pointer':
+                elif field_type=='pointer':
                     output = self.render_pointer(ctx, members[f][1][1][0], obj.get_value(), ui)
                     
             except KeyError:
@@ -227,3 +229,5 @@ class QSTR(InodeStruct):
 class TaskStruct(InodeStruct):
     """ A Task """
     volatility_object = 'task_struct'
+    #overrides = { 'last_ran': "TIMESTAMP",
+    #              'timestamp': "TIMESTAMP"}

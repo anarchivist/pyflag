@@ -420,7 +420,7 @@ class StateType(ColumnType):
     hidden = True
     states = {}
     symbols = {
-        '=': 'is'
+        '=': 'equal'
         }
 
     def __init__(self, *args, **kwargs):
@@ -429,17 +429,20 @@ class StateType(ColumnType):
         self.tests = [ [ "is" ,"foobar", True ],
                        [ "is" , self.states.keys()[0], False],
                        ]
+        self.states_rev = {}
+        for k,v in self.states.items():
+            self.states_rev[v]=k
 
     def code_is(self, column, operator, state):
         for k,v in self.states.items():
-            if state.lower()==k:
+            if state.lower()==k.lower():
                 return lambda row: row[self.column] == v
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
         
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
-            if state.lower()==k:
+            if state.lower()==k.lower():
                 return DB.expand("%s = %r" ,(self.escape_column_name(self.column), v))
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
@@ -447,6 +450,14 @@ class StateType(ColumnType):
     def create(self):
         return DB.expand("`%s` enum(%s) default NULL" ,
                          (self.column, ','.join([ DB.expand("%r",x) for x in self.states.values()])))
+
+    def plain_display_hook(self, value, row, result):
+        try:
+            result.text(self.states_rev[value])
+        except KeyError:
+            result.text(value)
+
+    display_hooks = [ plain_display_hook, ColumnType.link_display_hook]
 
 class SetType(ColumnType):
     """ This can hold a number of different items simultaneously """
@@ -975,7 +986,7 @@ class InodeIDType(IntegerType):
             else:
                 query.set('annotate','no')
                 result.toolbar(icon='no.png', link = query, pane = 'pane',
-                               tooltip=row2['note'])
+                               tooltip=row2 and row2['note'])
 
             query.clear('annotate')
 
