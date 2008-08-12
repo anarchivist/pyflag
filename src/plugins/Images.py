@@ -145,8 +145,12 @@ class Standard(IO.Image):
         """
         result = []
         for f in filenames:
+            ## Ignore files which are urls
+            if re.match("[^:]+://",f): return filenames
+            
             if not f.startswith(config.UPLOADDIR):
                 f = "%s/%s" % (config.UPLOADDIR,f)
+
             if config.FOLLOW_SYMLINKS:
                 ## Is it a symlink? This allows us to symlink to a
                 ## single file from a fileset using a simple

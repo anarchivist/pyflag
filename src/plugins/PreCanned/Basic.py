@@ -30,3 +30,10 @@ class Images(Registry.PreCanned):
     family = "Disk Forensics"
     report = "Browse Types"
     description = "View all images bigger than 20kb "
+
+class HTMLPages(Registry.PreCanned):
+    args = {'filter': '"Content Type" contains html',
+            '_hidden':[1,3,5] }
+    report='Browse HTTP Requests'
+    family='Network Forensics'
+    description = 'View all HTML pages'

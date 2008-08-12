@@ -390,12 +390,19 @@ class PreCanned:
     def display(self, query, result):
         import pyflag.FlagFramework
 
-        tmp = result.__class__(result)
-        tmp.link(self.description, pyflag.FlagFramework.query_type( \
+        new_query = pyflag.FlagFramework.query_type(
             case = query['case'],
             report = self.report,
-            family = self.family,
-            **self.args))
+            family = self.family)
+
+        for k,v in self.args.items():
+            if type(v) == list:
+                for x in v:
+                    new_query[k] = x
+            else:
+                new_query[k] = v
+        tmp = result.__class__(result)
+        tmp.link(self.description, new_query)
         result.row(tmp)
 
 LOCK = 0
