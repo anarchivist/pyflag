@@ -105,7 +105,7 @@ class Standard(IO.Image):
                 del query[offset]
             except: pass
 
-            io = IO.open_URL(query['filename'])
+            io = self.create(None, query.get('case'), query)
             try:
                 parts = sk.mmls(io)
             except IOError, e:
@@ -145,6 +145,8 @@ class Standard(IO.Image):
         """
         result = []
         for f in filenames:
+            if not f.startswith(config.UPLOADDIR):
+                f = "%s/%s" % (config.UPLOADDIR,f)
             if config.FOLLOW_SYMLINKS:
                 ## Is it a symlink? This allows us to symlink to a
                 ## single file from a fileset using a simple
