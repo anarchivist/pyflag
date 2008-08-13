@@ -79,7 +79,6 @@ try:
 except ImportError,e:
     active = False
     pyflaglog.log(pyflaglog.DEBUG, "Volatility linux support was not found. Skipping %s" % e)
-    raise
 
 ## These are all kind of tables we need for memory forensics
 class ProcessTypeSet(StateType):

@@ -3,7 +3,6 @@ use with memory images
 """
 import plugins.Urwid.Hexeditor as Hexeditor
 import pyflag.FlagFramework as FlagFramework
-import VolatilityLinux
 import struct
 import pyflag.format as format
 import pyflag.Registry as Registry
@@ -54,6 +53,8 @@ class JumpToVA(Hexeditor.Action):
                     return True
 
                 ## Now we need to work out what the VA offset is:
+                import VolatilityLinux
+
                 v = VolatilityLinux.get_vol_object(self.case, self.m)
                 phy_offset = v.addr_space.vtop(offset)
                 
@@ -101,6 +102,8 @@ class InodeStruct(format.DataType):
 
     def urwid_output(self, ui, offset):
         ## Get the profile for this case:
+        import VolatilityLinux
+
         ctx = VolatilityLinux.get_vol_object(ui.query['case'], ui.query['memory'])
 
         buf = format.Buffer(fd = ui.fd)[offset:]

@@ -17,7 +17,7 @@ class ImFeelingLucky(Reports.report):
     do.
     """
     name = "Im Feeling Lucky"
-    family = "Case Management"
+    family = "Disk Forensics"
 
     def display(self, query, result):
         for cls in Registry.PRECANNED.classes:
