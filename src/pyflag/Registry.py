@@ -54,6 +54,9 @@ class Registry:
     filenames = {}
     ## These are the modules which have been disabled
     loaded_modules = []
+
+    ## Excluded dirs are not descended into
+    excluded_dirs = []
     
     def __init__(self,ParentClass):
         """ Search the plugins directory for all classes extending ParentClass.
@@ -69,10 +72,23 @@ class Registry:
         for path in config.PLUGINS.split(':'):
             for dirpath, dirnames, filenames in os.walk(path):
                 sys.path.append(dirpath)
+                excluded = False
+                for x in self.excluded_dirs:
+                    if dirpath.startswith(x):
+                        excluded = True
+                        break
+
+                if excluded: continue
                 
                 for filename in filenames:
                     #Lose the extension for the module name
                     module_name = filename[:-3]
+                    if filename.lower().startswith("__dont_descend__"):
+                        for d in dirnames:
+                            excluded_path = os.path.join(dirpath, d)
+                            if excluded_path not in self.excluded_dirs:
+                                self.excluded_dirs.append(excluded_path)
+
                     if filename.endswith(".py"):
                         path = dirpath+'/'+filename
                         try:

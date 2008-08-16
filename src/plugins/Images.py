@@ -295,15 +295,8 @@ except ImportError:
     EWF = error
 
 import pyflag.tests as tests
-class AdvancedTest(tests.ScannerTest):
-    """ Test basic performance of Advanced IO Source """
-    test_case = "PyFlagTestCase"
-    test_file = "split/test_image.1"
-    subsystem = "Standard"
-    offset = "16128s"
-    
 class AdvancedTest2(tests.FDTest):
-    """ Test basic performance of Advanced IO Source """
+    """ Test basic performance of Split IO Source """
     def setUp(self):
         self.fd = OffsettedFile(["split/test_image.00",
                                  "split/test_image.01",

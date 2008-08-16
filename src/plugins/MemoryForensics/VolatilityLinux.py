@@ -20,7 +20,13 @@ import pyflag.pyflaglog as pyflaglog
 active = True
 
 try:
-    volatility_path = os.path.dirname(FlagFramework.__file__)+"/Volatility-1.3_Linux_rc.1/"
+    ## Include volatility in the python path here (We only support Volatility 1.3):
+    volatility_path = "."
+    for d in os.listdir(os.path.dirname(__file__)):
+        if d.startswith("Volatility-1.3"):
+            volatility_path = os.path.join(os.path.dirname(__file__),d)
+            
+    print "Volatility path %s" % volatility_path
     ## We need to make sure that we get in before an older version
     if volatility_path not in sys.path:
         sys.path.insert(0,volatility_path)

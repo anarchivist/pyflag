@@ -25,6 +25,10 @@ from forensics.x86 import *
 from vtypes import xpsp2types as types
 from vsyms import *
 
+import forensics.win32
+
+print "Loading Volatility from %s" % forensics.win32.__file__
+
 PROTOCOL_ENUM = { 6: "TCP",
                   17: "UDP",
                   }
@@ -126,9 +130,9 @@ def load_and_identify_image(fd, dtb=None, type=nopae_syms):
         
     return (addr_space, type, types)
             
-class Memory(DBFS):
+class WindowsMemory(DBFS):
     """ Class to load a memory image into the VFS """
-    name = "Memory"
+    name = "Windows Memory"
 
     def process_entry_file(self, dbh, addr_space, types, entry, pid):
         if not addr_space.is_valid_address(entry):
