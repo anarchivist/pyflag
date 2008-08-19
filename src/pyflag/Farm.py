@@ -305,12 +305,18 @@ def start_workers():
 
     ## The parent now calls the startup method on each of the events:
     for event in Registry.EVENT_HANDLERS.classes:
-        event().startup()
+        try:
+            event().startup()
+        except Exception,e:
+            pyflaglog.log(pyflaglog.ERRORS, "Error: %s" % e)
 
     ## The parent now calls the startup method on each of the events:
     print "Launching startup"
     for event in Registry.EVENT_HANDLERS.classes:
-        event().startup()
+        try:
+            event().startup()
+        except Exception,e:
+            pyflaglog.log(pyflaglog.ERRORS, "Error: %s" % e)
         
 def handler(sig, frame):
     #print "Got woken up"
