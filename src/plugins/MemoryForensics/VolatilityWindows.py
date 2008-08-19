@@ -10,24 +10,35 @@ from pyflag.FileSystem import FileSystem, DBFS, File
 import pyflag.DB as DB
 import pyflag.IO as IO
 from pyflag.ColumnTypes import StringType, TimestampType, InodeType, FilenameType, IntegerType
+import os
 
-## Volatility is now included in the PyFlag source tree to avoid versioning problems.
-## FIXME2: Remove wildcard imports to more specific imports.
-from forensics.win32.datetime import *
-from forensics.win32.tasks import *
-from forensics.win32.network import *
-from forensics.win32.handles import *
-from forensics.win32.modules import *
-from forensics.win32.vad import *
-from forensics.win32.scan import *
-from forensics.x86 import *
+try:
+    from forensics.win32.datetime import *
+    from forensics.win32.tasks import *
+    from forensics.win32.network import *
+    from forensics.win32.handles import *
+    from forensics.win32.modules import *
+    from forensics.win32.vad import *
+    from forensics.win32.scan import *
+    from forensics.x86 import *
+    
+    from vtypes import xpsp2types as types
+    from vsyms import *
 
-from vtypes import xpsp2types as types
-from vsyms import *
+    import forensics.win32
 
-import forensics.win32
+    class IOSourceAddressSpace(FileAddressSpace):
+        def __init__(self, fd):
+            #self.fname = fd.name
+            #self.name = fd.name
+            self.fhandle = fd
+            self.fsize = fd.size
+            self.fast_fhandle = fd
 
-print "Loading Volatility from %s" % forensics.win32.__file__
+
+except ImportError, e:
+    active = False
+    pyflaglog.log(pyflaglog.INFO, "Download and unpack Volatility1.3 in %s for memory foreniscs" % os.path.dirname(__file__))
 
 PROTOCOL_ENUM = { 6: "TCP",
                   17: "UDP",
@@ -77,14 +88,6 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         `port` int not null,
         `create_time` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00')""")
         
-class IOSourceAddressSpace(FileAddressSpace):
-    def __init__(self, fd):
-        #self.fname = fd.name
-        #self.name = fd.name
-        self.fhandle = fd
-        self.fsize = fd.size
-        self.fast_fhandle = fd
-
 BLOCKSIZE = 1024 * 1024 * 10
 
 def find_dtb(addr_space, types):
@@ -113,7 +116,7 @@ def find_dtb(addr_space, types):
 
     return None
 
-def load_and_identify_image(fd, dtb=None, type=nopae_syms):
+def load_and_identify_image(fd, dtb=None, type=None):
     flat_address_space = IOSourceAddressSpace(fd)
     
     if not dtb:
@@ -329,19 +332,19 @@ class MemroyProcessStats(Stats.Handler):
         ## Top level view - we only show the File Types stats branch
         ## if we have any types there.
         if not branch[0]:
-            dbh.execute("select count(*) as a from tasks where %s" % condition)
+            dbh.execute("select count(*) as a from mem_process where %s" % condition)
             row = dbh.fetch()
             if row['a']>0:
                 yield (self.name, self.name, 'branch')
         elif branch[0] != self.name:
             return
         elif len(branch)==1:
-            dbh.execute("select image_file_name from tasks group by image_file_name order by image_file_name")
+            dbh.execute("select task_name from mem_process group by image_file_name order by image_file_name")
             for row in dbh:
-                t = row['image_file_name'][:20]
-                yield (row['image_file_name'].replace("/","__"), t, 'leaf')
+                t = row['task_name'][:20]
+                yield (row['task_name'].replace("/","__"), t, 'leaf')
         elif len(branch)==2:
-            dbh.execute("select pid from tasks where image_file_name=%r order by pid", branch[1])
+            dbh.execute("select pid from mem_process where task_name=%r order by pid", branch[1])
             for row in dbh:
                 pid = row['pid'].__str__()
                 yield (pid, pid, 'leaf')
@@ -366,7 +369,7 @@ class MemroyProcessStats(Stats.Handler):
                              IntegerType(column = 'pid', name='PID'),
                              TimestampType('Time Created','create_time')],
                 table = 'tasks',
-                where = 'image_file_name = %r and %s' % (t, condition),
+                where = 'task_name = %r and %s' % (t, condition),
                 case = self.case,
                 )
 

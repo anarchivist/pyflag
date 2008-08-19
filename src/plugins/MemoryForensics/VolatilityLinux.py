@@ -21,14 +21,13 @@ active = True
 
 try:
     ## Include volatility in the python path here (We only support Volatility 1.3):
-    volatility_path = "."
+    volatility_path = None
     for d in os.listdir(os.path.dirname(__file__)):
         if d.startswith("Volatility-1.3"):
             volatility_path = os.path.join(os.path.dirname(__file__),d)
             
-    print "Volatility path %s" % volatility_path
     ## We need to make sure that we get in before an older version
-    if volatility_path not in sys.path:
+    if volatility_path and volatility_path not in sys.path:
         sys.path.insert(0,volatility_path)
 
     from vtypes import xpsp2types as types
@@ -84,7 +83,7 @@ try:
 ## Switch ourselves off if volatility is not there
 except ImportError,e:
     active = False
-    pyflaglog.log(pyflaglog.DEBUG, "Volatility linux support was not found. Skipping %s" % e)
+    pyflaglog.log(pyflaglog.INFO, "Download and unpack Volatility1.3 in %s for memory foreniscs" % os.path.dirname(__file__))
 
 ## These are all kind of tables we need for memory forensics
 class ProcessTypeSet(StateType):
