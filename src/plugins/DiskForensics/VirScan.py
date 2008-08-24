@@ -46,10 +46,16 @@ config.add_option("CLAMAV_SOCKET", default="/var/run/clamav/clamd.ctl",
                   help = "The location to the clamd socket. If we cant connect"
                   " virus scanning will not be available")
 
+config.add_option("CLAMAV_HOST", default="127.0.0.1",
+                  help = "The ip address of the clamav server (Will only be used if socket failed)")
+
 active = True
 
 try:
-    pyclamd.init_unix_socket(config.CLAMAV_SOCKET)
+    try:
+        pyclamd.init_unix_socket(config.CLAMAV_SOCKET)
+    except:
+        pyclamd.init_network_socket(config.CLAMAV_HOST, 3310)
 
     if not pyclamd.ping():
         raise pyclamd.ScanError("Server not pingable")

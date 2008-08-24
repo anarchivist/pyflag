@@ -28,8 +28,6 @@
 #include "struct.h"
 #include <string.h>
 #include <stdint.h>
-#include <netinet/in.h>
-#include "except.h"
 #include "misc.h"
 
 /********* Chars ****************/

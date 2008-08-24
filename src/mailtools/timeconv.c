@@ -10,7 +10,6 @@
  * There are functions in libpst.c to handle the dates
  * Do not use this one
  */
-
 #include <time.h>
 #include "common.h"
 

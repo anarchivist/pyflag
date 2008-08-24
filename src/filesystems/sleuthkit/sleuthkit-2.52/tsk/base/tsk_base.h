@@ -23,7 +23,7 @@
 /* include the TSK-specific header file that we created in autoconf
  * On Win32 though, we will not have this file...
  */
-#if !defined(_WIN32) && !defined (__WIN32__)
+#if defined(__MINGW32__) || !defined(_WIN32) && !defined (__WIN32__)
 #include "tsk/tsk_incs.h"
 #endif
 

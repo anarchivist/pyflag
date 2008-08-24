@@ -10,7 +10,7 @@ AC_DEFUN([AC_PYTHON_DEVEL],[
 	AC_MSG_RESULT($PYTHON_INCLUDE_DIR)`
 	AC_SUBST([PYTHON_CPPFLAGS],[-I$PYTHON_INCLUDE_DIR])
 
-	if [ test ! -r $PYTHON_INCLUDE_DIR/Python.h ]; then AC_MSG_ERROR(failed to find include file $PYTHON_EXTRA_LIBS/Python.h maybe you need to install python-dev?); fi
+	if [ test ! -r $PYTHON_INCLUDE_DIR/Python.h ]; then AC_MSG_ERROR(failed to find include file $PYTHON_INCLUDE_DIR/Python.h maybe you need to install python-dev?); fi
 
 	# Check for Python library path
 	AC_MSG_CHECKING([for python library path])
@@ -28,6 +28,20 @@ AC_DEFUN([AC_PYTHON_DEVEL],[
 	PYTHON_EXTRA_LIBS=`$PYTHON -c "import distutils.sysconfig;conf = distutils.sysconfig.get_config_var;print conf('LOCALMODLIBS')+' '+conf('LIBS')"
 	AC_MSG_RESULT($PYTHON_EXTRA_LIBS)`
 	AC_SUBST(PYTHON_EXTRA_LIBS)
+])
+
+AC_DEFUN([AC_PYTHON_XCOMPILE_WINDOWS], [
+	## This is used to specify the cross compiled windows binaries
+	AC_MSG_CHECKING([Setting Windows Python Paths])
+	PYTHON_INCLUDE_DIR=$1/include
+	AC_SUBST([PYTHON_CPPFLAGS], [-I$PYTHON_INCLUDE_DIR])
+	if [ test ! -r $PYTHON_INCLUDE_DIR/Python.h ]; then AC_MSG_ERROR(failed to find include file $PYTHON_INCLUDE_DIR/Python.h maybe you need to install python-dev?); fi
+	
+	## Set library paths
+	AC_SUBST([PYTHON_LDFLAGS],["-shared"])	
+	AC_SUBST([PYTHON_EXTRA_LIBS], [" -L$1/libs/ -lpython25 -lwsock32"])
+	AC_SUBST([PYTHON_SITE_PKG], [$1])
+	AC_SUBST([PYTHON_EXTENSION], [".pyd"])
 ])
 
 AC_DEFUN([AC_PYTHON_MODULE],[

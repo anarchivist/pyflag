@@ -39,7 +39,7 @@
 
 """
 #import iosubsys
-import pexpect
+#import pexpect
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type
 import pyflag.conf

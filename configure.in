@@ -100,16 +100,31 @@ AM_CONDITIONAL(HAVE_LIBJPEG, test "$have_libjpeg" = yes)
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)
-AM_PATH_PYTHON([2.5])
-AC_PYTHON_DEVEL()
-
+AC_ARG_WITH(
+	windows_python,
+	AC_HELP_STRING([--with-windows-python@<:@=WINDOWS_PYTHON@:>@],
+			[Windows Python path (for cross compiling)]
+	),
+	[
+		AM_PATH_PYTHON([2.5])
+		AC_MSG_RESULT(Setting windows python for cross compiling $withval )
+		AC_PYTHON_XCOMPILE_WINDOWS($withval)
+	],
+	[
+		## Not specified - use the system python
+		AM_PATH_PYTHON([2.5])
+		AC_PYTHON_DEVEL()
 AC_PYTHON_MODULE(MySQLdb, REQUIRED, [ You must install the python-mysql package ])
 AC_PYTHON_MODULE(pexpect, REQUIRED, [ You must install the python-pexpect package ])
 AC_PYTHON_MODULE(PIL, REQUIRED, [ You must install the python-imaging package ])
 AC_PYTHON_MODULE(dateutil, REQUIRED, [ You must install the python-dateutil package ])
 
+	])
+
+
+
 # check for binaries
-AC_PATH_PROG([MYSQL], mysql)
+#AC_PATH_PROG([MYSQL], mysql)
 
 # try to find magic files
 AC_ARG_WITH(magic, AC_HELP_STRING([--with-magic], [specify a colon-separated list of system magic files, default autodetect]),,[magic=$(file -v | tail -1 | awk '{print $4}')])

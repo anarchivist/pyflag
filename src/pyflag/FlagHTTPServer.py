@@ -257,7 +257,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                     self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
                     self.send_header("Etag",s.st_ino)
                     self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
-                    fd = open(path)
+                    fd = open(path, "rb")
                     f = fd.read()
                     
                     if content_encoding and content_encoding in self.headers.get("Accept-Encoding",""):
@@ -464,11 +464,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                        self.log_date_time_string(),
                        format%args))
         
-class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
-    pass
-
-#class FlagHTTPServer( BaseHTTPServer.HTTPServer):
+#class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 #    pass
+
+class FlagHTTPServer( BaseHTTPServer.HTTPServer):
+    pass
 
 def Server(HandlerClass = FlagServerHandler,
            ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):

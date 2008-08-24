@@ -1,21 +1,22 @@
+include $(top_srcdir)/config/Makefile.rules
+
 SUBDIRS		= . pyewf pyaff
 
 INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 
 # main bin and lib targets
 #noinst_PROGRAMS		= open
-bin_PROGRAMS		= sgzip evtool remote_server
-#lib_LTLIBRARIES	= libexcept.la libsgz.la libevf.la libio_hooker.la liboo.la libmd5.la
+bin_PROGRAMS		= sgzip evtool
 
-# convenience libs: just to reduce re-building, could instead install as shared libs by 
-# commenting this line out and uncommenting the one above
+# convenience libs
 noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la libsha1.la
 
 # Stuff that should be distributed:
 noinst_HEADERS		= $(srcdir)/*.h
 
 # python stuff
-pkgpyexec_LTLIBRARIES 	= pypacket.la
+noinst_LTLIBRARIES 	= liboo.la libexcept.la libsgz.la libevf.la libmd5.la pypacket.la
+pkgpyexec_PYTHON	= pypacket$(PYTHON_EXTENSION)
 
 pypacket_la_SOURCES	= pypacket.c
 pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include

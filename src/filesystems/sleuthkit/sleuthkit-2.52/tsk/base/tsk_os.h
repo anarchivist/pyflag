@@ -22,6 +22,21 @@
 #include <sys/sysmacros.h>
 #endif
 
+#ifdef __MINGW32__
+#define roundup(x, y)   \
+  ( ( ((x)+((y) - 1)) / (y)) * (y) )
+
+#define HAVE_GETHOSTNAME
+#include <windows.h>
+int gethostname_mingw (char *, size_t);
+
+#define gethostname gethostname_mingw
+#define strtok_r(a,b,c) strtok(a,b)
+#define fseeko fseek
+#define daddr_t int
+
+#endif
+
 #if defined(__CYGWIN__)
 #ifndef roundup
 #define roundup(x, y)	\
@@ -35,7 +50,7 @@
 #endif
 
 
-#if defined(_WIN32) || defined (__WIN32__)
+#if !defined(__MINGW32__) && (defined(_WIN32) || defined (__WIN32__))
 #define TSK_WIN32
 
 #ifndef UNICODE

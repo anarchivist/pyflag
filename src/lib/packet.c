@@ -31,10 +31,6 @@
 #include "misc.h"
 #include <ctype.h>
 
-#ifndef WINDOWS
-#include <netinet/in.h>
-#endif
-
 /*************************************************** 
                Packet implementation
 ****************************************************/

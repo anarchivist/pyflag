@@ -200,7 +200,7 @@ static PyTypeObject skfs_walkiterType = {
     0,                         /* tp_clear */
     0,                         /* tp_richcompare */
     0,                         /* tp_weaklistoffset */
-    PyObject_SelfIter,         /* tp_iter */
+    0, //PyObject_SelfIter,         /* tp_iter */
     (iternextfunc)skfs_walkiter_iternext, /* tp_iternext */
     0,                         /* tp_methods */
     0,                         /* tp_members */

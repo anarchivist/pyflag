@@ -9,17 +9,17 @@
 
 #ifndef LIBPST_H
 #define LIBPST_H
+#include <stdint.h>
+#include "common.h"
 
 #ifndef  _MSC_VER
 
-#ifndef FILETIME_DEFINED
-#define FILETIME_DEFINED
-//Win32 Filetime struct - copied from WINE
-typedef struct {
-  u_int32_t dwLowDateTime;
-  u_int32_t dwHighDateTime;
-} FILETIME;
-#endif //ifndef FILETIME_DEFINED
+#ifdef __WIN32__
+#define u_int32_t uint32_t
+#define u_int16_t uint16_t
+#define DWORD uint32_t
+#endif
+
 #endif //ifndef  _MSC_VER
 
 // define the INT32_MAX here cause it isn't normally defined

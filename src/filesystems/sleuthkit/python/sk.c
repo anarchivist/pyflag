@@ -18,6 +18,11 @@
 #include "tsk/libtsk.h"
 #include "tsk/fs/tsk_ntfs.h"
 
+#ifdef __MINGW32__
+// This does not make sense on windows
+#define S_ISLNK(x) 0
+#endif
+
 //#define SK_TALLOC_HACK 0
 
 static int TSK_IMG_INFO_TYPE_PYFILE_TYPE	=	0x40;

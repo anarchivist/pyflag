@@ -28,6 +28,12 @@
 #ifndef __MISC_H
 #define __MISC_H
 
+#ifdef __WIN32__
+#include <winsock.h>
+#define u_int8_t uint8_t
+#define u_int16_t uint16_t
+#define u_int32_t uint32_t
+#else
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
@@ -35,9 +41,10 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 //#include <unistd.h>
-#include "enum.h"
-
 #define O_BINARY 0
+#endif
+
+#include "enum.h"
 
 /** This is used for debugging. */
 #ifndef __DEBUG__

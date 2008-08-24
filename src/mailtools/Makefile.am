@@ -1,4 +1,8 @@
-pkgpyexec_LTLIBRARIES 	= pst.la
+include $(top_srcdir)/config/Makefile.rules
+
+noinst_LTLIBRARIES 	= pst.la
+pkgpyexec_PYTHON	= pst$(PYTHON_EXTENSION)
+
 noinst_HEADERS 		= libpst.h libstrfunc.h timeconv.h common.h
 
 pst_la_SOURCES		= libpst.c pst.c timeconv.c libstrfunc.h timeconv.h common.h

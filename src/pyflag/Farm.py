@@ -219,7 +219,12 @@ def start_workers():
         return
 
     for i in range(config.WORKERS):
-       pid = os.fork()
+       try:
+           pid = os.fork()
+       except AttributeError:
+           ## When running under windows we can not fork
+           return
+       
        ## Parents:
        if pid:
          children.append(pid)
@@ -326,7 +331,11 @@ def handler(sig, frame):
 ## expect it we may lose sync with the db. Seems to work for now, but
 ## Im dubious.
 ## FIXME: Use select on unix domain sockets instead of time.sleep
-signal.signal(signal.SIGUSR1, handler)
+try:
+    signal.signal(signal.SIGUSR1, handler)
+except AttributeError:
+    ## This fails on windows (no signals)
+    pass
 
 def wake_workers():
     """ Try to wake workers if possible. If we fail we must wait until

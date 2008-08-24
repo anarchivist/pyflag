@@ -518,7 +518,6 @@ class HTMLUI(UI.GenericUI):
                     preamble += "<img class='PyFlagTreeVerticalLine' src='images/treenode_blank.gif'>"
 
                 result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'], FlagFramework.iri_to_inline_js(link), img_class, img_src)
-
                 if len(branch)-1==depth and name == branch[depth]:
                     result+= u"&nbsp;<span class='PyFlagTreeSelected'>%s</span></a></span>\n" % unicode(sv)
                 else:

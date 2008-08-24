@@ -25,7 +25,6 @@ class UnicodeTree(Reports.report):
             result.heading(DB.expand("You selected %s",branch))
 
         def tree_cb(path):
-            print "Path is %r" % path
             levels = path.split("/")
             tmp = tree
             for x in levels:

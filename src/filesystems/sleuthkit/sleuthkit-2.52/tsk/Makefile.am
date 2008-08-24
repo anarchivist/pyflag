@@ -2,7 +2,7 @@
 SUBDIRS = base img vs fs hashdb
 
 # Merge the libraries into one
-lib_LTLIBRARIES = libtsk-pf.la
+noinst_LTLIBRARIES = libtsk-pf.la
 libtsk_pf_la_SOURCES =
 libtsk_pf_la_LIBADD = base/libtskbase.la img/libtskimg.la \
     vs/libtskvs.la fs/libtskfs.la hashdb/libtskhashdb.la

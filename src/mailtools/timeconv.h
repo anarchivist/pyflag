@@ -8,7 +8,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  time_t fileTimeToUnixTime( const FILETIME *filetime, DWORD *remainder );
+  time_t fileTimeToUnixTime( const FILETIME *filetime, uint32_t *remainder );
 
   char * fileTimeToAscii (const FILETIME *filetime);
 
