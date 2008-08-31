@@ -432,7 +432,7 @@ class ResolvingHTMLTag(SanitizingTag):
         ## have a method - chances are that its in the VFS:
         else:
             fsfd = FileSystem.DBFS(self.case)
-            new_reference = url_unquote(reference)
+            new_reference = decode_entity(url_unquote(reference))
             url = os.path.normpath(os.path.join(self.base_url, new_reference))
             try:
                 path, inode, inode_id = fsfd.lookup(path = url)
@@ -442,7 +442,8 @@ class ResolvingHTMLTag(SanitizingTag):
 
         ## Try to make reference more url friendly:
 #        reference = reference.replace(" ","%20")
-        reference = decode_entity(reference)
+        reference = url_unquote(decode_entity(reference))
+
         dbh = DB.DBO(self.case)
         dbh.execute("select http.status,http.inode_id from http join inode on "\
                     "inode.inode_id=http.inode_id where url=%r and not "\

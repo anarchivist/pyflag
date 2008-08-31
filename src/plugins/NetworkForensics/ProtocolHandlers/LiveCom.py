@@ -84,6 +84,7 @@ import pyflag.pyflaglog as pyflaglog
 import textwrap
 import pyflag.HTMLUI as HTMLUI
 import pyflag.Registry as Registry
+import pyflag.Graph as Graph
 
 class WebMailTable(FlagFramework.CaseTable):
     """ Table to store Web mail related information """
@@ -314,6 +315,73 @@ class HotmailScanner(Scanner.GenScanFactory):
             
             return inode_id
 
+class Live20Scanner(HotmailScanner):
+    """ Parse Hotmail Web 2.0 Session """
+
+    class Scan(HotmailScanner.Scan):
+        data = ''
+        types = (
+            '.',)
+
+        def boring(self, metadata, data=''):
+            if not Scanner.StoreAndScanType.boring(self, metadata, data='') and \
+                   re.match("new HM.FppReturnPackage\(", data):
+                self.data = ''
+                return False
+
+            return True
+
+        def process(self, data, metadata=None):
+            Scanner.StoreAndScanType.process(self, data, metadata)            
+            if not self.boring_status:
+                self.data += data
+
+        def finish(self):
+            if self.boring_status: return
+            pyflaglog.log(pyflaglog.DEBUG,"Opening %s for Hotmail AJAX processing" % self.fd.inode)        
+            m=re.search("HM.InboxUiData\((.+)",self.data)
+            if m:
+                string = m.group(1)
+                def a(*x):
+                    try:
+                        if x[0][2]:
+                            self.process_readmessage(x[0][2])
+                    except IndexError: pass
+
+                ## Now parse the data
+                eval("a(("+string, {}, {'a':a, 'null':0})
+
+        def process_readmessage(self, message):
+            parser =  HTML.HTMLParser(verbose=0)
+            parser.feed(message)
+            parser.close()
+
+            result = {'type': 'Read', 'Message':''}
+
+            ## Find the subject
+            sbj = parser.root.find('td', {'class':'ReadMsgSubject'})
+            if sbj: result['Subject'] = HTML.decode_entity(sbj.innerHTML())
+
+            context = None
+            for td in parser.root.search('td'):
+                data = td.innerHTML()
+                if context:
+                    result[context] = HTML.decode_entity(data)
+                    context = None
+                
+                if data.lower().startswith('from:'):
+                    context = 'From'
+                elif data.lower().startswith('to:'):
+                    context = 'To'
+                elif data.lower().startswith('sent:'):
+                    context = 'Sent'
+
+            msg = parser.root.find('div', {'class':'ReadMsgContainer'})
+            if msg:
+                result['Message'] = msg.innerHTML()
+
+            return self.insert_message(result, inode_template = 'l%s')
+        
 class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
     We also fetch images etc from the db if available.
@@ -358,8 +426,20 @@ class AttachmentColumn(InodeIDType):
     """ Displays the attachments related to the webmail message """
     def display(self, value, row, result):
         dbh = DB.DBO(self.case)
+        fsfd = FileSystem.DBFS(self.case)
         dbh.execute("select file.inode_id as inode_id, name from file, webmail_attachments where webmail_attachments.inode_id = %r and file.inode_id = webmail_attachments.attachment", value)
         for row in dbh:
+            try:
+                fd = fsfd.open(inode_id=row['inode_id'])
+                image = Graph.Thumbnailer(fd,100)
+            except IOError:
+                pass
+            
+            if image.height>0:
+                result.image(image,width=image.width,height=image.height)
+            else:
+                result.image(image,width=image.width)
+
             link = result.__class__(result)
             link.link(row['name'], FlagFramework.query_type(family = "Disk Forensics",
                                                             report = "ViewFile",
@@ -391,7 +471,7 @@ class WebMailMessages(Reports.report):
                          StringType('Subject', 'Subject'),
                          HTMLStringType('Message','Message'),
                          #StringType('MessageID', 'message_id'),
-                         #AttachmentColumn(name='Attachment',case = query['case']),
+                         AttachmentColumn(name='Attachment',case = query['case']),
                          StringType('Type','type'),
                          StringType('Service','service'),
                          ],

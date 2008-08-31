@@ -170,5 +170,3 @@ AC_MSG_NOTICE([MaxMind GeoIP:           $have_geoip ])
 AC_MSG_NOTICE([Advanced JpegCarving:    $have_libjpeg ])
 AC_MSG_NOTICE([*****************************************])
 AC_MSG_NOTICE([])
-
-

@@ -206,6 +206,21 @@ class HTTPCaseTable(FlagFramework.CaseTable):
         ]
     index = ['url','inode_id']
 
+class AttachmentColumnType(IntegerType):
+    """ View file Attachment in HTTP parameters """
+    
+    def __init__(self, **kwargs):
+        kwargs['name']="Attachment"
+        kwargs['column'] = 'indirect'
+        link = FlagFramework.query_type(case=kwargs['case'],
+                                        family='Disk Forensics',
+                                        report='ViewFile',
+                                        mode = 'Summary',
+                                        __target__ = 'inode_id')
+        kwargs['link'] = link
+        kwargs['link_pane'] = 'popup'
+        IntegerType.__init__(self, **kwargs)
+
 class HTTPParameterCaseTable(FlagFramework.CaseTable):
     """ HTTP Parameters - Stores request details """
     name = 'http_parameters'
@@ -213,7 +228,7 @@ class HTTPParameterCaseTable(FlagFramework.CaseTable):
         [ InodeIDType, {} ],
         [ StringType, dict(name = 'Parameter', column = 'key') ],
         [ StringType, dict(name = 'Value', column = 'value')],
-        [ IntegerType, dict(name = 'Attachment', column='indirect')],
+        [ AttachmentColumnType, {}],
         ]
     index = [ 'inode_id', 'key' ]
 

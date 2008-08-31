@@ -1,0 +1,42 @@
+Python Multimedia Messaging Service (MMS) library
+=================================================
+
+This provides the Python "mms" module, which contains several classes for
+the creation and manipulation of MMS messages (multimedia messages) used in
+mobile devices such as cellular telephones.
+
+Multimedia Messaging Service (MMS) is a messaging service for the mobile
+environment standardized by the WAP Forum and 3GPP. To the end-user MMS is
+very similar to the text-based Short Message Service (SMS): it provides
+automatic immediate delivery for user-created content from device to device.
+
+In addition to text, however, MMS messages can contain multimedia content such
+as still images, audio clips and video clips, which are binded together
+into a "mini presentation" (or slideshow) that controls for example, the order
+in which images are to appear on the screen, how long they will be displayed,
+when an audio clip should be played, etc. Furthermore, MMS messages do not have
+the 160-character limit of SMS messages.
+
+An MMS message is a multimedia presentation in one entity; it is not a text
+file with attachments.
+ 
+This library enables the creation of MMS messages with full support for
+presentation layout, and multimedia data parts such as JPEG, GIF, AMR, MIDI,
+3GP, etc. It also allows the decoding and unpacking of received MMS messages.
+
+
+How to install this package
+===========================
+
+python setup.py install
+
+
+Author and license information
+==============================
+
+Copyright (C) 2007 Francois Aucamp <faucamp@csir.co.za>
+
+License: GNU Lesser General Public License, version 2.1; see COPYING included
+         in this archive for details.
+
+This package is used in PyFlag 20080831
