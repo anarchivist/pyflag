@@ -70,7 +70,7 @@ AC_ARG_ENABLE(ewf,
 if test $have_libewf = yes; then
 	  ## Save libs
 	  ac_check_lib_save_LIBS=$LIBS
-	  LIBS="-lewf  $LIBS"
+	  LIBS="-lewf -static  $LIBS"
 	  AC_RUN_IFELSE(
 	    [
 	       AC_LANG_PROGRAM([[#include "libewf.h"]], 

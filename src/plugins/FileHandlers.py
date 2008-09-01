@@ -6,7 +6,7 @@ system. This makes it possible to load files from within the VFS, or
 the real filesystem transparently.
 """
 import pyflag.IO as IO
-import os,gzip,re
+import os,gzip,re,posixpath
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
@@ -34,7 +34,7 @@ class FileMethod(IO.FileHandler):
         ## Make sure there are no ../
         path = os.path.normpath(self.path)
             
-        if not self.path.startswith(config.UPLOADDIR):
+        if not self.path.startswith(posixpath.normpath(config.UPLOADDIR)):
             file = config.UPLOADDIR + "/" + path
         else:
             file = path
@@ -42,13 +42,13 @@ class FileMethod(IO.FileHandler):
         ## We need to handle gzip files transparently here:
         try:
             ## Allow log files to be compressed.
-            fd=gzip.open(file,'r')
+            fd=gzip.open(file,'rb')
             
             ## gzip doesnt really verify the file until you read something:
             fd.read(10)
             fd.seek(0)
         except:
-            fd=open(file,'r')
+            fd=open(file,'rb')
 
         return fd
 

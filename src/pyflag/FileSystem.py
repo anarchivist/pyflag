@@ -44,7 +44,7 @@ This inode therefore refers to the 14th file in the zip archive contained in ino
 
 Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
-import os,os.path, fnmatch
+import os,os.path, fnmatch, posixpath
 import sys
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -63,6 +63,7 @@ import StringIO
 import pyflag.Scanner as Scanner
 import pyflag.Graph as Graph
 import pyflag.Store as Store
+import pyflag.CacheManager as CacheManager
 
 FSCache = Store.Store()
 
@@ -297,10 +298,10 @@ class DBFS(FileSystem):
         dbh.check_index('file','name', 200)
 
         if new_filename:
-            new_filename=os.path.normpath(new_filename)
+            new_filename=posixpath.normpath(new_filename)
 
             ## Make sure that all intermediate dirs exist:
-            dirs = os.path.dirname(new_filename).split("/")
+            dirs = posixpath.dirname(new_filename).split("/")
             for d in range(len(dirs)-1,0,-1):
                 path = "/".join(dirs[:d])+"/"
                 path = FlagFramework.normpath(path)
@@ -345,8 +346,8 @@ class DBFS(FileSystem):
             return inode_id
 
         ## Now add to the file and inode tables:
-        file_props = dict(path = FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
-                          name = os.path.basename(new_filename),
+        file_props = dict(path = FlagFramework.normpath(posixpath.dirname(new_filename)+"/"),
+                          name = posixpath.basename(new_filename),
                           status = 'alloc',
                           mode = directory_string,
                           inode_id = inode_id,
@@ -374,8 +375,8 @@ class DBFS(FileSystem):
         else:
             ## We are listing the exact file specified:
             where = DB.expand(" path=%r and name=%r", (
-                FlagFramework.normpath(os.path.dirname(path)+'/'),
-                os.path.basename(path)))
+                FlagFramework.normpath(posixpath.dirname(path)+'/'),
+                posixpath.basename(path)))
                    
         mode =''
         if(dirs == 1):
@@ -412,9 +413,9 @@ class DBFS(FileSystem):
     def lookup(self, path=None,inode=None, inode_id=None):
         dbh=DB.DBO(self.case)
         if path:
-            dir,name = os.path.split(path)
+            dir,name = posixpath.split(path)
             if not name:
-                dir,name = os.path.split(path[:-1])
+                dir,name = posixpath.split(path[:-1])
             if dir == '/':
                 dir = ''
 
@@ -465,14 +466,14 @@ class DBFS(FileSystem):
         return row
 
     def isdir(self,directory):
-        directory=os.path.normpath(directory)
+        directory=posixpath.normpath(directory)
         if directory=='/': return 1
         
         dbh=DB.DBO(self.case)
-        dirname=FlagFramework.normpath(os.path.dirname(directory)+'/')
+        dirname=FlagFramework.normpath(posixpath.dirname(directory)+'/')
         dbh.check_index('file','path', 200)
         dbh.check_index('file','name', 200)
-        dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,os.path.basename(directory)))
+        dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,posixpath.basename(directory)))
         row=dbh.fetch()
         if row:
             return 1
@@ -480,7 +481,7 @@ class DBFS(FileSystem):
             return 0
         
     def exists(self,path):
-        dir,file=os.path.split(path)
+        dir,file=posixpath.split(path)
         dbh=DB.DBO(self.case)
         dbh.execute("select mode from file where path=%r and name=%r limit 1",(dir,file))
         row=dbh.fetch()
@@ -636,10 +637,9 @@ class File:
 
     def look_for_cached(self):
         ## Now we check to see if there is a cached copy of the file for us:
-        self.cached_filename = self.get_temp_path()
         try:
             ## open the previously cached copy
-            self.cached_fd = open(self.cached_filename,'r')
+            self.cached_fd = CacheManager.MANAGER.open(self.case, self.inode)
 
             ## Find our size (This may not be important but we leave it for now):
             self.cached_fd.seek(0,2)
@@ -657,13 +657,6 @@ class File:
         except:
             pass
 
-    def get_temp_path(self):
-        """ Returns the full path to a temporary file based on filename.
-        """
-        filename = self.inode.replace('/','-')
-        result= "%s/case_%s/%s" % (config.RESULTDIR,self.case,filename)
-        return result
-
     def cache(self):
         """ Creates a cache file if it does not exist """
         if not self.cached_fd:
@@ -676,33 +669,20 @@ class File:
         ## This forces the File class to regenerate the data instead
         ## of getting it from the cache
         self.cached_fd = None
-        size=0
-
-        ## Recreate the cache file (May need to use kernel locking for
-        ## multithreaded support)
-        cached_filename = self.get_temp_path()
-        fd = open(cached_filename, 'w')
-
         self.seek(0)
         
-        ## Copy ourself into the file
-        while 1:
-            data=self.read(10000000)
-            if not data or len(data)==0: break
-            fd.write(data)
-            size+=len(data)
-
-        fd.close()
+        ## Create a new cache object
+        self.size = CacheManager.MANAGER.create_cache_from_fd(self.case, self.inode, self)
         
         ## Now set the cached fd so a subsequent read will get it from the cache:
-        self.cached_fd =  open(cached_filename, 'r')
-        self.size = size
+        self.cached_fd =  CacheManager.MANAGER.open(self.case, self.inode)
+        #self.size = size
         self.readptr = readptr
 
         ## Close our parent fd:
         self.fd.close()
 
-        return size
+        return self.size
 
     def lookup_id(self):
         ## A shortcut cached item
@@ -1018,7 +998,7 @@ class File:
 
         path, inode, inode_id = fsfd.lookup(inode=query['inode'])
         if not path: return
-        base_path, name = os.path.split(path)
+        base_path, name = posixpath.split(path)
         link.link(path,
                   FlagFramework.query_type((),family="Disk Forensics",
                       report='BrowseFS',
@@ -1119,7 +1099,7 @@ def translate(pat):
 globbing_re = re.compile("[*+?\[\]]")
 
 def glob_sql(pattern):
-    path,name = os.path.split(pattern)
+    path,name = posixpath.split(pattern)
 
     if globbing_re.search(path):
         path_sql = "path rlike '^%s/?$'" % translate(path)

@@ -29,13 +29,14 @@ import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
 from pyflag.FileSystem import File
 import pyflag.IO as IO
-from pyflag.FlagFramework import query_type, get_temp_path
+from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import struct,re,os
 import reassembler
 from pyflag.ColumnTypes import StringType, IntegerType, TimestampType
 from pyflag.ColumnTypes import InodeIDType, IPType, PCAPTime
 import pyflag.Reports as Reports
+import pyflag.CacheManager as CacheManager
 
 class DataType(StringType):
     hidden = True
@@ -160,9 +161,9 @@ class StreamFile(File):
         fds = []
         for s in stream_ids:
             try:
-                filename = FlagFramework.get_temp_path(dbh.case,
-                                         "%s|S%s" % (self.fd.inode, s))
-                fds.append(open(filename))
+                fds.append(CacheManager.MANAGER.create_cache_fd(
+                    dbh.case,
+                    "%s|S%s" % (self.fd.inode, s)))
             except IOError,e:
                 fds.append(-1)
 
@@ -174,7 +175,7 @@ class StreamFile(File):
         initials = [ True,] * len(stream_ids)
 
         # The output file
-        out_fd = open(get_temp_path(dbh.case, self.inode),"w")
+        out_fd = CacheManager.MANAGER.create_cache_fd(dbh.case, self.inode)
 
         min_packet_id = sys.maxint
         

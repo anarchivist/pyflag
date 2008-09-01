@@ -28,7 +28,7 @@
 # ******************************************************
 
 """ Flag plugin to load various forms of data into the case databases """
-import re,os,os.path
+import re,os,os.path, posixpath
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type
@@ -207,10 +207,10 @@ class LoadIOSource(Reports.report):
 
             ## Adjust all the filenames to be rooted at the UPLOADDIR:
             for f in filenames:
-                if "://" not in f:
-                    query['filename'] = os.path.normpath(
-                        "%s/%s" % (config.UPLOADDIR, f))
-                else:
+            ##    if "://" not in f:
+            ##        query['filename'] = posixpath.normpath(
+            ##            "%s/%s" % (config.UPLOADDIR, f))
+            ##    else:
                     query['filename'] = f
 
             io = image.open(query['iosource'], query['case'], query)
@@ -676,7 +676,7 @@ class LoadDataTests(unittest.TestCase):
                                    "mount_point=/stdimage/"])
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
-        self.assertEqual(dbh.fetch()['count'],86)
+        self.assertEqual(dbh.fetch()['count'],90)
 
     def test03MultipleSources(self):
         """ Test that multiple images can be loaded on the same VFS """

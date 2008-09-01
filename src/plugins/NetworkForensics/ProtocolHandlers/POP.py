@@ -25,7 +25,7 @@ config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pyflag.Time as Time
-import re
+import re, posixpath
 from NetworkScanner import *
 
 config.add_option("POP3_PORTS", default='[110,]',
@@ -171,7 +171,7 @@ class POPScanner(StreamScannerFactory):
             date_str = ds_timestamp.split(" ")[0]
 
             path, inode, inode_id = self.fsfd.lookup(inode=combined_inode)
-            path=os.path.normpath(path+"/../../../../../")
+            path=posixpath.normpath(path+"/../../../../../")
 
             inode_id = self.fsfd.VFSCreate(None,new_inode,
                                            "%s/POP/%s/Message_%s" % (path, date_str,

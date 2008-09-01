@@ -476,7 +476,7 @@ def Server(HandlerClass = FlagServerHandler,
 
     HandlerClass.protocol_version = protocol
     httpd = ServerClass(server_address, HandlerClass)
-    httpd.socket.settimeout(1.0)
+    #httpd.socket.settimeout(1.0)
     sa = httpd.socket.getsockname()
     pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s", sa)
     httpd.serve_forever()

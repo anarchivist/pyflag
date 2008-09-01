@@ -356,9 +356,9 @@ if __name__ == '__main__':
     import sys
     
     if len(sys.argv)==2:
-        fd = open(sys.argv[1])
+        fd = open(sys.argv[1],'rb')
     else:
-        fd = open("test_document.pdf")
+        fd = open("test_document.pdf",'rb')
         
     p = PDFParser(fd, 1)
 

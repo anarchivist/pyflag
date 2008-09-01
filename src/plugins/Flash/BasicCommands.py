@@ -22,7 +22,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.pyflagsh as pyflagsh
-import sys,os
+import sys,os,posixpath
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.IO as IO
@@ -80,7 +80,7 @@ class ls(pyflagsh.command):
             
     def list(self,path):
         """ List the files in a particular path """
-        path=os.path.abspath(os.path.join(self.environment.CWD,path))
+        path=posixpath.abspath(posixpath.join(self.environment.CWD,path))
         try:
             if self.environment._FS.isdir(path):
                 if not path.endswith('/'):
@@ -123,8 +123,8 @@ class ls(pyflagsh.command):
     def complete(self,text,state):
         args=self.args
         if len(args)==1: args.append('.')
-        path,name=os.path.split(args[-1])
-        path=os.path.abspath(os.path.join(self.environment.CWD,path))
+        path,name=posixpath.split(args[-1])
+        path=posixpath.abspath(posixpath.join(self.environment.CWD,path))
         if not path.endswith('/'):
             path=path+'/'
 
@@ -147,7 +147,7 @@ class cd(ls):
         except IndexError:
             path="/"
 
-        new_path=os.path.abspath(os.path.join(self.environment.CWD,path))
+        new_path=posixpath.abspath(posixpath.join(self.environment.CWD,path))
         if not new_path.endswith('/'):
             new_path+='/'
 
@@ -163,8 +163,8 @@ class cd(ls):
     def complete(self,text,state):
         args=self.args
         if len(args)==1: args.append('.')
-        path,name=os.path.split(args[-1])
-        path=os.path.abspath(os.path.join(self.environment.CWD,path))
+        path,name=posixpath.split(args[-1])
+        path=posixpath.abspath(posixpath.join(self.environment.CWD,path))
         if not path.endswith('/'):
             path=path+'/'
 
@@ -219,13 +219,13 @@ class cp(ls):
         args=self.args
         target=args[-1]
         #Check to see if the target is a valid directory:
-        if not os.path.isdir(target):
+        if not posixpath.isdir(target):
             raise IOError("Target %s is not a directory. (Note: Target must exist on the host filesystem)")
         
         for arg in self.glob_files(args[:-1]):
             ## FIXME: implement a -R switch
             #target_path=target + '/' + arg[len(self.environment.CWD):]
-            target_path=target + '/' + os.path.basename(arg)
+            target_path=target + '/' + posixpath.basename(arg)
             outfd=open(target_path,"w")
             try:
                 fd=self.environment._FS.open(arg)
@@ -588,11 +588,11 @@ class find(ls):
     def execute(self):
         for path in self.args:
             for file in self.list(path):
-                yield os.path.normpath( "/////%s/%s" % (file['path'],file['name']))
+                yield posixpath.normpath( "/////%s/%s" % (file['path'],file['name']))
         
     def list(self,path):
         """ List the files in a particular path """
-        path=os.path.abspath(os.path.join(self.environment.CWD,path))
+        path=posixpath.abspath(posixpath.join(self.environment.CWD,path))
         try:
             if self.environment._FS.isdir(path):
                 if not path.endswith('/'):
@@ -626,7 +626,7 @@ class file(ls):
         
         for path in self.glob_files(self.args):
             path,inode, inode_id = self.environment._FS.lookup(path=path)
-            dbh.execute("select type.inode,name, mime,type from type,file where file.inode =%r and file.inode=type.inode",(inode))
+            dbh.execute("select type.inode_id,name, mime,type from type,file where file.inode_id =%r and file.inode_id=type.inode_id",(inode_id))
             row = dbh.fetch()
             if row:
                 yield row

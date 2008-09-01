@@ -35,7 +35,7 @@ import socket, struct
 import pypcap
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-from plugins.NetworkForensics.PCAPFS import CachedWriter
+from pyflag.CacheManager import CachedWriter
 import pyflag.FlagFramework as FlagFramework
 
 parser = OptionParser(usage = """%prog [options] pcap_file ... pcap_file
@@ -56,7 +56,7 @@ parser.add_option("-v", "--verbose", default=5, type='int',
 (options, args) = parser.parse_args()
 
 if options.stats:
-    stats_fd = open(options.stats,'w')
+    stats_fd = open(options.stats,'wb')
     stats_fd.write("""## Stats for streams in the following format:
 ## stream name: (packet_id, offselt, length) ....
 """)
@@ -120,7 +120,7 @@ def Callback(mode, packet, connection, options = None):
             connection['l'])
 
         if options.stats:
-            stats_fd = open(options.stats,'a')
+            stats_fd = open(options.stats,'ab')
             stats_fd.write(stat)
             stats_fd.close()
             #for i in range(len(connection['packets'])):
@@ -132,7 +132,7 @@ def Callback(mode, packet, connection, options = None):
 processor = reassembler.Reassembler(packet_callback = FlagFramework.Curry(Callback, options=options))
 for f in args:
     try:
-        pcap_file = pypcap.PyPCAP(open(f))
+        pcap_file = pypcap.PyPCAP(open(f,"rb"))
     except IOError:
         continue
     

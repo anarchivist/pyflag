@@ -31,7 +31,7 @@
 
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
-import re,cgi,types,os,time
+import re,cgi,types,os,time,posixpath
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 from pyflag.DB import expand
@@ -303,7 +303,7 @@ class GenericUI:
                     def pane_cb(path,tmp):
                         fsfd = FileSystem.DBFS( query["case"])
                         if not fsfd.isdir(path):
-                            path=os.path.dirname(path)
+                            path=posixpath.dirname(path)
 
                         new_query = make_new_query(query, path + '/')
 
@@ -348,7 +348,7 @@ class GenericUI:
             result.heading(description)
             def left(path):
                 if os.path.basename(path)=='.': return
-                path=os.path.normpath(config.UPLOADDIR + '/' +path)
+                path=os.path.normpath(os.path.join(config.UPLOADDIR,path))
                 try:
                     for d in os.listdir(path):
                         if os.path.isdir(os.path.join(path,d)):
@@ -371,7 +371,7 @@ class GenericUI:
                 )""", tablename)
 
                 ## populate the table:
-                full_path=os.path.normpath(config.UPLOADDIR + '/' + path)
+                full_path=os.path.normpath(os.path.join(config.UPLOADDIR,path))
                 dbh.mass_insert_start(tablename)
                 ## List all the files in the directory:
                 try:

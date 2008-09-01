@@ -71,17 +71,12 @@ class OLEScan(Scanner.GenScanFactory):
             new_inode = "%s|O%s" % (self.fd.inode, self.count)
             self.count+=1
             filename = metadata.get('Attach filename', metadata.get('Attach long filenm','Attachment'))
-            #print "Creating a new inode %s on %s/%s" % (new_inode, path, filename)
             
-            ## Create a cache file:
-            out_fd = open(FlagFramework.get_temp_path(self.case, new_inode),'w')
-            out_fd.write(data)
-            out_fd.close()
+            CacheManager.MANAGER.create_cache_from_data(self.case, new_inode, data)
 
             self.ddfs.VFSCreate(None, new_inode,
                                 "%s/%s" % (path, filename),
                                 size = len(data))
-
 
             new_fd = self.ddfs.open(inode = new_inode)
             Scanner.scanfile(self.ddfs, new_fd, self.factories)

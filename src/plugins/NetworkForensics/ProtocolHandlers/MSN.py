@@ -47,7 +47,7 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
-import base64
+import base64, posixpath
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib,os,time,datetime
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType, PCAPTime
@@ -82,13 +82,6 @@ def safe_base64_decode(s):
 
 allowed_file_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ"\
                      "RSTUVWXYZ0123456789.-_ "
-
-def get_temp_path(case,inode):
-    """ Returns the full path to a temporary file based on filename.
-    """
-    filename = inode.replace('/','-')
-    result= "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
-    return result
 
 class Message:
     """ A class representing the message """
@@ -1528,7 +1521,7 @@ class Message:
 
                 try:
                    path=self.ddfs.lookup(inode_id=self.fd.inode_id)
-                   path=os.path.normpath(path+"/../../../../../")
+                   path=posixpath.normpath(path+"/../../../../../")
                 except Exception, e:
                     print e
                     pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
@@ -1561,13 +1554,12 @@ class Message:
         
                 ## We also touch the file, just in case... (for example
                 ## what happens if this file is later declined
-                ## but we never see the deline message
-                filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % 
-                                                (self.fd.inode, 
-                                                headers['sessionid'],
-                                                self.session_id))
-                fd=os.open(filename,os.O_RDWR | os.O_CREAT)
-                bytes = os.write(fd,"COULD NOT GET MSN FILE DATA!")
+                ## but we never see the decline message
+                CacheManager.MANAGER.create_cache_from_data(\
+                    dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, 
+                                               headers['sessionid'],
+                                               self.session_id),
+                    "COULD NOT GET MSN FILE DATA!")
                 
             elif (self.declineRegex.match(request_type)):
                 # Ok, so now a file has been declined.
@@ -1651,11 +1643,12 @@ class Message:
         ## We have a real channel id so this is an actual file:
         else:
             dbh=DB.DBO(self.case)
-            filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % 
-                    (self.fd.inode, channel_sid,self.session_id))
-            fd=os.open(filename,os.O_RDWR | os.O_CREAT)
-            os.lseek(fd,offset,0)
-            bytes = os.write(fd,data)
+            fd = CacheManager.MANAGER.create_cache_from_fd(\
+                dbh.case,"%s|CMSN%s-%s" % (self.fd.inode,
+                                           channel_sid,self.session_id))
+            
+            fd.seek(offset)
+            bytes = fd.write(data)
 
             if bytes < message_size:
                 pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as "\

@@ -185,7 +185,9 @@ def child_exist():
 
 def terminate_children():
     for pid in children:
-        os.kill(pid, signal.SIGABRT)
+        try:
+            os.kill(pid, signal.SIGABRT)
+        except: pass
 
 class Task:
     """ All distributed tasks need to extend this subclass """
@@ -209,6 +211,87 @@ config.add_option("WORKERS", default=2, type='int',
 config.add_option("JOB_QUEUE", default=10, type='int',
                   help='Number of jobs to take on at once')
 
+
+def worker_run():
+     """ The main loop of the worker """
+     atexit.register(child_exist)
+
+     ## It is an error to fork with db connections
+     ## established... they can not be shared:
+     if DB.db_connections > 0:
+         ## We try to fix it by making the child get new
+         ## handlers. Note that the child still needs to hold the
+         ## handles or they will get closed on the parent as well
+         ## - this seems like a hack
+         DB.DBO.DBH_old = DB.DBO.DBH
+         DB.DBO.DBH = Store.Store(max_size=10)
+         DB.db_connections = 0
+
+     ## Start the logging thread for each worker:
+     pyflaglog.start_log_thread()
+
+     ## These are all the methods we support
+     jobs = []
+
+     ## This is the last broadcast message we handled. We will
+     ## only handle broadcasts newer than this.
+     broadcast_id = 0
+     try:
+         dbh=DB.DBO()
+         dbh.execute("select max(id) as max from jobs")
+         row = dbh.fetch()
+         broadcast_id = row['max'] or 0
+     except: pass
+
+     while 1:
+         ## Check for new tasks:
+         if not jobs:
+             time.sleep(10)
+
+         dbh = None
+         try:
+             dbh = DB.DBO()
+             try:
+                 dbh.execute("lock tables jobs write")
+                 sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
+                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
+                 jobs = [ row for row in dbh ]
+
+                 if not jobs:
+                     continue
+
+                 ## Ensure the jobs are marked as processing so other jobs dont touch them:
+                 for row in jobs:
+                     if row['state'] == 'pending':
+                         dbh.execute("update jobs set state='processing' where id=%r", row['id'])
+                     elif row['state'] == 'broadcast':
+                         broadcast_id = row['id']
+             finally:
+                 if dbh:
+                     dbh.execute("unlock tables")
+         except:
+             continue
+
+         ## Now do the jobs
+         for row in jobs:
+             try:
+                 try:
+                     task = Registry.TASKS.dispatch(row['command'])
+                 except:
+                     print "Dont know how to process job %s" % row['command']
+                     continue
+
+                 try:
+                     task = task()
+                     task.run(row['arg1'], row['arg2'], row['arg3'])
+                 except Exception,e:
+                     pyflaglog.log(pyflaglog.ERRORS, "Error %s(%s,%s,%s) %s" % (task.__class__.__name__,row['arg1'], row['arg2'],row['arg3'],e))
+
+             finally:
+                 if row['state'] != 'broadcast':
+                     dbh.execute("delete from jobs where id=%r", row['id'])
+
+
 def start_workers():
     if config.FLUSH:
         dbh = DB.DBO()
@@ -222,90 +305,28 @@ def start_workers():
        try:
            pid = os.fork()
        except AttributeError:
-           ## When running under windows we can not fork
-           return
+           ## When running under windows we can not fork...  We must
+           ## launch this module by itself instead - this is very
+           ## suboptimal because we will be performing all startup
+           ## code (registry parsing etc) for each worker. If you want
+           ## performance you would not choose windows anyway,
+           ## though. The following is windows specific:
+           ## First find the name of the interpreter:
+           import ctypes, sys
+
+           name = ctypes.create_string_buffer(255)
+           length = ctypes.windll.kernel32.GetModuleFileNameA(None, name, 255)
+           interpreter = name.raw[:length]
+
+           os.spawnv(os.P_NOWAIT, interpreter, [interpreter, __file__] + sys.argv[1:])
+           pid = 1
        
        ## Parents:
        if pid:
          children.append(pid)
        else:   
-         atexit.register(child_exist)
-
-         ## It is an error to fork with db connections
-         ## established... they can not be shared:
-         if DB.db_connections > 0:
-             ## We try to fix it by making the child get new
-             ## handlers. Note that the child still needs to hold the
-             ## handles or they will get closed on the parent as well
-             ## - this seems like a hack
-             DB.DBO.DBH_old = DB.DBO.DBH
-             DB.DBO.DBH = Store.Store(max_size=10)
-             DB.db_connections = 0
-         
-         ## Start the logging thread for each worker:
-         pyflaglog.start_log_thread()
-
-         ## These are all the methods we support
-         jobs = []
-
-         ## This is the last broadcast message we handled. We will
-         ## only handle broadcasts newer than this.
-         broadcast_id = 0
-         try:
-             dbh=DB.DBO()
-             dbh.execute("select max(id) as max from jobs")
-             row = dbh.fetch()
-             broadcast_id = row['max'] or 0
-         except: pass
-
-         while 1:
-             ## Check for new tasks:
-             if not jobs:
-                 time.sleep(10)
-
-             dbh = None
-             try:
-                 dbh = DB.DBO()
-                 try:
-                     dbh.execute("lock tables jobs write")
-                     sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
-                     dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
-                     jobs = [ row for row in dbh ]
-
-                     if not jobs:
-                         continue
-
-                     ## Ensure the jobs are marked as processing so other jobs dont touch them:
-                     for row in jobs:
-                         if row['state'] == 'pending':
-                             dbh.execute("update jobs set state='processing' where id=%r", row['id'])
-                         elif row['state'] == 'broadcast':
-                             broadcast_id = row['id']
-                 finally:
-                     if dbh:
-                         dbh.execute("unlock tables")
-             except:
-                 continue
-             
-             ## Now do the jobs
-             for row in jobs:
-                 try:
-                     try:
-                         task = Registry.TASKS.dispatch(row['command'])
-                     except:
-                         print "Dont know how to process job %s" % row['command']
-                         continue
-
-                     try:
-                         task = task()
-                         task.run(row['arg1'], row['arg2'], row['arg3'])
-                     except Exception,e:
-                         pyflaglog.log(pyflaglog.ERRORS, "Error %s(%s,%s,%s) %s" % (task.__class__.__name__,row['arg1'], row['arg2'],row['arg3'],e))
-
-                 finally:
-                     if row['state'] != 'broadcast':
-                         dbh.execute("delete from jobs where id=%r", row['id'])
-                
+           worker_run()
+           
     atexit.register(terminate_children)
 
     ## The parent now calls the startup method on each of the events:
@@ -343,7 +364,23 @@ def wake_workers():
     """
     ## A Signal should interrupt the children's sleep
     for pid in children:
-        os.kill(pid, signal.SIGUSR1)
+        try:
+            os.kill(pid, signal.SIGUSR1)
+        except AttributeError: pass
 
 config.add_option("FLUSH", default=False, action='store_true',
                   help='There are no workers currently processing, flush job queue.')
+
+if __name__ == "__main__":
+    import pyflag.Registry as Registry
+    import pyflag.conf
+    config=pyflag.conf.ConfObject()
+
+    config.set_usage(usage = "PyFlag Worker")
+
+    Registry.Init()
+
+    config.parse_options()
+    
+    print "Starting PyFlag worker"
+    worker_run()

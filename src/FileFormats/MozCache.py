@@ -177,7 +177,7 @@ class MozCacheRecord:
         if self.record['DataLocation']['DataFile'] == 0:
         	# read record from its own file
         	filename = "%s%s%08Xd01" % (self.mozcache.path, os.path.sep, self.record['HashNumber'])
-        	fd = open(filename)
+        	fd = open(filename,'rb')
         	return fd.read()
         else:
             fd = self.mozcache.data_fds[self.record['DataLocation']['DataFile']-1]
@@ -212,11 +212,11 @@ class MozCache:
 class MozCache_path(MozCache):
     def __init__(self, path):
         self.path = path
-        map_fd = open("%s/_CACHE_MAP_" % self.path)
+        map_fd = open("%s/_CACHE_MAP_" % self.path,'rb')
         data_fds = [ 
-            open("%s/_CACHE_001_" % self.path),
-            open("%s/_CACHE_002_" % self.path),
-            open("%s/_CACHE_003_" % self.path)
+            open("%s/_CACHE_001_" % self.path,'rb'),
+            open("%s/_CACHE_002_" % self.path,'rb'),
+            open("%s/_CACHE_003_" % self.path,'rb')
             ]
         MozCache.__init__(self, map_fd, data_fds)
 
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     	if record.record['DataLocation']['DataFile'] != 0:
     		data = record.get_data()
     		filename = "exported-%08Xd01" % record.record['HashNumber']
-    		fd = open("%s/%s" % (mozcache.path, filename), "w")
+    		fd = open("%s/%s" % (mozcache.path, filename), "wb")
     		fd.write(data)
     		fd.close()
     	else:
@@ -264,6 +264,6 @@ if __name__ == "__main__":
         html_rec.append(html_record % (filename, record.record['HashNumber'], entry['KeyData']))
 
     print "Building index in %s/index.html\n" % mozcache.path
-    fd = open("%s/index.html" % mozcache.path, "w")
+    fd = open("%s/index.html" % mozcache.path, "wb")
     fd.write(html_page % "\n".join(html_rec))
     fd.close()

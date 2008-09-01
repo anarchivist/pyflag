@@ -10,7 +10,7 @@ to keep going as much as possible.
 
 """
 
-import lexer, struct
+import lexer, struct, posixpath
 import sys,re,urllib,os
 import pyflag.DB as DB
 from pyflag.DB import expand
@@ -65,10 +65,10 @@ def join_urls(first, last):
 
     m = re.match("(https?://[^/]+/)([^?]+)/", first)
     if first:
-        return m.group(1) + os.path.normpath("%s/%s" % (m.group(2), last))
+        return m.group(1) + posixpath.normpath("%s/%s" % (m.group(2), last))
     
     else:
-        return os.path.normpath("%s/%s" % (first, last))
+        return posixpath.normpath("%s/%s" % (first, last))
 
 ## NOTE: All data within the tag and parser is kept as binary
 ## strings. The parser can discover the charset while parsing the
@@ -385,7 +385,7 @@ class ResolvingHTMLTag(SanitizingTag):
         if m:
             self.method = m.group(1)
             self.host = m.group(2)
-            self.base_url = os.path.dirname(m.group(3))
+            self.base_url = posixpath.dirname(m.group(3))
         else:
             self.method = ''
             self.host = ''
@@ -397,7 +397,7 @@ class ResolvingHTMLTag(SanitizingTag):
         if self.base_url.endswith("/"):
             self.base_url = self.base_url[:-1]
         else:
-            self.base_url = os.path.dirname(url)
+            self.base_url = posixpath.dirname(url)
             
         self.comment = False
 
@@ -433,7 +433,7 @@ class ResolvingHTMLTag(SanitizingTag):
         else:
             fsfd = FileSystem.DBFS(self.case)
             new_reference = decode_entity(url_unquote(reference))
-            url = os.path.normpath(os.path.join(self.base_url, new_reference))
+            url = posixpath.normpath(posixpath.join(self.base_url, new_reference))
             try:
                 path, inode, inode_id = fsfd.lookup(path = url)
                 if inode_id:

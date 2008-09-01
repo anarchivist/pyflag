@@ -1502,6 +1502,8 @@ initsk(void)
 
     /* setup skfs_walkiter type */
     skfs_walkiterType.tp_new = PyType_GenericNew;
+    skfs_walkiterType.tp_iter = PyObject_SelfIter;
+
     if (PyType_Ready(&skfs_walkiterType) < 0)
         return;
 

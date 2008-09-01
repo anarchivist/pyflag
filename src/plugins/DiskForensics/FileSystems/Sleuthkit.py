@@ -14,7 +14,7 @@ import math
 import bisect
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import os.path
+import os.path, posixpath
 import stat
 
 import sk
@@ -101,7 +101,7 @@ class Sleuthkit(DBFS):
         the specified directory.
         """
         ## Ensure that mount point is normalised:
-        mount_point = os.path.normpath(mount_point)
+        mount_point = posixpath.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)
 
         # open the skfs

@@ -255,18 +255,21 @@ if __name__ == "__main__":
     UI.UI = TEXTUI.TEXTUI
 
     ## Handle a history file
-    histfile = os.path.join(os.environ["HOME"], ".flashhist")
+    histfile = os.path.join(os.environ.get("HOME",'.'), ".flashhist")
     try:
         readline.read_history_file(histfile)
-    except IOError:
+    except (IOError,NameError):
         pass
+
     import atexit
 
-    atexit.register(readline.write_history_file, histfile)
-    atexit.register(FlagFramework.post_event, 'exit', config.FLAGDB)
+    try:
+        atexit.register(readline.write_history_file, histfile)
+        readline.set_completer(completer)
+        readline.set_completer_delims(' \t\n/=+\'"')
+    except NameError: pass
     
-    readline.set_completer(completer)
-    readline.set_completer_delims(' \t\n/=+\'"')
+    atexit.register(FlagFramework.post_event, 'exit', config.FLAGDB)
     
     env=environment()
     parser=command_parse(env)

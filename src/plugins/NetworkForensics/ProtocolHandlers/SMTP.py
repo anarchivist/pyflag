@@ -22,7 +22,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
-import dissect,sys
+import dissect,sys, posixpath
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
@@ -151,7 +151,7 @@ class SMTPScanner(StreamScannerFactory):
             
             ## Create the VFS node:
             path, combined_inode, inode_id =self.fsfd.lookup(inode=combined_inode)
-            path=os.path.normpath(path+"/../../../../../")
+            path=posixpath.normpath(path+"/../../../../../")
             new_inode="%s|o%s:%s" % (combined_inode,offset,length)
             ds_timestamp = Time.convert(stream.ts_sec, case=self.case, evidence_tz="UTC")
             date_str = ds_timestamp.split(" ")[0]

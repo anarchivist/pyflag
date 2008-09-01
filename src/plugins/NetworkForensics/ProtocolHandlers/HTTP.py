@@ -23,7 +23,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
-import dissect,sys
+import dissect,sys, posixpath
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
@@ -37,6 +37,7 @@ import re,time,cgi,Cookie
 import TreeObj
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 import pyflag.Time as Time
+import pyflag.CacheManager as CacheManager
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -372,7 +373,7 @@ class HTTPScanner(StreamScannerFactory):
                                            size = len(value.value))
             fd = self.fsfd.open(inode_id=new_inode_id)
             ## dump the file to the correct filename:
-            open(fd.get_temp_path(),'w').write(value.value)
+            CacheManager.MANAGER.create_cache_from_data(fd.case, fd.inode, value.value)
             dbh.insert('http_parameters',
                    inode_id = inode_id,
                    key = key,
@@ -448,7 +449,7 @@ class HTTPScanner(StreamScannerFactory):
             ## Try to put the HTTP inodes at the mount point. FIXME:
             ## This should not be needed when a http stats viewer is
             ## written.
-            path=os.path.normpath(path+"/../../../../../")
+            path=posixpath.normpath(path+"/../../../../../")
 
             inode_id = self.fsfd.VFSCreate(None,new_inode,
                                            "%s/HTTP/%s/%s" % (path,date_str,
@@ -794,13 +795,22 @@ class Chunked(File):
     """
     specifier = 'c'
 
-    def create_file(self,filename):
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
+
+        self.cache()
+        
+    def read(self,length=None):
+        try:
+            return File.read(self, length)
+        except IOError: pass
+        
         delimiter="\r\n"
         
-        self.cached_fd = open(filename,'w')
         self.fd.seek(0)
         self.data = self.fd.read()
         self.size=0
+        result = ''
 
         while 1:
             end = self.data.find(delimiter)+len(delimiter)
@@ -813,35 +823,11 @@ class Chunked(File):
                 return
             
             if size==0: break
-            self.cached_fd.write(self.data[end:end+size])
+            result += self.data[end:end+size]
             self.size+=size
             self.data=self.data[end+size+len(delimiter):]
 
-        self.cached_fd.close()
-        
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
-
-        self.filename = FlagFramework.get_temp_path(self.case,self.inode)
-
-        try:
-            self.cached_fd=open(self.filename,'r')
-        except IOError:
-            self.create_file(self.filename)
-            self.cached_fd=open(self.filename,'r')
-            
-
-    def seek(self,offset,whence=0):
-        self.cached_fd.seek(offset,whence)
-
-    def tell(self):
-        return self.cached_fd.tell()
-
-    def read(self,length=None):
-        if length==None:
-            length=self.size-self.tell()
-            
-        return self.cached_fd.read(length)
+        return result
 
 class HTTPTree(TreeObj.TreeObj):
     """ HTTP Requests can be thought of as forming a tree, relating

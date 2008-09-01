@@ -10,7 +10,7 @@ from pyflag.FileSystem import FileSystem,DBFS,File
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
-import time,os
+import time,os,posixpath
 import math
 import bisect
 import pyflag.conf
@@ -26,7 +26,7 @@ class Raw(DBFS):
 
     def load(self, mount_point, iosource_name, scanners=None, directory = None):
         ## Ensure that mount point is normalised:
-        mount_point = os.path.normpath(mount_point)
+        mount_point = posixpath.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)
 
         ## Just add a single inode:

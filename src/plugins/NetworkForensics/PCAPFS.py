@@ -43,7 +43,7 @@ from NetworkScanner import *
 import pypcap
 import cStringIO
 from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeIDType, CounterType, BigIntegerType, ShortIntegerType, IPType
-
+import pyflag.CacheManager as CacheManager
 
 description = "Network Forensics"
 
@@ -122,39 +122,6 @@ class ConnectionDetailsTable(FlagFramework.CaseTable):
         [ TimestampType, dict(name='Timstamp', column='ts_sec')]
         ]
         
-class CachedWriter:
-    """ A class which caches data in memory and then flushes to disk
-    when ready. This does not tie up file descriptors.
-
-    FIXME: Stream reassembly typically uses lots of very small files -
-    this is inefficient in terms of storage and access speed. The
-    CachedWriter may be used to implement a kind of compound file.
-    """
-    def __init__(self, filename):
-        self.filename = filename
-        self.fd = cStringIO.StringIO()
-        self.offset = 0
-
-    def write_to_file(self):
-        ## Only write if we have data - so 0 length files will never
-        ## be written.
-        data = self.fd.getvalue()
-        if len(data)>0:
-            fd = open(self.filename,"a")
-            fd.write(data)
-            fd.close()
-            self.fd.truncate(0)
-        
-    def write(self, data):
-        self.fd.write(data)
-        self.offset += len(data)
-        
-        if self.fd.tell() > 100000:
-            self.write_to_file()
-
-    def __del__(self):
-        self.write_to_file()
-
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
     """
@@ -238,10 +205,9 @@ class PCAPFS(DBFS):
                            )
 
                 ## This is where we write the data out
-                connection['data'] = CachedWriter(
-                    FlagFramework.get_temp_path(dbh.case,
-                                                "I%s|S%s" % (iosource_name, connection['inode_id']))
-                    )
+                connection['data'] = CacheManager.MANAGER.create_cache_fd(
+                    dbh.case,
+                    "I%s|S%s" % (iosource_name, connection['inode_id']))
 
                 if tcp.data_len > 0:
                     Callback('data', packet, connection)

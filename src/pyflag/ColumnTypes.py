@@ -911,7 +911,7 @@ class InodeIDType(IntegerType):
         print "Exporting Inode %s to %s" % (value, exportdir)
         fsfd = FileSystem.DBFS(self.case)
         infd = fsfd.open(inode_id=value)
-        outfd = open("%s/%s" % (exportdir, value), "w")
+        outfd = open("%s/%s" % (exportdir, value), "wb")
         try:
             while True:
         	    data = infd.read(4096)

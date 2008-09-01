@@ -29,7 +29,7 @@ finds zip file contents where ever they appear within the zip -
 hopefull the both return the same thing, but in the case of a multi
 file zip file the carver will work better than the scanner.
 """
-import os.path,sys
+import os.path,sys,posixpath
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 import zipfile,gzip,tarfile, zlib
@@ -56,7 +56,7 @@ class ZipScan(GenScanFactory):
     
     class Scan(StoreAndScanType):
         types = (
-            'application/x-zip',
+            'application/(x-)?zip',
             )
 
         def external_process(self,fd):
@@ -65,14 +65,14 @@ class ZipScan(GenScanFactory):
             cache_key = "%s:%s" % (self.case , self.fd.inode)
 
             ## Try to read the fd as a zip file
-            z = zipfile.ZipFile(fd,'r')
+            z = zipfile.ZipFile(fd,'rb')
 
             pathname, inode, inode_id = self.ddfs.lookup(inode = self.inode)
-            
+
             ## retrieve evidence timezone, this is necessary because zip files
             ## store time in localtime
-            evidence_tz = Time.get_evidence_tz_name(self.case, fd)
-
+            evidence_tz = Time.get_evidence_tz_name(self.case, self.fd)
+            
             ## List all the files in the zip file:
             dircount = 0
             inodes = []
@@ -86,21 +86,21 @@ class ZipScan(GenScanFactory):
                     t=0
 
                 ## If the entry corresponds to just a directory we ignore it.
-                if not os.path.basename(namelist[i]): continue
+                if not posixpath.basename(namelist[i]): continue
 
                 info = z.infolist()[i]
                 inode = "%s|Z%s:%s" % (self.inode,info.header_offset, info.compress_size)
                 inodes.append(inode)
                 
-                self.ddfs.VFSCreate(None,
-                                    inode,pathname+"/"+namelist[i],
-                                    size=info.file_size,
-                                    mtime=t)
+                inode_id = self.ddfs.VFSCreate(None,
+                                               inode,pathname+"/"+namelist[i],
+                                               size=info.file_size,
+                                               mtime=t)
                 
             for inode in inodes:
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
-                fd = self.ddfs.open(inode = inode)
+                fd = self.ddfs.open(inode_id = inode_id)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
 class GZScan(ZipScan):
@@ -366,7 +366,7 @@ class GZ_file(File):
             except IOError,e:
                 step /= 2
                 if step<10:
-                    pyflaglog.log(pyflaglog.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
+                    pyflaglog.log(pyflaglog.DEBUG, "Error reading from %s(%s), could only get %s bytes (wanted %s/%s)" % (self.fd.inode, e, count, length,self.size));
                     break
                 
                 else:

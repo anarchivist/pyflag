@@ -226,7 +226,7 @@ class Thumbnailer(Image):
         """ Sets the thumbnail to a constant image """
         self.image = PIL.Image.open("%s/%s" % (config.IMAGEDIR,name))
         self.width, self.height = self.image.size
-        self.thumbnail = open("%s/%s" % (config.IMAGEDIR,name))
+        self.thumbnail = open("%s/%s" % (config.IMAGEDIR,name),'rb')
         self.content_type='image/png'
         
     def Unknown(self):

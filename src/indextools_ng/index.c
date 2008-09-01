@@ -245,7 +245,7 @@ static PyTypeObject trie_iter_Type = {
     0,                         /* tp_clear */
     0,                         /* tp_richcompare */
     0,                         /* tp_weaklistoffset */
-    0,//PyObject_SelfIter,         /* tp_iter */
+    0, 
     trie_iter_next,            /* tp_iternext */
     trie_iter_methods,        /* tp_methods */
     0,                         /* tp_members */
@@ -286,6 +286,8 @@ PyMODINIT_FUNC initindex(void) {
         return;
 
     trie_iter_Type.tp_new = PyType_GenericNew;
+    trie_iter_Type.tp_iter = PyObject_SelfIter;
+
     if (PyType_Ready(&trie_iter_Type) < 0)
         return;
 

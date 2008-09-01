@@ -789,13 +789,7 @@ def splitpath(path):
 def joinpath(branch):
     return '/'+'/'.join(branch)
 
-def get_temp_path(case,filename):
-    """ Returns the full path to a temporary file based on filename.
-    """
-    filename = filename.replace('/','-')
-    return "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
-
-from os.path import join
+from posixpath import join
 import time
 
 def glob_to_sql(glob):
@@ -925,7 +919,10 @@ def print_info():
         result += "\n%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)
         for cls in registry.classes:
-            result+= "%s: %s\n" % (cls, cls.__doc__)
+            try:
+                message =  cls.__doc__.splitlines()[0]
+            except: message = cls.__doc__
+            result+= "%s: %s\n" % (cls, message)
 
     return result
 

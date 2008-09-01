@@ -56,8 +56,9 @@ class BasicType(DataType):
     def read(self):
         try:
             length = struct.calcsize(self.fmt)
+            data = self.buffer[:length].__str__()
             if length>0:
-                return struct.unpack(self.fmt,self.buffer[:length].__str__())[0]
+                return struct.unpack(self.fmt,data)[0]
             return ''
         except struct.error,e:
             raise IOError("%s. Tried to use format string %s"% (e, self.fmt))
