@@ -25,7 +25,7 @@ method of synchronization.
 """
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import cStringIO
+import cStringIO, os
 
 class CachedWriter:
     """ A class which caches data in memory and then flushes to disk
@@ -70,11 +70,15 @@ class DirectoryCacheManager:
         for c in "/|:":
             inode = inode.replace(c,'_')
             
-        return "%s/case_%s/%s" % (config.RESULTDIR,case,inode)
+        return os.path.join(config.RESULTDIR,"case_%s" % case,inode)
 
     def create_cache_fd(self, case, inode):
         """ Return an fd with a write method for a new cache object """
         return CachedWriter(self.get_temp_path(case, inode))
+
+    def create_cache_seakable_fd(self, case, inode):
+        """ Return an fd with a write method for a new cache object """
+        return open(self.get_temp_path(case, inode),'wb')
 
     def create_cache_from_data(self, case, inode, data):
         """ Create a new cache entry from data. Data is expected to be
@@ -106,12 +110,7 @@ class DirectoryCacheManager:
 
     def open(self, case,inode):
         filename = self.get_temp_path(case, inode)
-        try:
-            return ProxyReader(filename)
-        except IOError:
-            filename = filename.replace(":","_")
-            filename = filename.replace("|","_")
-            return ProxyReader(filename)
+        return ProxyReader(filename)
 
 class ProxyReader:
     def __init__(self, filename):

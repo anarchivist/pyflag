@@ -15,9 +15,12 @@ AC_PROG_CC
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
 
+## Are we running on windows?
+AC_CHECK_HEADER(windows.h,have_windows=yes,have_windows=no)
+
 ## Allow users to disable optional libraries:
 ## Afflib needs some special libraries to link against - is that a bug in afflib?
-ac_check_lib_save_LIBS=$LIBS
+ac_my_check_lib_save_LIBS=$LIBS
 LIBS="-lz -lcrypto -lstdc++  $LIBS"
 
 AC_ARG_ENABLE(afflib, 
@@ -39,7 +42,10 @@ AC_ARG_ENABLE(afflib,
 		AC_MSG_WARN([You must install libaff (http://www.afflib.org/) for AFF image support])
 		])]
         )
-LIBS=$ac_check_lib_save_LIBS
+LIBS=$ac_my_check_lib_save_LIBS
+
+ac_my_check_lib_save_LIBS=$LIBS
+LIBS="-lz  $LIBS"
 
 AC_ARG_ENABLE(ewf, 
         [  --disable-ewf           Do not use libewf even if it is installed],
@@ -64,6 +70,7 @@ AC_ARG_ENABLE(ewf,
 	    AC_MSG_WARN([You must install libewf (http://www.uitwisselplatform.nl/projects/libewf/) for Expert Witness Format (encase) support])
 	  ])
        ])
+LIBS=$ac_my_check_lib_save_LIBS
 
 ## We only can use a later version than 20080501 - we compile a small
 ## program to check the version string:
@@ -97,6 +104,7 @@ AM_CONDITIONAL(HAVE_LIBAFFLIB, test "$have_libafflib" = yes)
 AM_CONDITIONAL(HAVE_LIBEWF, test "$have_libewf" = yes)
 AM_CONDITIONAL(HAVE_GEOIP, test "$have_geoip" = yes)
 AM_CONDITIONAL(HAVE_LIBJPEG, test "$have_libjpeg" = yes)
+AM_CONDITIONAL(HAVE_WINDOWS, test "$have_windows" = yes)
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)

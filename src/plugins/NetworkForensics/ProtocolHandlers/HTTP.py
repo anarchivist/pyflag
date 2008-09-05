@@ -213,7 +213,7 @@ class AttachmentColumnType(IntegerType):
     def __init__(self, **kwargs):
         kwargs['name']="Attachment"
         kwargs['column'] = 'indirect'
-        link = FlagFramework.query_type(case=kwargs['case'],
+        link = FlagFramework.query_type(case=kwargs.get('case'),
                                         family='Disk Forensics',
                                         report='ViewFile',
                                         mode = 'Summary',

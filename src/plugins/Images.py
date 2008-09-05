@@ -149,7 +149,7 @@ class Standard(IO.Image):
             if re.match("[^:]+://",f): return filenames
 
             if not f.startswith(posixpath.normpath(config.UPLOADDIR)):
-                f = "%s/%s" % (config.UPLOADDIR,f)
+                f = os.path.join(config.UPLOADDIR,f)
 
             if config.FOLLOW_SYMLINKS:
                 ## Is it a symlink? This allows us to symlink to a

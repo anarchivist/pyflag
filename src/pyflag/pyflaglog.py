@@ -117,7 +117,7 @@ def log(level,message, *args):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
     try:
         log_fd = open(config.LOGFILE,"ab")
-    except:
+    except Exception,e:
         log_fd = sys.stderr
 
     import pyflag.DB as DB

@@ -377,7 +377,7 @@ class GenericUI:
                 try:
                     for d in os.listdir(full_path):
                         filename = os.path.join(path,d)
-                        full_filename = "%s/%s" % (config.UPLOADDIR, filename)
+                        full_filename = os.path.join(config.UPLOADDIR, filename)
                         try:
                             if not os.path.isdir(full_filename):
                                 s = os.stat(full_filename)

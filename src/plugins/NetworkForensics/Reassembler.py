@@ -161,7 +161,7 @@ class StreamFile(File):
         fds = []
         for s in stream_ids:
             try:
-                fds.append(CacheManager.MANAGER.create_cache_fd(
+                fds.append(CacheManager.MANAGER.open(
                     dbh.case,
                     "%s|S%s" % (self.fd.inode, s)))
             except IOError,e:
@@ -175,7 +175,7 @@ class StreamFile(File):
         initials = [ True,] * len(stream_ids)
 
         # The output file
-        out_fd = CacheManager.MANAGER.create_cache_fd(dbh.case, self.inode)
+        out_fd = CacheManager.MANAGER.create_cache_seakable_fd(dbh.case, self.inode)
 
         min_packet_id = sys.maxint
         

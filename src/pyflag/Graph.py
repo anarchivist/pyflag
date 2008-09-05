@@ -224,9 +224,9 @@ class Thumbnailer(Image):
 
     def set_image(self,name):
         """ Sets the thumbnail to a constant image """
-        self.image = PIL.Image.open("%s/%s" % (config.IMAGEDIR,name))
+        self.image = PIL.Image.open(os.path.join(config.IMAGEDIR,name))
         self.width, self.height = self.image.size
-        self.thumbnail = open("%s/%s" % (config.IMAGEDIR,name),'rb')
+        self.thumbnail = open(os.path.join(config.IMAGEDIR,name),'rb')
         self.content_type='image/png'
         
     def Unknown(self):
@@ -272,12 +272,14 @@ class Thumbnailer(Image):
         """ Handles Jpeg thumbnails.
         """
         ## Calculate some basic statistics
+        print "Building thumbnail"
+        self.fd.seek(0)
         fd = cStringIO.StringIO(self.fd.read(2000000) + "\xff\xd9")
 
         try:
             self.image = PIL.Image.open(fd)
         except Exception,e:
-            print e
+            print "PIL Exception %s" % e
             self.size_x=24
             self.set_image("no.png")
             return
@@ -290,7 +292,7 @@ class Thumbnailer(Image):
 
         self.thumbnail = cStringIO.StringIO()
         try:
-            self.image.thumbnail((self.size_x,self.size_x / ratio), PIL.Image.NEAREST)
+            self.image.thumbnail((self.size_x,int(self.size_x / ratio)), PIL.Image.NEAREST)
         except Exception,e:
             print e
 

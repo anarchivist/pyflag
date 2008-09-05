@@ -1,6 +1,10 @@
 include $(top_srcdir)/config/Makefile.rules
 
+ifdef HAVE_WINDOWS
+AM_LDFLAGS		= -lmagic -lz -lregex
+else
 AM_LDFLAGS		= -lmagic -lz
+endif
 
 noinst_LTLIBRARIES 	= magic.la
 pkgpyexec_PYTHON	= magic$(PYTHON_EXTENSION)

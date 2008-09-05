@@ -8,9 +8,6 @@ INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 #noinst_PROGRAMS		= open
 bin_PROGRAMS		= sgzip evtool
 
-# convenience libs
-noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la libsha1.la
-
 # Stuff that should be distributed:
 noinst_HEADERS		= $(srcdir)/*.h
 
@@ -37,7 +34,7 @@ liboo_la_SOURCES	= class.c stringio.c struct.c talloc.c packet.c misc.c
 liboo_la_CPPFLAGS 	= -DHAVE_VA_COPY
 
 libmd5_la_SOURCES	= md5c.c 
-libsha1_la_SOURCES	= sha1.c
+#libsha1_la_SOURCES	= sha1.c
 
 # specifics (bins)
 sgzip_LDADD             = libsgz.la libexcept.la
@@ -45,4 +42,4 @@ sgzip_LDADD             = libsgz.la libexcept.la
 evtool_SOURCES		= evtool.c
 evtool_LDADD		= libevf.la libsgz.la libmd5.la libexcept.la
 
-remote_server_LDADD	= libexcept.la
+#remote_server_LDADD	= libexcept.la

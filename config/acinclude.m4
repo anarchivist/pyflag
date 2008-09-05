@@ -17,6 +17,7 @@ AC_DEFUN([AC_PYTHON_DEVEL],[
 	PYTHON_EXTRA_LIBS=`$PYTHON -c "import distutils.sysconfig;print distutils.sysconfig.get_python_lib() "
 	AC_MSG_RESULT($PYTHON_LDFLAGS)`
 	AC_SUBST([PYTHON_LDFLAGS],["-L$python_path -lpython$PYTHON_VERSION"])
+	AC_SUBST([PYTHON_EXTENSION], [".so"])
 
 	#
 	python_site=`echo $python_path | sed "s/config/site-packages/"`

@@ -35,7 +35,7 @@ class FileMethod(IO.FileHandler):
         path = os.path.normpath(self.path)
             
         if not self.path.startswith(posixpath.normpath(config.UPLOADDIR)):
-            file = config.UPLOADDIR + "/" + path
+            file = os.path.join(config.UPLOADDIR,path)
         else:
             file = path
 
@@ -96,7 +96,7 @@ class IOSourceMethod(IO.FileHandler):
         ## Adjust all the filenames to be rooted at the UPLOADDIR:
         for f in filenames:
             query['filename'] = os.path.normpath(
-                "%s/%s" % (config.UPLOADDIR, f))
+                os.path.join(config.UPLOADDIR, f))
         
         return image.open(None, None, query=query)
 
@@ -126,7 +126,7 @@ class IOSourceMethod(IO.FileHandler):
         ## Adjust all the filenames to be rooted at the UPLOADDIR:
         for f in filenames:
             query['filename'] = os.path.normpath(
-                "%s/%s" % (config.UPLOADDIR, f))
+                os.path.join(config.UPLOADDIR, f))
         
         return image.open(None, None, query=query)
 

@@ -314,8 +314,11 @@ class CaseDBInit(FlagFramework.EventHandler):
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:
-            os.mkdir("%s/case_%s" % (config.RESULTDIR,case))
-        except OSError:
+            path = os.path.join(config.RESULTDIR, "case_%s" % case)
+            print "Making path %s" % path
+            os.mkdir(path)
+        except OSError,e:
+            print "Error Creating dir %s" % e
             pass
 
 ##        ## Create an enum for the scanners in the inode table

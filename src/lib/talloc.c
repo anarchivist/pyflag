@@ -1184,6 +1184,35 @@ char *talloc_vasprintf(const void *t, const char *fmt, va_list ap)
 	
 	/* this call looks strange, but it makes it work on older solaris boxes */
 	va_copy(ap2, ap);
+	printf("Windows printf\n");
+#ifdef __WIN32__
+        /** Windows implementation is braindead in that it does not
+            return the number of characters needed, so we need to
+            guess (no wonder windows needs so much memory).
+
+            There is a weird function _vscprintf which does the right
+            thing but it needs some weird runtime stuff which we dont
+            want to depend on. (Why have an api function start with
+            _????).
+	*/
+        {
+          int result;
+          len=256;
+
+          ret = _talloc(t, len);
+          while(1) {
+            va_copy(ap2, ap);
+            
+            result = vsnprintf(ret, len, fmt, ap2);
+            if(result==-1) {
+              len+=256;
+              ret = _talloc_realloc(NULL, ret, len, NULL);
+            } else break;
+          }
+          ret = talloc_realloc(NULL, ret, char, result+1);
+          talloc_set_name_const(ret, ret);
+        }
+#else
 	len = vsnprintf(&c, 1, fmt, ap2);
 	va_end(ap2);
 	if (len < 0) {
@@ -1197,6 +1226,7 @@ char *talloc_vasprintf(const void *t, const char *fmt, va_list ap)
 		va_end(ap2);
 		_talloc_set_name_const(ret, ret);
 	}
+#endif
 
 	return ret;
 }

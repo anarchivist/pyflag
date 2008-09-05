@@ -7,7 +7,11 @@ geoip_la_SOURCES = geoip.c
 geoip_la_CPPFLAGS= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 geoip_la_LDFLAGS = -module $(PYTHON_LDFLAGS)
 
+if HAVE_WINDOWS
 AM_LDFLAGS	=  -lGeoIP -lws2_32
+else
+AM_LDFLAGS	=  -lGeoIP
+endif
 
 noinst_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la geoip.la libnetwork.la
 pkgpyexec_PYTHON	= _dissect$(PYTHON_EXTENSION) reassembler$(PYTHON_EXTENSION)\

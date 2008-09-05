@@ -21,10 +21,12 @@
 # ******************************************************
 """ This scanner scans a file for its mime type and magic """
 import pyflag.FlagFramework as FlagFramework
+import pyflag.CacheManager as CacheManager
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
+import PIL, cStringIO
 import os.path
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
@@ -100,15 +102,53 @@ class ThumbnailType(InodeIDType):
     def render_thumbnail_hook(self, inode_id, row, result):
         try:
             fd = self.fsfd.open(inode_id=inode_id)
-            image = Graph.Thumbnailer(fd,200)
+            image = PIL.Image.open(fd)
         except IOError:
             result.icon("broken.png")
             return
 
-        if image.height>0:
-            result.image(image,width=image.width,height=image.height)
-        else:
-            result.image(image,width=image.width)
+        width, height = image.size
+        print "Got an image of size %s, %s" % image.size
+
+        ## Calculate the new width and height:
+        new_width = 200.0
+        new_height = new_width / width * height
+
+        if new_width > width and new_height > height:
+            new_height = height
+            new_width = width
+
+        def show_image(query, result):
+            ## Try to fetch the cached copy:
+            filename = "thumb_%s" % inode_id
+
+            try:
+                fd = CacheManager.MANAGER.open(self.case, filename)
+                thumbnail = fd.read()
+            except IOError:
+                fd = self.fsfd.open(inode_id=inode_id)
+                fd = cStringIO.StringIO(fd.read(2000000) + "\xff\xd9")
+                image = PIL.Image.open(fd)
+                thumbnail = cStringIO.StringIO()
+
+                try:
+                    image.thumbnail((new_width, new_height), PIL.Image.NEAREST)
+                    image.save(thumbnail, 'jpeg')
+                    thumbnail = thumbnail.getvalue()
+                except IOError,e:
+                    print e
+                    thumbnail = open("%s/no.png" % (config.IMAGEDIR,),'rb').read()
+
+                CacheManager.MANAGER.create_cache_from_data(self.case, filename, thumbnail)
+                fd = CacheManager.MANAGER.open(self.case, filename)
+                
+            result.result = thumbnail
+            result.content_type = 'image/jpeg'
+            result.decoration = 'raw'
+
+        
+        result.result += "<img width=%s height=%s src='f?callback_stored=%s' />" % (new_width, new_height,
+                                                                result.store_callback(show_image))
 
     display_hooks = InodeIDType.display_hooks[:] + [render_thumbnail_hook,]
 
