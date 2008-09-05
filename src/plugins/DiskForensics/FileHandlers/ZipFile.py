@@ -65,7 +65,7 @@ class ZipScan(GenScanFactory):
             cache_key = "%s:%s" % (self.case , self.fd.inode)
 
             ## Try to read the fd as a zip file
-            z = zipfile.ZipFile(fd,'rb')
+            z = zipfile.ZipFile(fd)
 
             pathname, inode, inode_id = self.ddfs.lookup(inode = self.inode)
 

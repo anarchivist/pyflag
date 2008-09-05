@@ -1184,7 +1184,6 @@ char *talloc_vasprintf(const void *t, const char *fmt, va_list ap)
 	
 	/* this call looks strange, but it makes it work on older solaris boxes */
 	va_copy(ap2, ap);
-	printf("Windows printf\n");
 #ifdef __WIN32__
         /** Windows implementation is braindead in that it does not
             return the number of characters needed, so we need to

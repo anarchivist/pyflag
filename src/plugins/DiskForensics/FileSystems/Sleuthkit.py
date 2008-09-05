@@ -424,7 +424,7 @@ class NTFSTests(unittest.TestCase):
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
         row = dbh.fetch()
-        self.assertEqual(row['count'],139)
+        self.assertEqual(row['count'],140)
         dbh.execute("select count(*) as count from file")
         row = dbh.fetch()
         self.assertEqual(row['count'],152)

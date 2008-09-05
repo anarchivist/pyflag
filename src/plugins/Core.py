@@ -156,10 +156,10 @@ class OffsetFile(FileSystem.File):
             self.size = fd.size - self.offset
 
     def read(self,length=None):
-        try:
-            return FileSystem.File.read(self,length)
-        except IOError:
-            pass
+        #try:
+        #    return FileSystem.File.read(self,length)
+        #except IOError:
+        #    pass
 
         available = self.size - self.readptr
         if length==None:
@@ -174,7 +174,20 @@ class OffsetFile(FileSystem.File):
         
         self.readptr+=len(result)
         return result
+    
+    def seek(self,offset,whence=0):
+        if whence==2:
+            self.readptr=self.size+offset
+        elif whence==1:
+            self.readptr+=offset
+        else:
+            self.readptr = offset
 
+        self.fd.seek(self.offset + self.readptr)
+        
+    def tell(self):
+        return self.readptr
+                                                    
     def explain(self, query, result):
         self.fd.explain(query,result)
 
@@ -225,14 +238,18 @@ class OffsetFileTests(tests.FDTest):
         
         fd2 = IO_File('PyFlagNTFSTestCase', None, 'Itest')
         fd2.seek(1000)
+        self.assertEqual(fd2.tell(), 1000)
         data=fd2.read(1000)
-
+        self.assertEqual(fd2.tell(), 2000)
+        
         self.fd.seek(0)
         data2 = self.fd.read()
+        self.assertEqual(self.fd.tell(),1000)
 
         ## Make sure that we are reading the same data with and
         ## without the offset:
         self.assertEqual(data2, data)
+        self.assertEqual(fd2.tell(), 2000)
 
 class Scan(Farm.Task):
     """ A task to distribute scanning among all workers """
@@ -315,7 +332,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:
             path = os.path.join(config.RESULTDIR, "case_%s" % case)
-            print "Making path %s" % path
             os.mkdir(path)
         except OSError,e:
             print "Error Creating dir %s" % e
