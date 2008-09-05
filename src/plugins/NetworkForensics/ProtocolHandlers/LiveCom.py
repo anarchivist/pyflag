@@ -182,7 +182,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             table = self.parser.root.find("table",{"class":"ItemListContentTable InboxTable"})
             if not table: return False
             
-            result = {'type': 'Listed', 'Message': table}
+            result = {'type': 'Listed', 'message': table}
 
             mail_box = self.parser.root.find("li", {"class":"FolderItemSelected"})
             if mail_box:
@@ -207,9 +207,9 @@ class HotmailScanner(Scanner.GenScanFactory):
             for field, pattern in [('To','fto'),
                                    ('From','ffrom'),
                                    ('CC','fcc'),
-                                   ('Bcc', 'fbcc'),
-                                   ('Subject', 'fsubject'),
-                                   ('Message', 'fmessagebody')]:
+                                   ('BCC', 'fbcc'),
+                                   ('subject', 'fsubject'),
+                                   ('message', 'fmessagebody')]:
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
@@ -218,7 +218,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             else: return False
 
         def process_readmessage(self,fd):
-            result = {'type': 'Read', 'Message':''}
+            result = {'type': 'Read', 'message':''}
             root = self.parser.root
 
             tag = root.find('div', {'class':'ReadMsgContainer'})
@@ -226,7 +226,7 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             ## Find the subject:
             sbj = tag.find('td', {'class':'ReadMsgSubject'})
-            if sbj: result['Subject'] = HTML.decode_entity(sbj.innerHTML())
+            if sbj: result['subject'] = HTML.decode_entity(sbj.innerHTML())
 
             ## Fill in all the other fields:
             context = None
@@ -241,14 +241,14 @@ class HotmailScanner(Scanner.GenScanFactory):
                 elif data.lower().startswith('to:'):
                     context = 'To'
                 elif data.lower().startswith('sent:'):
-                    context = 'Sent'
+                    context = 'sent'
 
             ## Now the message:
             ## On newer sites its injected using script:
             for s in root.search('script'):
                 m=re.match("document\.getElementById\(\"MsgContainer\"\)\.innerHTML='([^']*)'", s.innerHTML())
                 if m:
-                    result['Message'] += HTML.decode_unicode(m.group(1).decode("string_escape"))
+                    result['message'] += HTML.decode_unicode(m.group(1).decode("string_escape"))
                     break
 
             return self.insert_message(result)            
@@ -270,25 +270,25 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             for field, pattern in [('To','fto'),
                                    ('CC','fcc'),
-                                   ('Bcc', 'fbcc'),
-                                   ('Subject', 'fsubject')]:
+                                   ('BCC', 'fbcc'),
+                                   ('subject', 'fsubject')]:
                 tmp = tag.find('input', dict(name = pattern))
                 if tmp:
                     result[field] = HTML.decode_entity(tmp['value'])
             
             ## Now extract the content of the email:
-            result['Message'] = ''
+            result['message'] = ''
 
             ## Sometimes the message is found in the EditArea div:
             div = root.find('div', dict(id='EditArea'))
             if div:
-                result['Message'] += div.innerHTML()
+                result['message'] += div.innerHTML()
 
             ## On newer sites its injected using script:
             for s in root.search('script'):
                 m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s.innerHTML())
                 if m:
-                    result['Message'] += m.group(1).decode("string_escape")
+                    result['message'] += m.group(1).decode("string_escape")
                     break
 
             return self.insert_message(result)

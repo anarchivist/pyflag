@@ -115,6 +115,7 @@ class DirectoryCacheManager:
 class ProxyReader:
     def __init__(self, filename):
         self.fd = open(filename,"rb")
+        self.name = filename
         
     def seek(self, x, whence=0):
         return self.fd.seek(x,whence)

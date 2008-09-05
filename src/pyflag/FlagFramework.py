@@ -789,6 +789,9 @@ def splitpath(path):
 def joinpath(branch):
     return '/'+'/'.join(branch)
 
+def sane_join(*branch):
+    return os.path.normpath(os.path.sep.join(branch))
+
 from posixpath import join
 import time
 

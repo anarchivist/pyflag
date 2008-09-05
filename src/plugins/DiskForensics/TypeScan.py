@@ -232,8 +232,6 @@ class TypeStats(Stats.Handler):
 
     def render_tree(self, branch, query):
         dbh = DB.DBO(self.case)
-
-        print branch
         ## Top level view - we only show the File Types stats branch
         ## if we have any types there.
         if not branch[0]:

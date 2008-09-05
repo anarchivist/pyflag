@@ -13,6 +13,8 @@ from pyflag.ColumnTypes import StringType, TimestampType, InodeType, FilenameTyp
 import os
 
 try:
+    import VolatilityCommon
+    
     from forensics.win32.datetime import *
     from forensics.win32.tasks import *
     from forensics.win32.network import *
@@ -38,7 +40,7 @@ try:
 
 except ImportError, e:
     active = False
-    pyflaglog.log(pyflaglog.INFO, "Download and unpack Volatility1.3 in %s for memory foreniscs" % os.path.dirname(__file__))
+    pyflaglog.log(pyflaglog.INFO, "Download and unpack Volatility1.3 in %s for Windows Memory foreniscs (%s)" % (os.path.dirname(__file__), e))
 
 PROTOCOL_ENUM = { 6: "TCP",
                   17: "UDP",

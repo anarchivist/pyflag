@@ -1,6 +1,6 @@
 include $(top_srcdir)/config/Makefile.rules
 
-ifdef HAVE_WINDOWS
+if HAVE_WINDOWS
 AM_LDFLAGS		= -lmagic -lz -lregex
 else
 AM_LDFLAGS		= -lmagic -lz

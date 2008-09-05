@@ -30,6 +30,7 @@ from pyflag.format import Buffer
 import re
 import pyflag.FlagFramework as FlagFramework
 import pyflag.FileSystem as FileSystem
+import pyflag.CacheManager as CacheManager
 
 class OLEScan(Scanner.GenScanFactory):
     """ Scan OLE2 files """
