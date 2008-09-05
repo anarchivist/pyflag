@@ -337,7 +337,7 @@ def start_workers():
         try:
             event().startup()
         except Exception,e:
-            pyflaglog.log(pyflaglog.ERRORS, "Error: %s" % e)
+            pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
 
     ## The parent now calls the startup method on each of the events:
     print "Launching startup"
@@ -345,7 +345,7 @@ def start_workers():
         try:
             event().startup()
         except Exception,e:
-            pyflaglog.log(pyflaglog.ERRORS, "Error: %s" % e)
+            pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
         
 def handler(sig, frame):
     #print "Got woken up"

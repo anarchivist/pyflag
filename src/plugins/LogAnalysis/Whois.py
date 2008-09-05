@@ -492,8 +492,8 @@ class WhoisInit(FlagFramework.EventHandler):
 
         dbh.execute("""CREATE TABLE `geoip_country` (
         `id` int(11) unsigned NOT NULL auto_increment,
-        `country` char(3) NOT NULL UNIQUE default('--'),
-        `country2` char(3) NOT NULL UNIQUE default('--'),
+        `country` char(3) NOT NULL UNIQUE,
+        `country2` char(3) NOT NULL UNIQUE,
         PRIMARY KEY (`id`),
         UNIQUE KEY (`country`)
         ) engine = MyISAM""")

@@ -807,6 +807,8 @@ class Chunked(File):
         except IOError,e:
             pass
 
+        ## Because we read ourselves as one full chunk we make sure we
+        ## dont keep reading more than once.
         if self.read_already: return ''
 
         delimiter="\r\n"

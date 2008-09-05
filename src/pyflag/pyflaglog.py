@@ -92,7 +92,7 @@ class LoggingThread(threading.Thread):
                 if dbh:
                     dbh.insert('logs', level=level, message=message[:250], _fast=True)
             except Exception,e:
-                sys.stdout.write( "Logging service: %s\nIf PyFlag is not configured yet just connect to its URL.\n" % e)
+                sys.stdout.write( "Logging service: %s\nIf PyFlag is not configured yet just connect to its URL. (http://%s:%s/)\n" % (e,config.HTTPSERVER_BINDIF, config.HTTPSERVER_PORT))
                 sys.stdout.flush()
                 time.sleep(10)
 
