@@ -12,7 +12,7 @@ nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflash.in \
 				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS) \
-				src/pyflag/conf.py.in
+				src/pyflag/conf.py.in autogen.sh
 
 # perform subs in scripts and config files
 edit = sed \

@@ -70,7 +70,8 @@ try:
 
     ## Volatility comes with memory maps and profiles - we need to know
     ## where they are:
-    config.add_option("memory_profile_dir", default=volatility_path + "/profiles",
+    config.add_option("memory_profile_dir", default=VolatilityCommon.volatility_path + \
+                      "/profiles",
                       help = "Directory that contains all volatility profiles.")
 
 ## Switch ourselves off if volatility is not there
