@@ -219,7 +219,7 @@ def parse(timestr, case=None, evidence_tz=None, **options):
         dt = datetime.datetime.fromtimestamp(int(timestr))
     except:
         DEFAULT = datetime.datetime(tzinfo=gettz("UTC"), *time.gmtime()[:6]).astimezone(evidence_tz)
-        dt = dateutil.parser.parse(timestr, default=DEFAULT, **options).astimezone(case_tz)
+        dt = pyflag.dateutil.parser.parse(timestr, default=DEFAULT, **options).astimezone(case_tz)
 
     return time.strftime("%Y-%m-%d %H:%M:%S", dt.timetuple())
 

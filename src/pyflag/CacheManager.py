@@ -110,7 +110,7 @@ class DirectoryCacheManager:
 
     def open(self, case,inode):
         filename = self.get_temp_path(case, inode)
-        return ProxyReader(filename)
+        return open(filename,'rb')
 
 class ProxyReader:
     def __init__(self, filename):

@@ -799,16 +799,21 @@ class Chunked(File):
         File.__init__(self, case, fd, inode)
 
         self.cache()
+    read_already = False
         
     def read(self,length=None):
         try:
             return File.read(self, length)
-        except IOError: pass
-        
+        except IOError,e:
+            pass
+
+        if self.read_already: return ''
+
         delimiter="\r\n"
         
         self.fd.seek(0)
-        self.data = self.fd.read()
+        data = self.fd.read()
+        self.data = data
         self.size=0
         result = ''
 
@@ -827,6 +832,7 @@ class Chunked(File):
             self.size+=size
             self.data=self.data[end+size+len(delimiter):]
 
+        self.read_already = True
         return result
 
 class HTTPTree(TreeObj.TreeObj):

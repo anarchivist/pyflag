@@ -161,9 +161,9 @@ class StreamFile(File):
         fds = []
         for s in stream_ids:
             try:
-                fds.append(CacheManager.MANAGER.open(
-                    dbh.case,
-                    "%s|S%s" % (self.fd.inode, s)))
+                fd = CacheManager.MANAGER.open(dbh.case,
+                                               "%s|S%s" % (self.fd.inode, s))
+                fds.append(fd)
             except IOError,e:
                 fds.append(-1)
 
