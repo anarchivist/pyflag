@@ -13,7 +13,7 @@ noinst_HEADERS		= $(srcdir)/*.h
 
 # python stuff
 noinst_LTLIBRARIES 	= liboo.la libexcept.la libsgz.la libevf.la libmd5.la pypacket.la
-pkgpyexec_PYTHON	= pypacket$(PYTHON_EXTENSION)
+nodist_pkgpyexec_PYTHON	= pypacket$(PYTHON_EXTENSION)
 
 pypacket_la_SOURCES	= pypacket.c
 pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include

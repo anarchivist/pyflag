@@ -1,7 +1,7 @@
 include $(top_srcdir)/config/Makefile.rules
 
 noinst_LTLIBRARIES 	= index.la
-pkgpyexec_PYTHON	= index$(PYTHON_EXTENSION)
+nodist_pkgpyexec_PYTHON	= index$(PYTHON_EXTENSION)
 
 noinst_HEADERS 		= trie.h 
 

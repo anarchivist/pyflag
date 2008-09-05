@@ -5,7 +5,7 @@ AM_LDFLAGS		= ../sleuthkit-2.52/tsk/.libs/libtsk-pf.a ../../../lib/.libs/liboo.a
 
 # This is for the sleuthkit python module
 noinst_LTLIBRARIES 	= sk.la
-pkgpyexec_PYTHON	= sk$(PYTHON_EXTENSION)
+nodist_pkgpyexec_PYTHON	= sk$(PYTHON_EXTENSION)
 noinst_HEADERS  = $(srcdir)/*.h
 
 sk_la_SOURCES	= sk.c

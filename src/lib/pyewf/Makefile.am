@@ -6,7 +6,7 @@ AM_LDFLAGS		= -lewf -lz
 if HAVE_LIBEWF
 # This is for the sleuthkit python module
 noinst_LTLIBRARIES 	= pyewf.la
-pkgpyexec_PYTHON	= pyewf$(PYTHON_EXTENSION)
+nodist_pkgpyexec_PYTHON	= pyewf$(PYTHON_EXTENSION)
 
 pyewf_la_SOURCES	= pyewf.c
 pyewf_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)

@@ -14,11 +14,11 @@ AM_LDFLAGS	=  -lGeoIP
 endif
 
 noinst_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la geoip.la libnetwork.la
-pkgpyexec_PYTHON	= _dissect$(PYTHON_EXTENSION) reassembler$(PYTHON_EXTENSION)\
+nodist_pkgpyexec_PYTHON	= _dissect$(PYTHON_EXTENSION) reassembler$(PYTHON_EXTENSION)\
 			  pypcap$(PYTHON_EXTENSION) geoip$(PYTHON_EXTENSION)
 else
 noinst_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la libnetwork.la
-pkgpyexec_PYTHON	= _dissect$(PYTHON_EXTENSION) reassembler$(PYTHON_EXTENSION)\
+nodist_pkgpyexec_PYTHON	= _dissect$(PYTHON_EXTENSION) reassembler$(PYTHON_EXTENSION)\
 			  pypcap$(PYTHON_EXTENSION)
 endif
 
