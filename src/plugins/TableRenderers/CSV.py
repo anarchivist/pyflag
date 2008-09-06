@@ -17,6 +17,7 @@ class CSVRenderer(UI.TableRenderer):
         
         result.textfield("Start Row (0)", "start_limit")
         result.textfield("End Row (0 - no limit)", "end_limit")
+        result.textfield("Filename (without extension)","filename")
 
         return submitted
         
@@ -37,12 +38,12 @@ class CSVRenderer(UI.TableRenderer):
             elements.append(self.elements[e])
             
         def generator(query, result):
-            yield "#Pyflag Table widget output\n#Query was %s.\n" % query
-            try:
-                yield "# Filter: %s\n" % query[self.filter]
-            except KeyError: pass
+            #yield "#Pyflag Table widget output\n#Query was %s.\n" % query
+            #try:
+            #    yield "# Filter: %s\n" % query[self.filter]
+            #except KeyError: pass
 
-            yield "#Fields: %s\n" % ",".join(self.column_names)
+            yield ",".join(self.column_names)+"\r\n"
             data = cStringIO.StringIO()
             csv_writer = csv.DictWriter(data,self.column_names,
                                         dialect = 'excel')
@@ -56,7 +57,11 @@ class CSVRenderer(UI.TableRenderer):
                 data.truncate(0)
             
         result.generator.generator = generator(query,result)
-
+        result.generator.content_type = "text/csv"
+        result.generator.headers = [("Content-Disposition",
+                                     "attachment; filename=%s.csv" % query.get(\
+                                     'filename','table')),]
+        
     def generate_rows(self, query):
         """ This implementation gets all the rows, but makes small
         queries to maximise the chance of getting cache hits.
@@ -66,8 +71,11 @@ class CSVRenderer(UI.TableRenderer):
         
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries.
-        try:    self.limit = int(query.get(self.limit_context,0))
+        try:    self.limit = int(query.get("start_limit",0))
         except: self.limit = 0
+
+        try:    end_limit = int(query.get("end_limit",0))
+        except: end_limit = 0
 
         while 1:
             dbh.cached_execute(self.sql,limit = self.limit, length=self.pagesize)
@@ -75,7 +83,9 @@ class CSVRenderer(UI.TableRenderer):
             for row in dbh:
                 yield row
                 count += 1
-
+                if end_limit > 0 and count + self.limit > end_limit: return
+                
             if count==0: break
-
+            
+            
             self.limit += self.pagesize
