@@ -508,21 +508,32 @@ class Hexeditor:
         type is an integer refering to the palette in PALETTE
         """
         self.fd = fd
-        self.case = fd.case
         self.query = query
-        self.inode_id = fd.lookup_id()
-        fd.seek(0)
-        ## We try to set the size to the maximum we can have:
+        
         try:
-            filesize = fd.size
-            blocksize = fd.block_size
-            slack = blocksize - filesize % blocksize
-            self.fd.overread = blocksize
-            self.fd.slack = True
-            self.size = filesize + slack + blocksize
-        except AttributeError:
-            self.size = fd.size
-            
+            self.case = fd.case
+            self.inode_id = fd.lookup_id()
+
+
+            ## We try to set the size to the maximum we can have:
+            try:
+                filesize = fd.size
+                blocksize = fd.block_size
+                slack = blocksize - filesize % blocksize
+                self.fd.overread = blocksize
+                self.fd.slack = True
+                self.size = filesize + slack + blocksize
+            except AttributeError:
+                self.size = fd.size
+
+        except:
+            self.case = None
+            self.inode_id = 0
+            fd.seek(0,2)
+            self.size = fd.tell()
+
+        fd.seek(0)
+
         self.file_offset = 0
         self.mark = 0
         self.focus_column = 1
@@ -711,7 +722,7 @@ class Hexeditor:
     def update_status_bar(self):
         self.adjust_mark()
         self.status_bar.set_text(
-            "%s/%s 0x%X/0x%X %s" % (self.mark,self.fd.size-1,
+            "%s/%s 0x%X/0x%X %s" % (self.mark,self.size-1,
                                     self.mark,
                                     self.size-1, self.message))
 

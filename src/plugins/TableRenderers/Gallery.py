@@ -76,7 +76,7 @@ class GalleryRenderer(HTMLBundle.HTMLDirectoryRenderer):
                 tmp = []
                 self.row_count +=1
 
-                if self.row_count > 5:
+                if self.row_count > self.pagesize:
                     break
 
         result += self.render_row( tmp)

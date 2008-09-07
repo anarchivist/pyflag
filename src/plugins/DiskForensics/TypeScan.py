@@ -108,11 +108,10 @@ class ThumbnailType(InodeIDType):
             return
 
         width, height = image.size
-        print "Got an image of size %s, %s" % image.size
 
         ## Calculate the new width and height:
-        new_width = 200.0
-        new_height = new_width / width * height
+        new_width = 200
+        new_height = int(float(new_width) / width * height)
 
         if new_width > width and new_height > height:
             new_height = height
@@ -129,6 +128,7 @@ class ThumbnailType(InodeIDType):
                 fd = self.fsfd.open(inode_id=inode_id)
                 fd = cStringIO.StringIO(fd.read(2000000) + "\xff\xd9")
                 image = PIL.Image.open(fd)
+                image = image.convert('RGB')
                 thumbnail = cStringIO.StringIO()
 
                 try:
@@ -136,7 +136,7 @@ class ThumbnailType(InodeIDType):
                     image.save(thumbnail, 'jpeg')
                     thumbnail = thumbnail.getvalue()
                 except IOError,e:
-                    print e
+                    print "PIL Error: %s" % e
                     thumbnail = open("%s/no.png" % (config.IMAGEDIR,),'rb').read()
 
                 CacheManager.MANAGER.create_cache_from_data(self.case, filename, thumbnail)
