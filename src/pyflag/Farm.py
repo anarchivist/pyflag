@@ -186,7 +186,25 @@ children = []
 def child_exist():
     print "Child Existed"
 
+## Windows uses events for IPCs
+try:
+    import win32event
+    
+    TerminateEvent = win32event.CreateEvent(None, 0, 0, "PyFlagTerminateEvent")
+    SyncEvent      = win32event.CreateEvent(None, 0, 0, "PyFlagSyncEvent")
+except ImportError:
+    win32event = None
+    
 def terminate_children():
+    try:
+        print "Terminating children"
+        for pid in children:
+            win32event.PulseEvent(TerminateEvent)
+
+        return
+    except AttributeError:
+        pass
+    
     for pid in children:
         try:
             os.kill(pid, signal.SIGABRT)
@@ -249,7 +267,14 @@ def worker_run():
      while 1:
          ## Check for new tasks:
          if not jobs:
-             time.sleep(10)
+             try:
+                 r = win32event.WaitForMultipleObjects([SyncEvent, TerminateEvent], False, 10000)
+                 if r==1:
+                     ## TerminateEvent signaled
+                     sys.exit(0)
+                 
+             except (NameError,AttributeError),e:
+                 time.sleep(10)
 
          dbh = None
          try:
@@ -340,7 +365,6 @@ def start_workers():
             pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
 
     ## The parent now calls the startup method on each of the events:
-    print "Launching startup"
     for event in Registry.EVENT_HANDLERS.classes:
         try:
             event().startup()
@@ -365,6 +389,14 @@ def wake_workers():
     """ Try to wake workers if possible. If we fail we must wait until
     the worker polls next, so its not a big deal.
     """
+    try:
+        for i in range(config.WORKERS):
+            win32event.PulseEvent(SyncEvent)
+
+        return
+    except AttributeError,e:
+        pass
+
     ## A Signal should interrupt the children's sleep
     for pid in children:
         try:

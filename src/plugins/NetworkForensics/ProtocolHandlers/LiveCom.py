@@ -152,7 +152,7 @@ class HotmailScanner(Scanner.GenScanFactory):
         def boring(self, metadata, data=''):
             ## We dont think its boring if our base class does not:
             ## And the data contains '<title>\s+Windows Live' in the top.
-            if not Scanner.StoreAndScanType.boring(self, metadata, data='') and \
+            if not Scanner.StoreAndScanType.boring(self, metadata, data) and \
                    re.search("<title>\s+Windows Live", data):
                    ## Make a new parser:
                 if not self.parser:

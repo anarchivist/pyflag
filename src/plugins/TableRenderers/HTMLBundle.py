@@ -87,31 +87,30 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.write(string)
         outfd.close()
 
+    header = '''<html><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
+    <style>
+    body {
+    overflow: auto;
+    height: 100%%;
+    }
+
+    div.PyFlagPage {
+    overflow: visible;
+    width: 100%%;
+    }
+    </style>
+    <title>%(title)s</title>
+    </head>
+    <body>
+    <div class="PyFlagHeader">
+    %(toolbar)s
+    </div>
+    <div class="PyFlagPage" id="PyFlagPage">
+    <table class="PyFlagTable" ><thead><tr>'''
 
     def render_page(self, page_name, page_number, elements, row_generator):
-        header = '''<html><head>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
-        <style>
-        body {
-        overflow: auto;
-        height: 100%%;
-        }
-
-        div.PyFlagPage {
-        overflow: visible;
-        width: 100%%;
-	}
-        </style>
-        <title>%(title)s</title>
-        </head>
-        <body>
-        <div class="PyFlagHeader">
-        %(toolbar)s
-        </div>
-        <div class="PyFlagPage" id="PyFlagPage">
-        <table class="PyFlagTable" ><thead><tr>'''
-
         result = ''
         for e in range(len(elements)):
             n = elements[e].name
@@ -183,8 +182,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                    page_name = page_name,
                    description = self.description)
 
-        return header % {'toolbar': self.navigation_buttons(page_number),
-                         'title': self.description,
+        return self.header % {'toolbar': self.navigation_buttons(page_number),
+                         'title': self.description or "PyFlag HTML Export",
                          } + \
                result + """</tbody></table>
                </div>

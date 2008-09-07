@@ -4,6 +4,7 @@ headers more accurately
 import pyflag.Magic as Magic
 import pyflag.Registry as Registry
 import pyflag.DB as DB
+import pyflag.FlagFramework as FlagFramework
 
 class RFC2822(Magic.Magic):
     type = "RFC2822 Mime message"
@@ -74,8 +75,10 @@ class LibMagic(Magic.Magic):
                 raise IOError("Could not open magic file %s" % config.MAGICFILE)
 
     def score(self, data, case, inode_id):
-        ## Fixme - this is a race: this class instance is used by all
-        ## callers. This needs to be fixed by locking the Resolver class.
+        ## The Magic library expects a byte string and does not look
+        ## at encoding at all. We need to provide it a utf8 encoded
+        ## string.
+        data = FlagFramework.smart_str(data, errors='ignore')
         self.type = magic.buffer(LibMagic.magic, data)
         self.mime = magic.buffer(LibMagic.mimemagic, data)
         

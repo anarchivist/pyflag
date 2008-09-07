@@ -38,8 +38,9 @@ class MMSScanner(LiveCom.HotmailScanner):
         service = 'MMS'
 
         def boring(self, metadata, data =''):
-            return not "H" in self.fd.inode
-
+            return Scanner.StoreAndScanType.boring(self,metadata, data) \
+                   or not "H" in self.fd.inode
+                
         def process(self, data, metadata=None):
             Scanner.StoreAndScanType.process(self, data, metadata)
 

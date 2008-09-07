@@ -195,7 +195,7 @@ def selector_display(self, description=None, variable=None, result=None, table=N
     tmp=result.__class__(result)
     dbh=DB.DBO(case)
     dbh.execute("select %s from %s group by %s order by %s", (field,table,field,field))
-    keys= [ row[variable] for row in dbh]
+    keys= [ row[field] for row in dbh]
     tmp.const_selector('',variable,[default]+keys,['default']+keys)
     tmp2=result.__class__(result)
     tmp3=result.__class__(result)

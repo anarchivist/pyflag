@@ -59,7 +59,7 @@ class CSVRenderer(UI.TableRenderer):
         result.generator.generator = generator(query,result)
         result.generator.content_type = "text/csv"
         result.generator.headers = [("Content-Disposition",
-                                     "attachment; filename=%s.csv" % query.get(\
+                                     "attachment; filename='%s.csv'" % query.get(\
                                      'filename','table')),]
         
     def generate_rows(self, query):

@@ -44,6 +44,7 @@ import pyflag.Time as Time
 import time, textwrap
 import pyflag.Registry as Registry
 import re,struct, textwrap
+import pyflag.TableActions as TableActions
 
 class date_obj:
     format = "%Y-%m-%d %H:%M:%S"
@@ -183,6 +184,8 @@ class ColumnType:
         self.table = table
         self.case = case
         self.default = default
+        for k,v in kwargs.items():
+            setattr(self, k, v)
         
     ## These are the symbols which will be treated literally
     symbols = {
@@ -491,9 +494,13 @@ class IntegerType(ColumnType, LogParserMixin):
         integer = int(arg)
         return lambda row: int(row[self.column]) == integer
 
+    auto_increment = False
+    
     def create(self):
         if self.default!=None:
             return "`%s` int(11) not null default %s" % (self.column, self.default)
+        elif self.auto_increment:
+            return "`%s` int(11) not null auto_increment" % self.column
         else:
             return "`%s` int(11)" % self.column
 
@@ -967,9 +974,17 @@ class InodeIDType(IntegerType):
 
                 ## Then we do an insert to set the new value
                 if query['annotate'] == 'yes':
+                    category = query.get("new_annotate_category")
+                    if not category:
+                        category = query.get("annotate_category","Note")
+
+                    query.set("annotate_category",category)
+                    query.clear("new_annotate_category")
+                    
                     dbh.insert('annotate',
                                inode_id = inode_id,
                                note = query.get("annotate_text","Tag"),
+                               category = category,
                                )
                     
                     action = 'deactivate'
@@ -1009,11 +1024,16 @@ class InodeIDType(IntegerType):
 
             def set_annotation_text(query,result):
                 query.default('annotate_text','Tag')
+                query.default("annotate_category", "Note")
                 result.decoration='naked'
                 result.heading("Set Annotation Text")
                 result.para("This text will be used for all quick annotation")
                 result.start_form(query, pane='parent_pane')
                 result.textarea("Annotation Text",'annotate_text')
+                TableActions.selector_display(None, "Category", "annotate_category",
+                                              result=result, table = 'annotate',
+                                              field='category', case=query['case'],
+                                              default='Note')
                 result.end_table()
                 result.end_form()
 
