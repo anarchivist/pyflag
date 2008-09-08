@@ -197,7 +197,7 @@ class StreamFile(File):
 
             # First time we saw this stream - the seq is the ISN
             if initials[index]:
-                deltas[index] -= row['seq']
+                deltas[index] -= row['seq'] - row['cache_offset']
                 initials[index] = False
 
             # We need to find if we grew the output file at all:

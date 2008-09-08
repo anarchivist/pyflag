@@ -72,6 +72,12 @@ class DirectoryCacheManager:
             
         return os.path.join(config.RESULTDIR,"case_%s" % case,inode)
 
+    def get_temp_path_old(self, case, inode):
+        """ Backwards compatibility with the old notation """
+        inode = inode.replace("/",'-')
+            
+        return os.path.join(config.RESULTDIR,"case_%s" % case,inode)
+
     def create_cache_fd(self, case, inode):
         """ Return an fd with a write method for a new cache object """
         return CachedWriter(self.get_temp_path(case, inode))
@@ -110,7 +116,11 @@ class DirectoryCacheManager:
 
     def open(self, case,inode):
         filename = self.get_temp_path(case, inode)
-        return open(filename,'rb')
+        try:
+            return open(filename,'rb')
+        except IOError:
+            new_filename = self.get_temp_path_old(case,inode)
+            return open(new_filename,'rb')
 
 class ProxyReader:
     def __init__(self, filename):

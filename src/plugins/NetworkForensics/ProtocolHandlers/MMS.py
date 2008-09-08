@@ -23,6 +23,7 @@ import pyflag.pyflaglog as pyflaglog
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 import LiveCom
+import pyflag.CacheManager as CacheManager
 
 class MMSScanner(LiveCom.HotmailScanner):
     """ Scans MMS messages """
@@ -72,7 +73,6 @@ class MMSScanner(LiveCom.HotmailScanner):
             count = 0
             for part in message.dataParts:
                 count +=1
-                print part.contentType
                 if part.contentType.startswith('text/'):
                     result['message'] += part.data
                     dbh.update('webmail_messages', where='inode_id="%s"' % inode_id,
@@ -80,7 +80,7 @@ class MMSScanner(LiveCom.HotmailScanner):
 
                 elif not part.contentType.endswith('smil'):
                     new_inode = self.fd.inode + "|m%s" % count
-                    filename = FlagFramework.get_temp_path(self.fd.case, new_inode)
+                    filename = CacheManager.MANAGER.get_temp_path(self.fd.case, new_inode)
                     fd = open(filename,"wb")
                     fd.write(part.data)
                     fd.close()
@@ -91,7 +91,14 @@ class MMSScanner(LiveCom.HotmailScanner):
                                                         new_inode,
                                                         "%s/Message %s" % (path,count),
                                                         size = len(part.data))
-                    
+
+                    parameters = {}
+                    for hdr in part.headers:
+                        value = part.headers[hdr]
+                        if type(value) == tuple:
+                            if len(value[1]) > 0:
+                                parameters = value[1]
+
                     filename = parameters.get("Filename", parameters.get("Name","output.bin"))        
                     dbh.insert("webmail_attachments",
                                inode_id = inode_id,
