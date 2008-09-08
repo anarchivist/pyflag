@@ -238,7 +238,7 @@ function popup(query, callback, width, height) {
   // elements if available:
   var f = document.forms['pyflag_form_1'];
   if(f) {
-    query = 'f?';
+    query = query+"&";
 
     for(var i=0; i<f.elements.length; i++) {
       var e = f.elements[i];

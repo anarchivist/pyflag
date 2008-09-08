@@ -434,10 +434,16 @@ class HTMLUI(UI.GenericUI):
         if tooltip:
             description = self.tooltipise(tooltip, description)
 
-        if reverse:
-            self.result+="<tr><td align=right><input type=checkbox name=\"%s\" value=\"%s\" %s></td><td>%s</td></tr>\n" % (name,value, opt_str, description)
+        checkbox_str = "<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value, opt_str)
+
+        if not description:
+            self.result += checkbox_str
+
+        elif reverse:
+            self.result+="<tr><td align=right>%s</td><td>%s</td></tr>\n" % (checkbox_str, description)
         else:
-            self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value, opt_str), **options)
+            self.row(description,checkbox_str, **options)
+            
         if self.form_parms.has_key(name):
             del self.form_parms[name]
             
@@ -986,6 +992,7 @@ class HTMLUI(UI.GenericUI):
 
         More comments in TableRenderer()
         """
+        self.start_form(self.defaults)
         ## Create a renderer:
         r = UI.TableRenderer(**opts)
 

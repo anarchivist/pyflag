@@ -32,6 +32,7 @@ import pyflag.Registry as Registry
 import pyflag.DB as DB
 import pyflag.TableObj as TableObj
 import pyflag.TableActions as TableActions
+import pyflag.FileSystem as FileSystem
 
 class AnnotatedInode(FlagFramework.CaseTable):
     """ Annotation table - Annotates and categorizes Inodes """
@@ -270,6 +271,7 @@ def render_annotate_inode_id(self, inode_id, row, result):
     annotate = AnnotationObj(case=self.case)
     row = annotate.select(inode_id=inode_id)
 
+    tmp0 = result.__class__(result)
     tmp1 = result.__class__(result)
     tmp2 = result.__class__(result)
     if row:
@@ -282,7 +284,11 @@ def render_annotate_inode_id(self, inode_id, row, result):
     else:
         value1 = inode
     tmp2.link(value1, tooltip = inode, target=link, pane="new")
-    result.row(tmp1,tmp2)
+
+    ## Add a checkbox for mass annotations:
+    tmp0.checkbox(None, "annotate_inode", inode_id)
+
+    result.row(tmp0, tmp1,tmp2)
 
 def operator_annotated(self, column, operator, pattern):
     """ This operator selects those inodes with pattern matching their annotation """
@@ -291,8 +297,74 @@ def operator_annotated(self, column, operator, pattern):
                                            self.column,
                                            pattern)
 
+def column_decorator(self, table, sql, query, result):
+    original_column_decorator(self, table, sql, query, result)
+
+    case = query['case']
+    print query
+    
+    def mass_annotate(new_query, result):
+        if not new_query.has_key("annotate_inode"):
+            result.heading("Error")
+            result.para("You must select some inodes to annotate by checking their checkboxes")
+            return
+
+        if new_query.has_key("__submit__"):
+            tag = new_query.get("annotate_text","Tag")
+            category = new_query.get("annotate_category", "Note")
+            if new_query.has_key("new_annotate_category"):
+                category = new_query['new_annotate_category']
+                
+            dbh = DB.DBO(case)
+            ## First delete old annotations if present
+            for inode_id in new_query.getarray("annotate_inode"):
+                dbh.delete("annotate", where=DB.expand("inode_id=%r", inode_id))
+
+            ## Now insert new ones
+            for inode_id in new_query.getarray("annotate_inode"):
+                dbh.insert("annotate",
+                           inode_id = inode_id,
+                           note = tag,
+                           category = category,
+                           )
+
+            del query["annotate_inode"]
+            query.set("annotate_text", tag)
+            query.set("annotate_category", category)
+            result.refresh(0, query, pane="parent_pane")
+
+        fsfd = FileSystem.DBFS(case)
+        new_query.default('annotate_text',query.get("annotate_text","Tag"))
+        new_query.default("annotate_category", query.get("annotate_category","Note"))
+        result.decoration='naked'
+        result.heading("Set Annotation Text")
+        result.start_form(new_query, pane='self')
+        result.textarea("Annotation Text",'annotate_text')
+        TableActions.selector_display(None, "Category", "annotate_category",
+                                      result=result, table = 'annotate',
+                                      field='category', case=case,
+                                      default='Note')
+        result.end_table()
+        result.end_form()
+
+        result.para("The following inodes will be annotated:")
+        result.start_table(**{'class':'GeneralTable'})
+        for inode_id in new_query.getarray("annotate_inode"):
+            path, inode, inode_id = fsfd.lookup(inode_id = inode_id)
+            
+            result.row(inode, path)
+
+    result.toolbar(cb = mass_annotate, icon="annotate.png",
+                   tooltip = "Annotate all selected inodes",
+                   pane='popup')
+
+    return self.name
+
 add_display_hook(InodeIDType, "render_annotate_inode_id", render_annotate_inode_id)
 InodeIDType.operator_annotated = operator_annotated
+if InodeIDType.column_decorator != column_decorator:
+    original_column_decorator = InodeIDType.column_decorator
+    InodeIDType.column_decorator = column_decorator
 
 class InterestingIPObj(TableObj.TableObj):
     table = "interesting_ips"
