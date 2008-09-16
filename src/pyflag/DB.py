@@ -524,7 +524,7 @@ class DBO:
         
         """
         self.expire_cache()
-        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r limit 1 for update""", (sql, limit, limit + length))
+        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r order by id limit 1 for update""", (sql, limit, limit + length))
         row = self.fetch()
         if not row:
             ## Row does not exist - make it
@@ -596,6 +596,7 @@ class DBO:
                 dbh.execute("create table cache_%s %s limit %s,%s",
                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
                 dbh.execute("update sql_cache set status='cached' where id=%r" , id)
+                dbh.execute("commit")
             except Exception,e:
                 ## Make sure we remove the progress status from the
                 ## table
@@ -749,9 +750,9 @@ class DBO:
                     pass
                 ids = [row['sql_id'] for row in self]
                 for id in ids:
-                    self.execute("drop table if exists cache_%s", id)
                     self.execute("delete from sql_cache where id=%r", id)
                     self.execute("delete from sql_cache_tables where sql_id=%r", id)
+                    self.execute("drop table if exists cache_%s", id)
             finally:
                 self.end_transaction()
 
@@ -1079,6 +1080,54 @@ def convert_to_unicode(case, table):
     except:
         pass
 
-class CacheManager(threading.Thread):
-    """ A thread which checks the consistency of tables """
-    pass
+if __name__=="__main__":
+    config.set_usage(usage = "PyFlag Database Cache manager."
+                     " (You must run this if you choose periodic caching).")
+
+    config.add_option("period", default=60,
+                      help = "Number of minutes to wait between cache refreshes")
+
+    config.parse_options()
+
+    while 1:
+        pdbh = DBO()
+        pdbh.execute("select value from meta where property='flag_db'")
+        for row in pdbh:
+            try:
+                case = row['value']
+                dbh = DBO(case)
+                dbh2 = DBO(case)
+                dbh.execute("select * from sql_cache")
+                for row in dbh:
+                    pyflaglog.log(pyflaglog.DEBUG, expand("Refreshing cache for %s %s: %s",
+                                                          (case, row['timestamp'], row['query'])))
+                    dbh2.insert("sql_cache",
+                                query = row['query'],
+                                status = 'progress',
+                                limit = row['limit'],
+                                length = row['length'],
+                                _fast = True)
+                    new_id = dbh2.autoincrement()
+                    dbh2.execute("create table cache_%s %s limit %s,%s", (new_id, row['query'],
+                                 row['limit'], row['length']))
+                    dbh2.execute("update sql_cache set status='cached' where id=%r" , new_id)
+                    dbh2.delete("sql_cache",
+                                where = "id = %s" % row['id'])
+                    dbh2.execute("commit")
+
+                ## Now prune any cache tables
+                dbh.execute("show tables")
+                for row in dbh:
+                    table = row.values()[0]
+                    m=re.match("cache_(\d+)", table)
+                    if m:
+                        dbh2.execute("select * from sql_cache where id=%r", m.group(1))
+                        if not dbh2.fetch():
+                            dbh2.execute("drop table %s" % table)
+                            pyflaglog.log(pyflaglog.DEBUG, "Dropping expired table %s" % table)
+                    
+            except Exception,e:
+                pyflaglog.log(pyflaglog.ERROR, "Error: %s" % e)
+
+        pyflaglog.log(pyflaglog.DEBUG, "Waiting for %s minutes" % config.PERIOD)
+        time.sleep(config.PERIOD * 60)

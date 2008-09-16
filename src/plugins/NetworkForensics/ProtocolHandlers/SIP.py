@@ -50,6 +50,8 @@ import struct,re
 from pyflag.ColumnTypes import StringType, PacketType, IPType
 import pyflag.Store as Store
 
+disable =True
+
 ## This keeps track of outstanding invitations.
 SIPInvites = Store.Store()
 
