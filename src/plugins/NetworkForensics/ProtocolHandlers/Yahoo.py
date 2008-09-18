@@ -72,6 +72,9 @@ class YahooParser:
 
         result.update(self.get_details(message))
         dbh.insert('msn_session', **result)
+
+    def YAHOO_SERVICE_P2PFILEXFER(self, message, dbh):
+        print message
         
 #    def YAHOO_SERVICE_LOGON(self, message):
 #        print message
@@ -151,7 +154,7 @@ class YahooParser:
 class YahooScanner(StreamScannerFactory):
     """ A Yahoo IM Protocol scanner """
     default = True
-    depends = []
+    depends = ['TypeScan']
     group = 'NetworkScanners'
 
     def process_stream(self, stream, factories):
@@ -166,3 +169,23 @@ class YahooScanner(StreamScannerFactory):
         parser = YahooParser(stream)
         for action in parser.process():
             pass
+
+## Unit tests:
+import pyflag.pyflagsh as pyflagsh
+import pyflag.tests as tests
+
+class YahooIMTests(tests.ScannerTest):
+    """ Tests Yahoo Messenger Scanner """
+    test_case = "PyFlagTestCase"
+    test_file = 'yahooim-filetransfer.pcap.E01'
+    subsystem = "EWF"
+    fstype = "PCAP Filesystem"
+
+    def test01HotmailScanner(self):
+        """ Test Hotmail Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "YahooScanner",
+                                   ])                   ## List of Scanners

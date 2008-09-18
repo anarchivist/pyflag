@@ -357,14 +357,18 @@ class ConfObject(object):
         raise AttributeError("Parameter %s is not configured - try setting it on the command line (-h for help)" % attr)
 
 config = ConfObject()
-config.add_file("@sysconfdir@/pyflagrc", 'py')
+config_file = "@sysconfdir@/pyflagrc"
+if os.access(config_file, os.R_OK):
+    config.add_file(config_file)
+else:
+    config.add_file("pyflagrc")
 
 ## The following are global parameters we need - administrators will
 ## probably need to set those to something more sensible:
 config.add_option("UPLOADDIR", default="/tmp/",
                   help = "Directory under which the web GUI will allow loading files")
 
-config.add_option("DATADIR", default="@DATADIR@", readonly=True,
+config.add_option("DATADIR", default="@DATADIR@", readonly=False,
                   help = "Directory where pyflag installation files go")
 
 config.add_option("RESULTDIR", default="/tmp/",

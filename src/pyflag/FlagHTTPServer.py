@@ -30,6 +30,7 @@
 """ Main HTTP server module """
 import sys
 sys.path.append("..")
+sys.path.append("pyflag")
 
 import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports

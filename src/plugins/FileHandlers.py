@@ -33,9 +33,9 @@ class FileMethod(IO.FileHandler):
     def open(self):
         ## Make sure there are no ../
         path = os.path.normpath(self.path)
-            
+        
         if not self.path.startswith(posixpath.normpath(config.UPLOADDIR)):
-            file = os.path.join(config.UPLOADDIR,path)
+            file = os.path.normpath(os.path.sep.join([config.UPLOADDIR,path]))
         else:
             file = path
 

@@ -495,7 +495,7 @@ class TableRenderer(UI.TableRenderer):
             query.set(self.filter, filter_expression)
 
         ## Check that we can filter on the word as all:
-        element = WordColumn(case = query['case'], filter=self.filter,
+        element = WordColumn(case = self.case, filter=self.filter,
                              where = self.where)
 
         element.ui = result

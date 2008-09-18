@@ -169,8 +169,10 @@ required to manage working threads (other than ensuring the UPLOAD and
 RESULTDIR are synctonised).
 
 """ 
-import sys
-sys.path.append("..")
+import sys,os
+
+sys.path.append(os.path.join(os.path.dirname(__file__),"pyflag"))
+sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 import pyflag.conf
 config=pyflag.conf.ConfObject()

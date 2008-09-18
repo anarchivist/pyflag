@@ -22,8 +22,10 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 """ An interactive shell for examining file systems loaded into flag """
-import sys
-sys.path.append("..")
+import sys,os
+
+sys.path.append(os.path.join(os.path.dirname(__file__),"pyflag"))
+sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 try:
     import readline

@@ -544,7 +544,7 @@ def render_timeline_hook(self, value, row, result):
 
     def add_to_timeline_cb(query, result):
 
-        timeline = TimelineObj(case=query['case'])
+        timeline = TimelineObj(case=self.case)
 
         ## We got submitted - actually try to do the deed:
         if 'Add to Timeline' in query.getarray('__submit__'):

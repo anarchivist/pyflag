@@ -1860,6 +1860,14 @@ class MSNTables(FlagFramework.EventHandler):
 
 import re
 
+class ChatMessages(Registry.PreCanned):
+    args = { 'filter': ' "Type" = MESSAGE',
+             'order':0, 'direction':1,
+             '_hidden': [2,3,4,8]}
+    family = 'Network Forensics'
+    report = 'Browse MSN Data'
+    description = 'View MSN/Yahoo chat messages'
+
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True

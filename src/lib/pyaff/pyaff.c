@@ -1,5 +1,9 @@
 #include "Python.h"
+#if LIBAFFLIB_VERSION > 3
 #include "afflib.h"
+#else
+#include "afflib/afflib.h"
+#endif
 
 #include <string.h>
 #include <stdlib.h>
@@ -105,8 +109,12 @@ affile_init(affile *self, PyObject *args, PyObject *kwds) {
     	return -1;
     }
 
-    //self->size = af_get_imagesize(self->af);
+#if LIBAFFLIB_VERSION < 3
     self->size = self->af->image_size;
+#else
+    self->size = af_get_imagesize(self->af);
+#endif
+
     return 0;
 }
 

@@ -489,7 +489,6 @@ class CaseDBInit(FlagFramework.EventHandler):
 
         ## We now spawn the cache manager thread TODO
         
-        
     def exit(self, dbh, case):
         IO.IO_Cache.flush()
         DB.DBO.DBH.flush()
