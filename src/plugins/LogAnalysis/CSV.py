@@ -22,6 +22,8 @@
 # ******************************************************
 import csv
 import plugins.LogAnalysis.Simple as Simple
+import pyflag.LogFile as LogFile
+import pyflag.FlagFramework as FlagFramework
 
 #active = False
 
@@ -33,17 +35,38 @@ class CSVLog(Simple.SimpleLog):
         return csv.reader(self.read_record())
         
     def form(self,query,result):
-        result.end_table()
-        result.row("Unprocessed text from file",colspan=5)
-        sample = []
-        count =0
-        for line in self.read_record():
-            sample.append(line)
-            count +=1
-            if count>3:
-                break
-            
-        result.row('\n'.join(sample),bgcolor='lightgray')
-        result.end_table()
+        def test_csv(query,result):
+            self.parse(query)
+            result.start_table()
+            result.row("Unprocessed text from file",colspan=5)
+            sample = []
+            count =0
+            for line in self.read_record():
+                sample.append(line)
+                count +=1
+                if count>3:
+                    break
 
-        self.draw_type_selector(result)
+            result.row('\n'.join(sample),bgcolor='lightgray')
+            result.end_table()
+
+            self.draw_type_selector(result)
+
+        def test(query,result):
+            self.parse(query)
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.")
+            self.display_test_log(result)
+            return True
+            
+        result.wizard(
+            names = [ "Step 1: Select Log File",
+                      "Step 2: Configure Columns",
+                      "Step 3: View test result",
+                      "Step 4: Save Preset",
+                      "Step 5: End"],
+            callbacks = [ LogFile.get_file,
+                          test_csv,
+                          test,
+                          FlagFramework.Curry(LogFile.save_preset, log=self),
+                          LogFile.end ]
+            )
