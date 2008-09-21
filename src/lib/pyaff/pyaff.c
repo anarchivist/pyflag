@@ -1,5 +1,5 @@
 #include "Python.h"
-#if LIBAFFLIB_VERSION > 3
+#if LIBAFFLIB_VERSION < 3
 #include "afflib.h"
 #else
 #include "afflib/afflib.h"
