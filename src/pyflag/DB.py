@@ -1084,7 +1084,7 @@ if __name__=="__main__":
     config.set_usage(usage = "PyFlag Database Cache manager."
                      " (You must run this if you choose periodic caching).")
 
-    config.add_option("period", default=60,
+    config.add_option("period", default=60, type='int',
                       help = "Number of minutes to wait between cache refreshes")
 
     config.parse_options()
