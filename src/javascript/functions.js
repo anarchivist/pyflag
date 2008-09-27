@@ -460,7 +460,11 @@ function find_window_by_name(name) {
   var target=0;
 
   while(1) {
-    if(w.__pyflag_name == name) { target=w;};
+    try {
+      if(w.__pyflag_name == name) { target=w;};
+    } catch(err) {
+      break;
+    };
 
     //Top level window has the same name as its parent
     //if(w.__pyflag_parent==w.__pyflag_name) 
