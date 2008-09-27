@@ -41,11 +41,6 @@ try:
     from forensics.linux.info import info_systime, info_timezone,\
         info_cpus, info_system_utsname
 
-    ## Initialise volatility's registry
-    import forensics.registry as MemoryRegistry
-
-    MemoryRegistry.Init()
-
     def FormatWithDefaults(format,args,defaults={}):
         argslist = list(args)
         if len(defaults) > 0:
@@ -62,8 +57,6 @@ try:
 
     class IOSourceAddressSpace(FileAddressSpace):
         def __init__(self, fd):
-            #self.fname = fd.name
-            #self.name = fd.name
             self.fhandle = fd
             self.fsize = fd.size
             self.fast_fhandle = fd

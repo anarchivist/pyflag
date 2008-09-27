@@ -396,6 +396,19 @@ class CarverRegistry(ScannerRegistry):
 ## registered:
 class Action: pass
 
+## These plugins allow writing specific loaders for different
+## filesystem. The filesystem attribute should be the name of the
+## filesystem loader these plugins are designed for.
+class FileSystemLoader:
+    order = 10
+    filesystem = ""
+
+    def load(self, loader):
+        """ This needs to be implemented where loader is the
+        FileSystem object
+        """
+        pass
+
 ## A Precanned report
 class PreCanned:
     report = None
@@ -440,6 +453,7 @@ CASE_TABLES = None
 TABLE_RENDERERS = None
 ACTIONS = None
 PRECANNED = None
+FSLOADERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -545,6 +559,9 @@ def Init():
 
     global PRECANNED
     PRECANNED = ScannerRegistry(PreCanned)
+
+    global FSLOADERS
+    FSLOADERS = ScannerRegistry(FileSystemLoader)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

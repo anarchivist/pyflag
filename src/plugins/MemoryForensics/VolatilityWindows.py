@@ -2,7 +2,7 @@
 https://www.volatilesystems.com/default/volatility to implement a memory
 forensic capability in pyflag
 """
-
+active = False
 import pyflag.FileSystem as FileSystem
 import pyflag.FlagFramework as FlagFramework
 import pyflag.pyflaglog as pyflaglog
@@ -28,15 +28,6 @@ try:
     from vsyms import *
 
     import forensics.win32
-
-    class IOSourceAddressSpace(FileAddressSpace):
-        def __init__(self, fd):
-            #self.fname = fd.name
-            #self.name = fd.name
-            self.fhandle = fd
-            self.fsize = fd.size
-            self.fast_fhandle = fd
-
 
 except ImportError, e:
     active = False
@@ -135,9 +126,9 @@ def load_and_identify_image(fd, dtb=None, type=None):
         
     return (addr_space, type, types)
             
-class WindowsMemory(DBFS):
+class Memory(DBFS):
     """ Class to load a memory image into the VFS """
-    name = "Windows Memory"
+    name = "Memory"
 
     def process_entry_file(self, dbh, addr_space, types, entry, pid):
         if not addr_space.is_valid_address(entry):
@@ -568,10 +559,10 @@ import pyflag.tests
 
 ## Unit test
 class MemoryFS(pyflag.tests.ScannerTest):
-    """ Test Memory Forensic Analysis """
+    """ Test Windows Memory Forensic Analysis """
     test_case = "Memory"
     test_file = "xp-laptop-2005-06-25.img.e01"
     subsystem = "EWF"
-    fstype = "Memory"
+    fstype = "Windows Memory"
     mount_point = "proc"
     

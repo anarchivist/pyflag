@@ -276,8 +276,6 @@ class CaseTableReports(report):
                     elements.append(e.bind_column(query['case'], column_name))
                     break
                 
-        print elements
-        
         result.table(
             elements = elements,
             case = query['case'],

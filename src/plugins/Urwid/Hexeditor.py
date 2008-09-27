@@ -743,7 +743,8 @@ class Hexeditor:
                 if urwid.is_mouse_event(key):
                     event, button, col, row = key
                     try:
-                        self.actions[self.mode].process_mouse_event(self.width, self.height,
+                        self.actions[self.mode].process_mouse_event(self,
+                                                                    self.width, self.height,
                                                                     event, button, col, row)
                     except AttributeError:
                         self.process_mouse_event(self.width, self.height,

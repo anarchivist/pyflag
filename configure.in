@@ -180,6 +180,7 @@ AC_OUTPUT([
 	src/filesystems/sleuthkit/Makefile
 	src/filesystems/sleuthkit/python/Makefile
 	src/filesystems/magic/Makefile
+	src/distorm/Makefile
 	src/include/Makefile
 	src/include/crypto/Makefile
 	debian/Makefile
