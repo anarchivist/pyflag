@@ -52,7 +52,9 @@ class DisasseblerAction(Hexeditor.Action):
                 ui.mark = self.offset_ints[i-1]
             elif key == 'page down':
                 ui.mark = self.offset_ints[ui.height+1]
-
+            elif key == 'window resize' or key =='ctrl l':
+                ui.width, ui.height = ui.ui.get_cols_rows()
+                
     def process_mouse_event(self,ui, width, height, event, button, col, row):
         if event == 'mouse press' and button==1:
             ui.mark = self.offset_ints[row]

@@ -23,7 +23,7 @@ class WindowsSSDTTable(FlagFramework.CaseTable):
                 [ MemoryOffset, dict(name = 'Base Address', column='base') ],
                 [ IntegerType, dict(name = 'Index', column='index') ],
                 [ StringType, dict(name = 'Function', column='function')],
-                [ MemoryOffset, dict(name = 'Handler', column='handler')],
+                [ MemoryOffset, dict(name = 'Handler', column='handler', prebuffer='d')],
                 [ StringType, dict(name = 'Module', column='module')]
                 ]
 

@@ -50,17 +50,24 @@ except AttributeError:
     ## Patch it in:
     forensics.addrspace.FileAddressSpace = IOSourceAddressSpace
 
-    ## We also remove these functions because they try to open the
-    ## file directly (besides we support crash dumps and hiberfiles
-    ## seperately )
+    ## We need to reimplement these functions in a sane way (Currently
+    ## they try to open the file directly)
     import vutils
     
-    def hook(x):
+    def is_crash_dump(filename):
+        fd = forensics.addrspace.FileAddressSpace(filename)
+        if fd.read(0, 8) == "PAGEDUMP":
+            return True
         return False
 
-    vutils.is_crash_dump = hook
-    vutils.is_hiberfil = hook
-
+    def is_hiberfil(filename):
+        fd = forensics.addrspace.FileAddressSpace(filename)
+        if fd.read(0, 4) == 'hibr':
+            return True
+        return False
+    
+    vutils.is_crash_dump = is_crash_dump
+    vutils.is_hiberfil = is_hiberfil
 
 ## Make sure we initialise Volatility plugins
 import forensics.registry as MemoryRegistry
@@ -94,6 +101,9 @@ class MemoryOffset(BigIntegerType):
                                           inode_id=inode_id,
                                           case=self.case,
                                           mode="HexDump")
+        try:
+            target['_prebuffer'] = self.prebuffer
+        except AttributeError: pass
         
         result.link("0x%08X" % offset, target=target, pane='new')
     

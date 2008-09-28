@@ -442,7 +442,6 @@ class AnnotateOffset(Action):
             self.top = None
         elif self.state == 'pending':
             ## Pass the key stroke to the underlying form
-            print "Sending %s" % key
             ui.top.keypress( (ui.width,ui.height) , key)
 
     def do_button(self, button, (ui, press)):
@@ -812,7 +811,13 @@ def hexedit(self, query, result):
             result.content_type = "text/html"
             result.result = "".join(pyflag_display._html_page)                
 
+    ## Allow the editor to be initialised with predefined keystokes:
+    if query.has_key("_prebuffer"):
+        for line in query['_prebuffer'].split("\n"):
+            generator.send(line+"\n")
+
     result.iframe(callback = urwid_cb)
+
 
 try:
     import urwid
