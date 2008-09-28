@@ -77,6 +77,28 @@ class AddressSpace(FileSystem.File):
         (self.addr_space, self.symtab, self.types) = vutils.load_and_identify_image(op, opts)
         self.size = 0xFFFFFFFFFFFFFFFF
 
+        if pid > 0:
+            # get list of windows processes
+            all_tasks = vmodules.process_list(self.addr_space, self.types, self.symtab)        
+
+            ## Find the task struct
+            all_tasks = vmodules.process_find_pid(self.addr_space,
+                                                  self.types, self.symtab,
+                                                  all_tasks, pid)
+            if len(all_tasks) == 0:
+                print "Error process [%d] not found"%opts.pid
+                return
+            elif len(all_tasks)>1:
+                print "Found multiple possible processes"
+
+            task = all_tasks[0]
+            ## The process address space
+            process_address_space = vmodules.process_addr_space(self.addr_space,
+                                                                self.types, task,
+                                                                self.filename)
+
+            self.addr_space = process_address_space
+
     def read(self, length=None):
         result = self.addr_space.read(self.readptr, length)
         if result == None:

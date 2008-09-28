@@ -1,8 +1,12 @@
+include $(top_srcdir)/config/Makefile.rules
+
 AM_CFLAGS		= -include config.h
+AM_LDFLAGS		= -lafflib -lz -lcrypto
 
 if HAVE_LIBAFFLIB
 # This is for the sleuthkit python module
-pkgpyexec_LTLIBRARIES 	= pyaff.la
+noinst_LTLIBRARIES 	= pyaff.la
+nodist_pkgpyexec_PYTHON = pyaff$(PYTHON_EXTENSION)
 
 pyaff_la_SOURCES	= pyaff.c
 pyaff_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -DLIBAFFLIB_VERSION=@LIBAFFLIB_VERSION@

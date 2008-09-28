@@ -72,10 +72,18 @@ class Images(Registry.PreCanned):
     name = "/Disk Forensics/Multimedia/Graphics Analysis"
 
 class HTMLPages(Registry.PreCanned):
+    args = {'filter':' "Thumbnail"  has_magic HTML ',
+            'order': 4, 'direction':1}
+    family = "Disk Forensics"
+    report = "Browse Types"
+    description = "View all HTML Pages "
+    name = "/Disk Forensics/Multimedia/HTML Pages"
+
+class HTMLURLs(Registry.PreCanned):
     args = {'filter': '"Content Type" contains html',
             '_hidden':[1,3,5] }
     report='Browse HTTP Requests'
     family='Network Forensics'
-    description = 'View all HTML pages'
-    name = [ "/Disk Forensics/Multimedia/HTML Pages",
-             "/Network Forensics/Web Applications/HTML Pages" ]
+    description = 'View all HTML URLs'
+    name = [ "/Network Forensics/Web Applications/HTML URLs" ]
+
