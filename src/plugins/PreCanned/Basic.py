@@ -19,10 +19,49 @@ class ImFeelingLucky(Reports.report):
     name = "Im Feeling Lucky"
     family = "Disk Forensics"
 
-    def display(self, query, result):
-        for cls in Registry.PRECANNED.classes:
-            cls().display(query, result)
+    def get_names(self, cls):
+        if type(cls.name)==str:
+            names = [cls.name,]
+        else:
+            names = cls.name
+                    
+        return names
 
+    def display(self, query, result):
+        def left_pane_cb(path):
+            ## We expect a directory here:
+            if not path.endswith('/'): path=path+'/'
+
+            seen = []
+            result = []
+            for cls in Registry.PRECANNED.classes:
+                if not cls.name: continue
+                
+                for name in self.get_names(cls):
+                    if name.startswith(path):
+                        branches = name[len(path):].split('/')
+                        branch = branches[0]
+                        if branch not in seen:
+                            seen.append(branch)
+                            if len(branches)>1:
+                                result.append((branch, branch, "branch"))
+                            else:
+                                result.append((branch, branch, "leaf"))
+
+            return result
+            
+        def right_pane_cb(path, result):
+            for cls in Registry.PRECANNED.classes:
+                for name in self.get_names(cls):
+                    if name == path:
+                        query.set("open_tree",path)
+                        cls().display(query, result)
+                        return
+
+            result.heading("Precanned Analysis")
+            result.para("Select the type of automated analysis required. You can use this to get you started, and then drive the analysis further.")
+
+        result.tree(tree_cb = left_pane_cb, pane_cb = right_pane_cb)
 
 class Images(Registry.PreCanned):
     args = {'filter':' "Thumbnail"  has_magic image and  "Size"  > 20000 ',
@@ -30,6 +69,7 @@ class Images(Registry.PreCanned):
     family = "Disk Forensics"
     report = "Browse Types"
     description = "View all images bigger than 20kb "
+    name = "/Disk Forensics/Multimedia/Graphics Analysis"
 
 class HTMLPages(Registry.PreCanned):
     args = {'filter': '"Content Type" contains html',
@@ -37,3 +77,5 @@ class HTMLPages(Registry.PreCanned):
     report='Browse HTTP Requests'
     family='Network Forensics'
     description = 'View all HTML pages'
+    name = [ "/Disk Forensics/Multimedia/HTML Pages",
+             "/Network Forensics/Web Applications/HTML Pages" ]

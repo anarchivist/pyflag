@@ -71,3 +71,10 @@ class SSDTReport(Reports.CaseTableReports):
                 "Function", "Handler",
                 "Module" ]
     
+class SSDTPrecan(Registry.PreCanned):
+    """ Display the System Service Descriptor Table (SSDT). You can then click on the function handlers to see a disassembly of each. Note also which module the handler routine resides in for an indication if something is hooking this entry. """
+    report = "View SSDT"
+    family = "Memory Forensics"
+    description = "View SSDT"
+    name = "/Memory Forensics/Windows Analysis/View SSDT"
+    

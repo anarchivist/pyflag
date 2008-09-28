@@ -413,11 +413,27 @@ class FileSystemLoader:
 class PreCanned:
     report = None
     family = None
-    args = None
+    args = {}
+    ## This is a description of the report
     description = None
+
+    ## This is the name of the report. The name is seperated by / to
+    ## indicate several levels. The report will then be accessible at
+    ## this level of tree. (e.g. Memory Forensics/Windows Analysis/List Tasks)
+    name = None
 
     def display(self, query, result):
         import pyflag.FlagFramework
+
+        ## Present the heading and description
+        try:
+            path = query['open_tree']
+            result.heading(path.split("/")[-2])
+        except Exception,e:
+            pass
+
+        if self.__class__.__doc__:
+            result.para(self.__class__.__doc__)
 
         new_query = pyflag.FlagFramework.query_type(
             case = query['case'],

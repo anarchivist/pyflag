@@ -7,7 +7,7 @@ import StringIO, sys, string
 import pyflag.DB as DB
 import pyflag.Time as Time
 
-active = False
+active = True
 
 class WindowsTaskTable(FlagFramework.CaseTable):
     """ Windows Tasks table - lists all windows tasks """
@@ -83,7 +83,8 @@ class FindTasks(Registry.FileSystemLoader):
 
             ## Insert one row for the task
             new_inode = "%s/%s/%s" % (loader.mount_point, row['pid'], row['name'])
-            row['inode_id'] = loader.VFSCreate(None, "A%s" % row['pid'], new_inode)
+            row['inode_id'] = loader.VFSCreate(None, "I%s|A%s" % (
+                loader.iosource_name, row['pid']), new_inode)
             dbh.insert('windows_tasks', _fast = True, **row)
 
             for module in modules:
@@ -100,3 +101,11 @@ class FindTasks(Registry.FileSystemLoader):
                                                     loader.types, module) or -1
 
                 dbh.insert("windows_modules", _fast=True, **row2)
+
+class ViewWindowsTasks(Registry.PreCanned):
+    """ List running tasks from windows memory images """
+    args = {'columns': ['windows_modules:0','windows_modules:1', 'windows_modules:2', 'windows_modules:3' ] }
+    family = "Disk Forensics"
+    report = "Generic Report"
+    description = "List windows tasks"
+    name = "/Memory Forensics/Windows Analysis/List Tasks"

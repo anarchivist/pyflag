@@ -1867,6 +1867,7 @@ class ChatMessages(Registry.PreCanned):
     family = 'Network Forensics'
     report = 'Browse MSN Data'
     description = 'View MSN/Yahoo chat messages'
+    name = "/Network Forensics/Communications/MSN Chats"
 
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """

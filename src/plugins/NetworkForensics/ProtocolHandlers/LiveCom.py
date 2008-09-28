@@ -687,11 +687,13 @@ class AllWebMail(Registry.PreCanned):
     family="Network Forensics"
     args = {"order":0, "direction":1}
     description = "View all Webmail messages"
+    name = "/Network Forensics/Web Applications/View Webmails"
 
 class WebMailByService(AllWebMail):
     args = {"groupby":"Service"}
     description = "View all Web mail by Service"
-
+    name = "/Network Forensics/Web Applications/View Webmails by Service"
+    
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests as tests
