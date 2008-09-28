@@ -1,7 +1,7 @@
 include $(top_srcdir)/config/Makefile.rules
 
 AM_CFLAGS		= -include config.h
-AM_LDFLAGS		= -lafflib -lz -lcrypto
+AM_LDFLAGS		= -lafflib -lz -lcrypto -lstdc++
 
 if HAVE_LIBAFFLIB
 # This is for the sleuthkit python module
