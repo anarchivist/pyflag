@@ -1,6 +1,6 @@
 include $(top_srcdir)/config/Makefile.rules
 
-AM_CFLAGS		= -include config.h
+AM_CFLAGS		= -include config.h -DLIBAFFLIB_VERSION=@LIBAFFLIB_VERSION@
 AM_LDFLAGS		= -lafflib -lz -lcrypto -lstdc++
 
 if HAVE_LIBAFFLIB
