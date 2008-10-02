@@ -86,6 +86,7 @@ class WindowsCrashDumpSpace32:
         self.runs = []
         self.offset = offset
         self.base = baseAddressSpace
+        self.fname = ''
         native_types = forensics.x86.x86_native_types
 
         self.dump_header = self.base.read(offset,obj_size(debug_types, '_DMP_HEADER'))

@@ -201,7 +201,7 @@ class report:
     #instances of the same class know when they are analysing.
     executing = {}
 
-    def __init__(self,flag,ui=None):
+    def __init__(self,flag=None,ui=None):
         ## This is here to avoid circular dependancy
         import pyflag.TypeCheck as TypeCheck
         import pyflag.HTMLUI as UI

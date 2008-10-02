@@ -96,7 +96,7 @@ class IOSourceMethod(IO.FileHandler):
         ## Adjust all the filenames to be rooted at the UPLOADDIR:
         for f in filenames:
             query['filename'] = os.path.normpath(
-                os.path.join(config.UPLOADDIR, f))
+                os.path.sep.join([config.UPLOADDIR, f]))
         
         return image.open(None, None, query=query)
 
@@ -126,7 +126,7 @@ class IOSourceMethod(IO.FileHandler):
         ## Adjust all the filenames to be rooted at the UPLOADDIR:
         for f in filenames:
             query['filename'] = os.path.normpath(
-                os.path.join(config.UPLOADDIR, f))
+                os.path.sep.join([config.UPLOADDIR, f]))
         
         return image.open(None, None, query=query)
 

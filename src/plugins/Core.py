@@ -535,6 +535,8 @@ class InodeTable(FlagFramework.CaseTable):
                 [ IntegerType, dict(name = "Index Version", column='version', default=0)],
                 [ IntegerType, dict(name = 'Desired Version', column='desired_version')],
                 ]
+
+    index = [ "inode", ]
     
     def __init__(self):
         scanners = [ "%s" % s.__name__ for s in Registry.SCANNERS.classes ]

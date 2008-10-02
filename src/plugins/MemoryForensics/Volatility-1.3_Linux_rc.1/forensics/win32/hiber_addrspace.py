@@ -41,6 +41,7 @@ from thirdparty.progressbar import *
 from forensics.win32.datetime import *
 from vtypes import xpsp2types as types
 from forensics.x86 import IA32PagedMemory
+import time
 
 page_shift = 12
 
