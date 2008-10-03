@@ -6,6 +6,7 @@ from pyflag.ColumnTypes import InodeIDType, IntegerType, StringType, TimestampTy
 import StringIO, sys, string
 import pyflag.DB as DB
 import pyflag.Time as Time
+import pyflag.Reports as Reports
 
 active = True
 
@@ -102,10 +103,11 @@ class FindTasks(Registry.FileSystemLoader):
 
                 dbh.insert("windows_modules", _fast=True, **row2)
 
-class ViewWindowsTasks(Registry.PreCanned):
+class ViewWindowsTasks(Reports.PreCannedCaseTableReoports):
     """ List running tasks from windows memory images """
-    args = {'columns': ['windows_modules:0','windows_modules:1', 'windows_modules:2', 'windows_modules:3' ] }
-    family = "Disk Forensics"
-    report = "Generic Report"
+    hidden = True
+    family = "Memory Forensics"
     description = "List windows tasks"
     name = "/Memory Forensics/Windows Analysis/List Tasks"
+    default_table = 'WindowsTaskTable'
+    columns = [ 'Inode', "Process ID", "Task Name", "Command Line","Started" ]

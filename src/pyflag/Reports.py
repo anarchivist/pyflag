@@ -280,3 +280,22 @@ class CaseTableReports(report):
             elements = elements,
             case = query['case'],
             )
+
+class PreCannedCaseTableReoports(CaseTableReports, Registry.PreCanned):
+    """ A Convenience class to create Inlined precanned reports """
+    def display(self, query,result):
+        import pyflag.FlagFramework as FlagFramework
+        for k,v in self.args.items():
+            result.defaults.default(k, v)
+
+        CaseTableReports.display(self, query, result)
+
+        if query.has_key('open_tree'):
+            result.toolbar(link = FlagFramework.query_type(family = self.family,
+                                                           report = self.name,
+                                                           case = query['case'],
+                                                           ),
+                           pane= 'new',
+                           icon = "fullscreen.png",
+                           tooltip = 'Open in a new window')
+                                                       

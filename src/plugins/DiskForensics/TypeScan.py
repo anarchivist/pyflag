@@ -303,7 +303,7 @@ InodeIDType.operator_has_magic = operator_has_magic
 class TypeCaseTable(FlagFramework.CaseTable):
     """ Type Table """
     name = 'type'
-    columns = [ [ InodeIDType, dict() ],
+    columns = [ [ ThumbnailType, dict(name='Thumbnail') ],
                 [ StringType, dict(name = 'Mime', column = 'mime')],
                 [ StringType, dict(name = 'Type', column = 'type')],
                 ]

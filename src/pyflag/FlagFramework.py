@@ -957,17 +957,16 @@ class CaseTable:
             if isinstance(column_cls, ColumnTypes.ColumnType):
                 yield column_cls
             else:
-                print column_cls
                 yield column_cls(**args)
 
     def bind_column(self, case, column_name):
         """ Tries to find column_name in our columns and returns a
         bound (instantiated) column object
         """
-
         for x in self.columns:
             column_cls = x[0]
             args = x[1]
+            args['case'] = case
             args['table'] = args.get('table', self.name)
             ## This is a little expensive because we instantiate each
             ## column just in order to check its name. This is

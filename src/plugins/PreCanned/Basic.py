@@ -63,13 +63,14 @@ class ImFeelingLucky(Reports.report):
 
         result.tree(tree_cb = left_pane_cb, pane_cb = right_pane_cb)
 
-class Images(Registry.PreCanned):
+class Images(Reports.PreCannedCaseTableReoports):
+    """ Display a preview of images """
     args = {'filter':' "Thumbnail"  has_magic image and  "Size"  > 20000 ',
-            'order': 4, 'direction':1}
+            'order': 1, 'direction':0}
     family = "Disk Forensics"
-    report = "Browse Types"
     description = "View all images bigger than 20kb "
     name = "/Disk Forensics/Multimedia/Graphics Analysis"
+    columns = ['TypeCaseTable.Thumbnail', 'InodeTable.Size','FileTable.Filename']
 
 class HTMLPages(Registry.PreCanned):
     args = {'filter':' "Thumbnail"  has_magic HTML ',
