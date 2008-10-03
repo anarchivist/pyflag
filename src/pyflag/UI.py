@@ -824,19 +824,19 @@ class TableRenderer:
                     tmp = result.__class__(result)
                     new_query.set('order', e)
                     new_query.set('direction',0)
-                    tmp.link("%s<img src='images/increment.png'>" % n, target= new_query, pane='self')
+                    tmp.link("%s<img src='images/increment.png'>" % n, target= new_query, pane='pane')
                     result.result+="<th>%s</th>" % tmp
                 else:
                     tmp = result.__class__(result)
                     new_query.set('order', e)
                     new_query.set('direction',1)
-                    tmp.link("%s<img src='images/decrement.png'>" % n, target= new_query, pane='self')
+                    tmp.link("%s<img src='images/decrement.png'>" % n, target= new_query, pane='pane')
                     result.result+="<th>%s</th>" % tmp
             else:
                 tmp = result.__class__(result)
                 new_query.set('order', e)
                 new_query.set('direction',1)
-                tmp.link(n, target= new_query, pane='self')
+                tmp.link(n, target= new_query, pane='pane')
                 result.result+="<th>%s</th>" % tmp
 
         result.result+='''</tr></thead><tbody class="scrollContent">'''

@@ -147,16 +147,16 @@ class FileSystem:
             sofar.append(part)
             try:
 ## This is some caching which should be faster, but doesnt seem to
-## make much different in practice???
-                
-##                try:
-##                    inode_so_far = '|'.join(sofar)
+## make much different in practice??? (It does make a difference with
+## memory images, for example - so we leave it on)
+                try:
+                    inode_so_far = '|'.join(sofar)
                     
-##                    retfd = FSCache.get(inode_so_far)
+                    retfd = FSCache.get(inode_so_far)
 ##                    print "Got %s from cache (%s)" % (inode_so_far, FSCache.size())
-##                except KeyError:
+                except KeyError:
                     retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
-##                    FSCache.put(retfd, key=inode_so_far)
+                    FSCache.put(retfd, key=inode_so_far)
                     
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part

@@ -12,13 +12,17 @@ bin_PROGRAMS		= sgzip evtool
 noinst_HEADERS		= $(srcdir)/*.h
 
 # python stuff
-noinst_LTLIBRARIES 	= liboo.la libexcept.la libsgz.la libevf.la libmd5.la pypacket.la
-nodist_pkgpyexec_PYTHON	= pypacket$(PYTHON_EXTENSION)
+noinst_LTLIBRARIES 	= liboo.la libexcept.la libsgz.la libevf.la libmd5.la pypacket.la pyxpress.la
+nodist_pkgpyexec_PYTHON	= pypacket$(PYTHON_EXTENSION) pyxpress$(PYTHON_EXTENSION)
 
 pypacket_la_SOURCES	= pypacket.c
 pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 pypacket_la_LDFLAGS	= -module $(PYTHON_LDFLAGS)
 pypacket_la_LIBADD	= liboo.la
+
+pyxpress_la_SOURCES	= pyxpress.c
+pyxpress_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+pyxpress_la_LDFLAGS	= -module $(PYTHON_LDFLAGS)
 
 # specifics (libs)
 libexcept_la_SOURCES 	= except.c

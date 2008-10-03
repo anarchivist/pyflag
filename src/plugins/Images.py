@@ -151,7 +151,9 @@ class Standard(IO.Image):
             if not f.startswith(os.path.normpath(config.UPLOADDIR)):
                 f = FlagFramework.sane_join(config.UPLOADDIR,f)
 
-            if config.FOLLOW_SYMLINKS:
+            ## FIXME - this is of limited value because the user can
+            ## just create multiple symlinks for each file
+            if 0 and config.FOLLOW_SYMLINKS:
                 ## Is it a symlink? This allows us to symlink to a
                 ## single file from a fileset using a simple
                 ## name. This makes it nice to manage the upload
