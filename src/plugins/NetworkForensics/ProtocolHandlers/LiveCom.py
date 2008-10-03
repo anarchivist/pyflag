@@ -840,7 +840,7 @@ if __name__ == '__main__':
     Registry.Init()
 
     ## Update the current webmail_messages to include message ids
-    dbh = DB.DBO("a5970_00_00")
+    dbh = DB.DBO(sys.argv[1])
     dbh1 = dbh.clone()
     dbh.execute("select inode_id, parent_inode_id, message_id from webmail_messages")
     for row in dbh:

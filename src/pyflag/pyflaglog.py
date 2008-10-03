@@ -125,7 +125,7 @@ def log(level,message, *args):
     try:
         string = DB.expand("%s(%s): %s" % (os.getpid(),lookup[level],message), args)
     except Exception,e:
-        print e
+        log_fd.write("%s\n" % e)
         string = message
 
     if config.LOG_LEVEL >= level:
@@ -140,9 +140,9 @@ def log(level,message, *args):
         log_fd.flush()
         
     if level<=ERRORS and level>0:
-        print string
-        print traceback.print_tb(sys.exc_info()[2])
-        sys.stdout.flush()
+        log_fd.write("%s\n" % string)
+        log_fd.write("%s\n" % traceback.print_tb(sys.exc_info()[2]))
+        log_fd.flush()
 
 def render_system_messages(result):
     result.row("System messages:")

@@ -116,7 +116,7 @@ class Menu(Theme.BasicTheme):
         result += self.menu_javascript
 
         result += '''<div class=PyFlagHeader>
-        <div class=Toolbar><abbr title="Im Feeling Lucky"><a href="javascript:SelectMenuItem(\'/f?family=Disk%%20Forensics&report=Im%%20Feeling%%20Lucky\');" ><img width=24 height=24 src=images/home.png /></a></abbr> %s </div><div class="CaseSelector"><form class=CaseSelector id=CaseSelector>%s</form></div>
+        <div class=Toolbar><abbr title="Im Feeling Lucky"><a href="javascript:SelectMenuItem(\'f?family=Disk%%20Forensics&report=Im%%20Feeling%%20Lucky\');" ><img width=24 height=24 src=images/home.png /></a></abbr> %s </div><div class="CaseSelector"><form class=CaseSelector id=CaseSelector>%s</form></div>
         </div>
         <div class="PyFlagPage" id="PyFlagPage" onmouseover="hideSubMenus()">
         ''' % (toolbar_str,case_selector)

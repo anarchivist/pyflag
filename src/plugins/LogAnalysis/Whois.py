@@ -35,6 +35,7 @@ config=pyflag.conf.ConfObject()
 import re
 import pyflag.pyflaglog as pyflaglog
 import pyflag.Store as Store
+import os
 
 description = "Offline Whois"
 hidden = False
@@ -75,30 +76,37 @@ WHOIS_CACHE = Store.Store()
 
 ## Try for the GeoIP City Stuff....
 
+def load_geofile(name, type):
+    filename = os.path.join(config.GEOIPDIR,name)
+    if not os.access(filename, os.R_OK):
+        raise IOError("%s not found" % filename)
+
+    return GeoIP(filename, type)
+
 try:
     from geoip import GeoIP, GEOIP_CITY_EDITION_REV1, GEOIP_ORG_EDITION, GEOIP_ISP_EDITION
 
     try:
-        gi_resolver = GeoIP(config.GEOIPDIR + "/GeoIPCity.dat", 
-                                 GEOIP_CITY_EDITION_REV1)
+        gi_resolver = load_geofile("GeoIPCity.dat", 
+                                   GEOIP_CITY_EDITION_REV1)
     except IOError:
         try:
-            gi_resolver = GeoIP(config.GEOIPDIR + "/GeoLiteCity.dat", 
-                                     GEOIP_CITY_EDITION_REV1)
+            gi_resolver = load_geofile("GeoLiteCity.dat", 
+                                       GEOIP_CITY_EDITION_REV1)
         except IOError:
             gi_resolver = None
 
     ## Now try for the GeoIPISP
     try:
-        gi_isp_resolver = GeoIP(config.GEOIPDIR + "/GeoIPISP.dat",\
-                                GEOIP_ISP_EDITION)
+        gi_isp_resolver = load_geofile("GeoIPISP.dat",\
+                                       GEOIP_ISP_EDITION)
     except IOError:
         gi_isp_resolver = None
 
     ## Now try the GEOIPOrg
     try:
-        gi_org_resolver = GeoIP(config.GEOIPDIR + "/GeoIPOrg.dat",\
-                                GEOIP_ORG_EDITION)
+        gi_org_resolver = load_geofile("GeoIPOrg.dat",\
+                                       GEOIP_ORG_EDITION)
     except IOError:
         gi_org_resolver = None
         

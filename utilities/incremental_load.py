@@ -57,7 +57,7 @@ config.add_option("mountpoint", default='/',
 config.add_option("sleep", default=60, type="int",
                   help='Length of time to wait between directory polls')
 
-config.add_option("scanners", default='HTTPScanner,YahooMailScan,HotmailScanner,MSNScanner,IRCScanner,POPScanner,YahooMail20Scan,GmailScanner,SMTPScanner,FTPScanner,SquirrelMailScan,MMSScanner,Live20Scanner',
+config.add_option("scanners", default='HTTPScanner,YahooMailScan,HotmailScanner,MSNScanner,IRCScanner,POPScanner,YahooMail20Scan,GmailScanner,SMTPScanner,FTPScanner,SquirrelMailScan,MMSScanner,Live20Scanner,IndexScan',
                   help='A comma delimited string of scanners to run')
 
 config.add_option("timeout", default=120, type='int',
