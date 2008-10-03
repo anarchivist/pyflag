@@ -380,7 +380,111 @@ class Live20Scanner(HotmailScanner):
             if msg:
                 result['Message'] = msg.innerHTML()
 
+
+            ## Try to detect the message ID
+            tag = parser.root.find('div', {'mid':'.'})
+            if tag:
+                result['message_id'] = tag['mid']
+
             return self.insert_message(result, inode_template = 'l%s')
+
+import os.path
+
+class LiveAttachements(FlagFramework.EventHandler):
+    def find_uploaded_attachments(self, dbh):
+        dbh.execute("select * from http_parameters where `key`='fAttachments'")
+        dbh2 = dbh.clone()
+        for row in dbh:
+            parent_inode_id = row['inode_id']
+            ## Find all the attachments
+            for line in row['value'].split("\x1b"):
+                items = line.split("|")
+                filename = items[2][36:]
+                m = re.search("([^.]+)", filename)
+                if m: filename = m.group(1)
+                ## Try to locate the files as they got uploaded
+                dbh2.execute("select * from http_parameters where `key`='Subject' and value=%r limit 1",
+                             filename)
+                row = dbh2.fetch()
+                if row:
+                    ## Is there an attachment?
+                    dbh2.execute("select * from http_parameters where inode_id = %r and `key`='Attachment'",
+                                 row['inode_id'])
+                    row = dbh2.fetch()
+                    if row:
+                        attachment = row['indirect']
+
+                        # Find the webmail message for this attachment
+                        dbh2.execute("select * from webmail_messages where parent_inode_id = %r",
+                                     parent_inode_id)
+                        row = dbh2.fetch()
+                        if row:
+                            ## Check if there already is an entry in attachment table
+                            dbh2.execute("select * from webmail_attachments where "
+                                         "inode_id = %r and attachment = %r limit 1",
+                                         (row['inode_id'], attachment))
+
+                            if not dbh2.fetch():
+                                dbh2.insert("webmail_attachments",
+                                            inode_id = row['inode_id'],
+                                            attachment =attachment)
+    
+    def periodic(self, dbh, case):
+        """ A periodic handler to ensure that attachements are matched
+        to their respective messages
+        """
+        self.find_uploaded_attachments(dbh)
+        dbh2 = dbh.clone()
+        dbh3 = dbh.clone()
+        dbh4 = dbh.clone()
+        dbh3.check_index("webmail_messages","message_id")
+        ## Iterate over all unique message ids
+        dbh.execute("select message_id from webmail_messages group by message_id")
+        for row in dbh:
+            message_id = row['message_id']
+            attachments = []
+            ## For each message_id find direct download:
+            dbh2.execute('select * from http where url like "%%GetAttachment%%messageId=%s%%"', message_id)
+            for row in dbh2:
+                inode_id = row['inode_id']
+                if inode_id not in attachments:
+                    attachments.append(inode_id)
+
+            ## For each message id find possible SafeRedirect urls
+            dbh2.execute('select http.inode_id, url from http_parameters join http on '
+                         'http.inode_id = http_parameters.inode_id where  `key`="kr" and '
+                         'value like "mid=%s%%" and url like "%%SafeRedirect%%"', message_id)
+            for row2 in dbh2:
+                ## Find out where they redirect to:
+                dbh3.execute("select * from http_parameters where inode_id = %r and "
+                             "(`key`='hm__qs' or `key`='hm__tg')", row2['inode_id'])
+                tg = ''
+                qs = ''
+                for row3 in dbh3:
+                    if row3['key'] == 'hm__tg': tg = row3['value']
+                    elif row3['key'] == 'hm__qs': qs = row3['value']
+
+                ## Try to locate the destination of the redirection
+                dbh3.execute("select inode_id from http where url like '%s?%s%%'", (tg,qs))
+                row3 = dbh3.fetch()
+                if row3:
+                    attachment = row3['inode_id']
+                    if attachment not in attachments:
+                        attachments.append(attachment)
+
+            if attachments:
+                for attachment in attachments:
+                    ## Check all messages with the specific hotmail message id
+                    dbh3.execute("select inode_id from webmail_messages where message_id = %r",
+                                 message_id)
+                    for row3 in dbh3:
+                        ## Update the attachment table to contain the redirected URL.
+                        dbh4.execute("select * from webmail_attachments where inode_id =%r and attachment=%r",
+                                     (row3['inode_id'], attachment))
+                        if not dbh4.fetch():
+                            dbh4.insert("webmail_attachments",
+                                        inode_id = row3['inode_id'],
+                                        attachment = attachment)
         
 class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
@@ -429,6 +533,8 @@ class AttachmentColumn(InodeIDType):
         fsfd = FileSystem.DBFS(self.case)
         dbh.execute("select file.inode_id as inode_id, name from file, webmail_attachments where webmail_attachments.inode_id = %r and file.inode_id = webmail_attachments.attachment", value)
         for row in dbh:
+            tmp = result.__class__(result)
+
             try:
                 fd = fsfd.open(inode_id=row['inode_id'])
                 image = Graph.Thumbnailer(fd,100)
@@ -436,16 +542,21 @@ class AttachmentColumn(InodeIDType):
                 pass
             
             if image.height>0:
-                result.image(image,width=image.width,height=image.height)
+                tmp.image(image,width=image.width,height=image.height)
             else:
-                result.image(image,width=image.width)
+                tmp.image(image,width=image.width)
 
             link = result.__class__(result)
-            link.link(row['name'], FlagFramework.query_type(family = "Disk Forensics",
-                                                            report = "ViewFile",
-                                                            case = self.case,
-                                                            mode = 'Summary',
-                                                            inode_id = row['inode_id']))
+            name = row['name']
+            if len(name) > 20: name = name[:20]+" ..."
+            tmp.para(name)
+            link.link(tmp, tooltip = row['name'],
+                      pane = 'new',
+                      target= FlagFramework.query_type(family = "Disk Forensics",
+                                                       report = "ViewFile",
+                                                       case = self.case,
+                                                       mode = 'Summary',
+                                                       inode_id = row['inode_id']))
             result.row(link)
 
 class WebMailMessages(Reports.report):
@@ -685,7 +796,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
 class AllWebMail(Registry.PreCanned):
     report="Browse WebMail Messages"
     family="Network Forensics"
-    args = {"order":0, "direction":1}
+    args = {"order":0, "direction":1, "filter":"Type != Listed"}
     description = "View all Webmail messages"
     name = "/Network Forensics/Web Applications/View Webmails"
 
@@ -718,3 +829,43 @@ class HotmailTests(tests.ScannerTest):
         dbh.execute("select count(*) as c from webmail_messages")
         row = dbh.fetch()
         self.assert_(row['c'] > 0, "No hotmail messages were found")
+
+if __name__ == '__main__':
+    import sys
+    import pyflag.conf
+    config = pyflag.conf.ConfObject()
+
+    config.parse_options()
+
+    Registry.Init()
+
+    ## Update the current webmail_messages to include message ids
+    dbh = DB.DBO("a5970_00_00")
+    dbh1 = dbh.clone()
+    dbh.execute("select inode_id, parent_inode_id, message_id from webmail_messages")
+    for row in dbh:
+        if not row['message_id']:
+            data = ''
+            m=''
+            dbh1.execute("select `key`,value from http_parameters where inode_id=%r and `key`='kr' limit 1",
+                         row['parent_inode_id'])
+            row1 = dbh1.fetch()
+            if row1:
+                data = row1['value']
+                m = re.search('mid=([^&]+)', data)
+                
+            if not m:
+                dbh1.execute("select `key`,value from http_parameters where inode_id=%r and `key`='d' limit 1",
+                         row['parent_inode_id'])
+                row1 = dbh1.fetch()
+                if row1:
+                    data = row1['value']
+                    m = re.search('\\{\\"([^\\"]+)\\"', data)
+
+            if m:
+                dbh1.execute("update webmail_messages set message_id = %r where inode_id = %r",
+                             (m.group(1), row['inode_id']))
+                
+    
+    event = LiveAttachements()
+    event.periodic(dbh, dbh.case)
