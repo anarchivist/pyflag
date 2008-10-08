@@ -337,13 +337,14 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         self.sql = self._make_sql(query)
         
         ## This allows pyflag to cache the resultset, needed to speed
-        ## paging of slow queries.
-        try:    self.limit = int(query.get(self.limit_context,0))
+        ## paging of slow queries. FIXME - implement
+##        try:    self.limit = int(query.get(self.limit_context,0))
+        try:    self.limit = int(query.get('start_limit',0))
         except: self.limit = 0
         try:    self.end_limit = int(query.get('end_limit',0))
         except: self.end_limit = 0
 
-        dbh.execute(self.sql + " limit %s,999999" % self.limit)
+        dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit)
         count = 0
         for row in dbh:
             yield row

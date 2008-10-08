@@ -50,7 +50,7 @@ import pyflag.pyflaglog as pyflaglog
 import base64, posixpath
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib,os,time,datetime
-from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType, PCAPTime
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType, PCAPTime, PacketType, BigIntegerType
 
 config.add_option("MSN_PORTS", default='[1863,]',
                   help="A list of ports to be considered for MSN connections")
@@ -1793,20 +1793,35 @@ class ContextParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         self.context_meta_data = query_type(attrs)
 
+class MSNSessionTable(FlagFramework.CaseTable):
+    """ Store information about decoded MSN messages """
+    name = 'msn_session'
+    columns = [ [ InodeIDType, {} ],
+                [ PacketType, dict(name = 'Packet', column = 'packet_id') ],
+                [ BigIntegerType, dict(name = 'Session ID', column='session_id') ],
+                [ StringType, dict(name = 'Sender', column='sender')],
+                [ StringType, dict(name = 'Recipient', column='recipient')],
+                [ StringType, dict(name = 'Type', column='type')],
+                [ StringType, dict(name = 'Message', column='data', text=True) ],
+                [ IntegerType, dict(name = 'P2P File', column='p2p_file') ],
+                [ IntegerType, dict(name = 'Transaction ID', column='transaction_id') ]
+                ]
+    extras = [ [ PCAPTime, dict(name = "Timestamp", column='packet_id') ], ]
+    
 class MSNTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
-        dbh.execute(
-            """ CREATE TABLE if not exists `msn_session` (
-            `inode_id` INT NOT NULL,
-            `packet_id` INT NOT NULL,
-            `session_id` BIGINT,
-            `sender` VARCHAR(250),
-            `recipient` VARCHAR( 250 ),
-            `type` VARCHAR(50),
-            `data` TEXT NULL,
-            `p2p_file` INT NULL,
-            `transaction_id`  INT
-            )""")
+    ##    dbh.execute(
+##            """ CREATE TABLE if not exists `msn_session` (
+##            `inode_id` INT NOT NULL,
+##            `packet_id` INT NOT NULL,
+##            `session_id` BIGINT,
+##            `sender` VARCHAR(250),
+##            `recipient` VARCHAR( 250 ),
+##            `type` VARCHAR(50),
+##            `data` TEXT NULL,
+##            `p2p_file` INT NULL,
+##            `transaction_id`  INT
+##            )""")
         dbh.execute(
             """ CREATE TABLE if not exists `msn_p2p` (
             `inode_id` INT NOT NULL,
@@ -1860,14 +1875,15 @@ class MSNTables(FlagFramework.EventHandler):
 
 import re
 
-class ChatMessages(Registry.PreCanned):
+class ChatMessages(Reports.PreCannedCaseTableReoports):
     args = { 'filter': ' "Type" = MESSAGE',
              'order':0, 'direction':1,
-             '_hidden': [2,3,4,8]}
+             '_hidden': 1}
     family = 'Network Forensics'
-    report = 'Browse MSN Data'
     description = 'View MSN/Yahoo chat messages'
-    name = "/Network Forensics/Communications/MSN Chats"
+    name = "/Network Forensics/Communications/Chats/MSN"
+    default_table = "MSNSessionTable"
+    columns = ['Timestamp', 'Type', "Sender", "Recipient", "Message" ]
 
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
@@ -2325,10 +2341,10 @@ import pyflag.tests
 class MSNTests(pyflag.tests.ScannerTest):
     """ Tests MSN Scanner (Ver 8) """
     # We pick an obscure name on purpose
-    test_case = "PyFlag Test Case"
+    test_case = "PyFlagTestCase"
     test_file = "/NetworkForensics/ProtocolHandlers/MSN/MSN_Cap1_Ver8_LoginWithMessages.pcap"
     order = 21
-    subsystem = "Advanced"
+    subsystem = "Standard"
     fstype = "PCAP Filesystem"
     ## Test protocol version 8 handling...
     def test01Scan(self):

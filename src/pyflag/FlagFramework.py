@@ -949,7 +949,9 @@ class CaseTable:
         """ Returns a list of columns bound to the specified case """
         import pyflag.ColumnTypes as ColumnTypes
 
-        for x in self.columns:
+        possibles = self.columns + self.extras
+
+        for x in possibles:
             column_cls = x[0]
             args = x[1]
             args['case'] = case
@@ -963,7 +965,9 @@ class CaseTable:
         """ Tries to find column_name in our columns and returns a
         bound (instantiated) column object
         """
-        for x in self.columns:
+        possibles = self.columns + self.extras
+
+        for x in possibles:
             column_cls = x[0]
             args = x[1]
             args['case'] = case

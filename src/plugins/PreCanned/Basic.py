@@ -69,7 +69,7 @@ class Images(Reports.PreCannedCaseTableReoports):
             'order': 1, 'direction':0}
     family = "Disk Forensics"
     description = "View all images bigger than 20kb "
-    name = "/Disk Forensics/Multimedia/Graphics Analysis"
+    name = "/Disk Forensics/Multimedia/Graphics"
     columns = ['TypeCaseTable.Thumbnail', 'InodeTable.Size','FileTable.Filename']
 
 class HTMLPages(Registry.PreCanned):
