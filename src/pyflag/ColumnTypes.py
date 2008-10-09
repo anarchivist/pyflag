@@ -292,7 +292,7 @@ class ColumnType:
         """
         ## By default just implement a simple callback:
         if self.callback:
-            value = self.callback(value)
+            return self.callback(value)
         elif self.wrap:
             value = textwrap.fill( "%s" % value)
 

@@ -45,6 +45,7 @@ import Store
 DBIndex_Cache=Store.Store()
 
 db_connections=0
+mysql_connection_args = None
 
 ## Declare the configuration parameters we need here:
 config.add_option("FLAGDB", default='pyflag',
@@ -89,6 +90,10 @@ config.add_option("TABLE_QUERY_TIMEOUT", default=10, type='int',
 
 config.add_option("SQL_CACHE_MODE", default="realtime",
                   help="The SQL Cache mode (can be realtime, periodic, all) see the wiki page for explaination")
+
+config.add_option("DB_SS_CURSOR", default=False,
+                  action='store_true',
+                  help = "Enable server side database cursors")
 
 import types
 import MySQLdb.converters
@@ -279,6 +284,52 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
 
             self.py_row_cache.extend(results)
 
+def mysql_connect(case):
+    """ Connect specified case and return a new connection handle """
+    global db_connections, mysql_connection_args
+
+    ## If we already know the connection args we just go for it
+    if mysql_connection_args:
+        mysql_connection_args['db'] = case
+        dbh=MySQLdb.Connection(**mysql_connection_args)
+        dbh.autocommit(True)
+        return dbh
+
+    mysql_connection_args = dict(user = config.DBUSER,
+                db = case,
+                host=config.DBHOST,
+                port=config.DBPORT,
+                conv = conv,
+                use_unicode = True,
+                charset='utf8'
+                )
+
+    if config.DBPASSWD:
+        mysql_connection_args['passwd'] = config.DBPASSWD
+
+    if config.STRICTSQL:
+        mysql_connection_args['sql_mode'] = "STRICT_ALL_TABLES"
+
+    if config.DB_SS_CURSOR:
+        mysql_connection_args['cursorclass'] = PyFlagCursor
+    else:
+        mysql_connection_args['cursorclass'] = MySQLdb.cursors.DictCursor
+
+    try:
+        #Try to connect over TCP
+        dbh = MySQLdb.Connect(**mysql_connection_args)
+    except Exception,e:
+        ## or maybe over the socket?
+        mysql_connection_args['unix_socket'] = config.DBUNIXSOCKET
+        del mysql_connection_args['host']
+        del mysql_connection_args['port']
+
+        dbh = MySQLdb.Connect(**mysql_connection_args)
+
+    dbh.autocommit(True)
+
+    return dbh
+
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to
     the database sometimes.  To avoid having to reconnect on each
@@ -310,7 +361,7 @@ class Pool(Queue):
         try:
             return self._parameters[string]
         except KeyError:
-            dbh, tmp = self.get()
+            dbh = self.get()
             c=dbh.cursor()
 
             c.execute("select value from meta where property = %r limit 1" % string)
@@ -332,61 +383,17 @@ class Pool(Queue):
         """Get an object from the pool or a new one if empty."""
         try:
             try:
-                result=self.empty() and self.connect() or Queue.get(self, block)
+                result=self.empty() and mysql_connect(self.case) or Queue.get(self, block)
 
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Getting dbh from pool %s" % self.case)
             except Empty:
-                result = self.connect()
+                result = mysql_connect(self.case)
 
             return result
         except Exception,e:
             raise DBError("Unable to connect - does the DB Exist?: %s" % e)
 
-    def connect(self):
-        """ Connect specified case and return a new connection handle """
-        global db_connections
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB %s. We now have %s in total" % (self.case,
-                                                                                                     db_connections, ))
-        
-        args = dict(user = config.DBUSER,
-                    db = self.case,
-                    host=config.DBHOST,
-                    port=config.DBPORT,
-                    cursorclass=PyFlagCursor,
-                    conv = conv,
-                    use_unicode = True,
-                    charset='utf8'
-                    )
-
-        if config.DBPASSWD:
-            args['passwd'] = config.DBPASSWD
-
-        if config.STRICTSQL:
-            args['sql_mode'] = "STRICT_ALL_TABLES"
-            
-        try:
-            #Try to connect over TCP
-            dbh = MySQLdb.Connect(**args)
-
-            mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
-        except Exception,e:
-            ## or maybe over the socket?
-            ##  The following is used for debugging to ensure we dont
-            ##  have any SQL errors:
-            args['unix_socket'] = config.DBUNIXSOCKET
-            del args['host']
-            del args['port']
-
-            dbh = MySQLdb.Connect(**args)
-            mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
-
-        db_connections +=1
-        c=dbh.cursor()
-        c.execute("set autocommit=1")
-
-        return (dbh,mysql_bin_string)
-
-class DBO:
+class PooledDBO:
     """ Class controlling access to DB handles
 
     We implement a pool of connection threads. This gives us both worlds - the advantage of reusing connection handles without running the risk of exhausting them, as well as the ability to issue multiple simultaneous queries from different threads.
@@ -407,7 +414,7 @@ class DBO:
             pool = Pool(case)
             self.DBH.put(pool, key=case)
         
-        self.dbh,self.mysql_bin_string=pool.get()
+        self.dbh = pool.get()
 
         ## Ensure the tz is properly reset before handing out dbh:
         c = self.dbh.cursor()
@@ -506,7 +513,7 @@ class DBO:
         try:
             self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
             ## Make a copy to maintain the cursor
-            tables = [ row['id'] for row in self]
+            tables = [ row['id'] for row in self ]
             for table_id in tables:
                 self.execute("delete from sql_cache where id = %r" , table_id)
                 self.execute("delete from sql_cache_tables where sql_id = %r" , table_id)
@@ -615,127 +622,6 @@ class DBO:
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))
             
-    def xxcached_execute(self, sql, limit=0, length=50):
-        """ Execute the query_str with params inside the pyflag Cache system.
-
-        PyFlag often needs to execute the same query with different
-        limit clauses - for example when paging a table in the
-        GUI. Since MySQL applies the limits after perfomring the
-        query, and the MySQL query cache is applied on the results,
-        MySQL ends up redoing the same query for each page. If the
-        query is expensive this could significantly delay paging.
-
-        This function implements a cache in the db for especially
-        complex queries.
-
-        Note that races are controlled here by using a tranactional
-        table to achieve row level locks.
-        """
-        self.expire_cache()
-        self.start_transaction()
-        ## Try to find the query in the cache. We need a cache which
-        ## covers the range we are interested in: This will lock the
-        ## row while we generate its underlying cache table:
-        try:            
-            self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r limit 1 for update""", (sql, limit, limit + length))
-            row = self.fetch()
-                
-            if row and row['locked']:
-                self.end_transaction()
-                while 1:
-                    self.execute("select locked from sql_cache where id=%r limit 1", row['id'])
-                    row2 = self.fetch()
-                    if row2 and row2['locked']==0: break
-                    time.sleep(1)
-
-            if row:            
-                ## Return the query:
-                self.execute("update sql_cache set timestamp=now() where id=%r ",
-                             row['id'])
-
-                cache_limit = row['limit']
-
-                ## If we fail to return the table (probably because the
-                ## cache table disappeared) we simply continue on to make
-                ## a new one:
-                try:
-                    ## We need to commit the transaction before the
-                    ## select because we dont want to drain the cursor
-                    ## right now (More SS Crap):
-                    self.end_transaction()
-                    return self.execute("select * from cache_%s limit %s,%s",
-                                        (row['id'], limit - cache_limit, length))
-                except DBError,e:
-                    pass
-
-            ## Query is not in cache - create a new cache entry: We create
-            ## the cache centered on the required range - this allows
-            ## quick paging forward and backwards.
-            lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
-
-            ## Determine which tables are involved:
-            self.execute("explain %s", sql)
-            tables = [ row['table'] for row in self ]
-            
-            if not tables or tables[0]==None:
-                ## Release the lock on the row
-                self.end_transaction()
-                self.execute(sql)
-                return 
-
-            for t in tables:
-                if t == None:
-                    self.end_transaction()
-                    self.execute(sql)
-                    return
-
-            self.insert('sql_cache',
-                        query = sql, _timestamp='now()',
-                        #tables = ",%s," % ','.join(tables),
-                        limit = lower_limit,
-                        length = config.DBCACHE_LENGTH,
-                        locked = 1,
-                        _fast = True
-                        )
-
-            ## Create the new table
-            id = self.autoincrement()
-            
-            ## Store the tables in the sql_cache_tables:
-            for t in tables:
-                self.insert('sql_cache_tables',
-                            sql_id = id,
-                            table_name = t,
-                            _fast = True)
-
-            ## This is needed to flush the SS buffer (we do not want to go
-            ## out of sync here..)
-            self.fetch()
-
-            ## This could take a little while on a loaded db:
-            try:
-                self.execute("create table cache_%s %s limit %s,%s",
-                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
-                self.execute("update sql_cache set locked=0 where id=%r" , id)
-            except Exception,e:
-                print e
-                ## Oops the table already exists (should not happen)
-                self.execute("drop table `cache_%s`",id )
-                self.execute("create table `cache_%s` %s limit %s,%s",
-                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
-                self.execute("update sql_cache set locked=0 where id=%r" , id)
-        except Exception,e:
-            self.end_transaction()
-            raise e
-
-        ## This is a race which occurs sometimes????
-        try:
-            return self.execute("select * from cache_%s limit %s,%s",
-                                (id,limit - lower_limit,length))
-        except:
-            return self.execute("%s limit %s,%s" %
-                                (sql,lower_limit,length))
-
     def __iter__(self):
         return self
 
@@ -745,7 +631,7 @@ class DBO:
             self.execute("start transaction")
             try:
                 try:
-                    self.execute("select sql_id from sql_cache_tables where `table_name`=%r", table)
+                    self.execute("select sql_id from sql_cache_tables where `table_name`=%r for update", table)
                 except Exception, e:
                     pass
                 ids = [row['sql_id'] for row in self]
@@ -1011,35 +897,33 @@ class DBO:
             #print "dbh desctrucr: %s " % e
             pass
         except Exception,e:
-            import FlagFramework
+            import pyflag.FlagFramework as FlagFramework
             
             print FlagFramework.get_bt_string(e)
 
-    def MySQLHarness(self,client):
-        """ A function to abstact the harness pipes for all programs emitting SQL.
+class DirectDBO(PooledDBO):
+    """ A class which just makes a new connection for each handle """
+    def get_dbh(self, case):
+        self.dbh = mysql_connect(case)
 
-        @arg client: A string of the command to shell out to.
-        @arg dbh: The database handle to use.
-        """
-        if not client.startswith('/'):
-            client = "%s/%s" % (config.FLAG_BIN, client)
-            
-        pyflaglog.log(pyflaglog.DEBUG, "Will shell out to run %s " % client)
+    def __del__(self):
+        if self.transaction:
+            self.end_transaction()
 
-        import os
-        p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')
-        p_client=os.popen(client,'r')
-        while 1:
-            data= p_client.read(1000)
-            if not data: break
-            p_mysql.write(data)
+        try:
+            for i in self.temp_tables:
+                self.drop(i)
+        except: pass
+        self.mass_insert_commit()
+        self.dbh.close()
 
-        if not p_client.close():
-            pass
-    #        raise IOError("Client program exited with a non-zero exit code")
-        if not p_mysql.close():
-            pass
-    #        raise IOError("MySQL client exited with an error")
+config.add_option("DB_CONNECTION_TYPE", default="direct",
+                  help="Type of database connections (direct, pooled)")
+
+DBO = DirectDBO
+if config.DB_CONNECTION_TYPE == 'pooled':
+    print "You have selected pooled"
+    DBO = PooledDBO
 
 def escape_column_name(name):
     """ This is a handy utility to properly escape column names taking

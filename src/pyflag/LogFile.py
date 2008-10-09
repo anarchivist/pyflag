@@ -397,7 +397,7 @@ def drop_table(case, name):
     
     ## Ask the driver to remove its table:
     dbh.delete("log_tables",
-               where="table_name = %r " % name);
+               where= DB.expand("table_name = %r ", name));
 
     ## Make sure that the reports get all reset
     FlagFramework.reset_all(family='Load Data', report="Load Preset Log File",
@@ -432,7 +432,7 @@ def drop_preset(preset):
 
     dbh = DB.DBO()
     if preset:
-        dbh.delete("log_presets", where="name = %r" % preset)
+        dbh.delete("log_presets", where=DB.expand("name = %r",preset))
     
 ## Some common callbacks which log drivers might need:
 def end(query,result):

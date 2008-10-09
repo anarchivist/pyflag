@@ -325,9 +325,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         # FIXME: move email into RFC2822 scanner since thats what seems to use
         # it
         case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
-        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
-        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
-        #case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:
@@ -336,37 +333,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         except OSError,e:
             print "Error Creating dir %s" % e
             pass
-
-##        ## Create an enum for the scanners in the inode table
-##        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-##        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
-##        `inode_id` int auto_increment,
-##        `inode` VARCHAR(250) NOT NULL,
-##        `status` set('unalloc','alloc'),
-##        `uid` INT,
-##        `gid` INT,
-##        `mtime` TIMESTAMP NULL,
-##        `atime` TIMESTAMP NULL,
-##        `ctime` TIMESTAMP NULL,
-##        `dtime` TIMESTAMP NULL,
-##        `mode` INT,
-##        `links` INT,
-##        `link` TEXT,
-##        `size` BIGINT NOT NULL,
-##        `scanner_cache` set('',%s),
-##        primary key (inode_id)
-##        )""",",".join(scanners))
-
-##        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
-##        `inode_id` INT NULL,
-##        `inode` VARCHAR(250) NOT NULL,
-##        `mode` VARCHAR(3) NOT NULL,
-##        `status` VARCHAR(8) NOT NULL,
-##        `path` TEXT,
-##        `name` TEXT,
-##        `link` TEXT NULL,
-##        key `inode_id` (`inode_id`)
-##        )""")
 
         case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
         `inode` VARCHAR(250) NOT NULL,
@@ -384,24 +350,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         `value` MEDIUMTEXT NOT NULL ,
         KEY ( `iosource` )
         )""")
-
-        ## This is a nice idea, but its just not flexible enough... We
-        ## use VARCHAR for now...
-        
-##        ## Create the xattr table by interrogating libextractor:
-##        types = ['Magic']
-##        try:
-##            import extractor
-##            e = extractor.Extractor()
-##            types.extend(e.keywordTypes())
-##        except ImportError:
-##            pass
-
-##        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
-##                            `inode_id` INT NOT NULL ,
-##                            `property` ENUM( %s ) NOT NULL ,
-##                            `value` VARCHAR( 250 ) NOT NULL
-##                            ) """ % ','.join([ "%r" % x for x in types]))
 
         case_dbh.execute("""CREATE TABLE if not exists `xattr` (
                             `inode_id` INT NOT NULL ,
@@ -467,8 +415,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         `level` TINYINT NOT NULL ,
         `message` VARCHAR( 250 ) NOT NULL
         )""")
-
-        ##dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
 
         ## Update the schema version.
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)

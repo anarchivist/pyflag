@@ -268,10 +268,6 @@ class DBFS(FileSystem):
         ## Ensure that we have the IOSource available
         self.iosource = IO.open(self.case, iosource_name)
 
-    def delete(self):
-        dbh=DB.DBO(self.case)
-        dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
-
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777,
                   _fast=False, inode_id=None, update_only=False,
                   **properties):
