@@ -344,7 +344,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         try:    self.end_limit = int(query.get('end_limit',0))
         except: self.end_limit = 0
 
-        dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit)
+        dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit))
         count = 0
         for row in dbh:
             yield row
