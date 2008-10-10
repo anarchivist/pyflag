@@ -92,7 +92,7 @@ class HTMLUI(UI.GenericUI):
 
         if default != None:
             self.form_parms = default.form_parms
-            self.form_target = None
+            self.form_target = 'self'
             self.defaults = default.defaults
             self.toolbar_ui = default.toolbar_ui
             self.generator = default.generator
@@ -106,7 +106,7 @@ class HTMLUI(UI.GenericUI):
                 raise RuntimeError("You must instantiate this with a parent ui")
 
             self.form_parms =FlagFramework.query_type(())
-            self.form_target = None
+            self.form_target = 'self'
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=self.__class__(self)
             self.generator=HTTPObject()

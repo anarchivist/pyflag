@@ -83,101 +83,28 @@ class Image:
         """
         return self.data
 
-class GenericGraph(Image):
+class GenericGraph:
     """ Abstract class defining the graph interface.
-
-    @cvar out_format: The output format to use. Currently all these could be SVG, PNG, X11 but not all derived classes implement all of those. This class variable may be set by the relevant UI backend.
     """
-    out_format = 'svg'
+
+    def form(self, query, result):
+        """ A configuration form we will draw to allow the user to
+        adjust the plot
+        """
     
-    def __init__(self,**opts):
-        """ A constructor with options.
+    def plot(self, gen, query, result):
+        """ This is the main interface for the plotting engine.
 
-        The following options are supported:
+        Given a generator in gen which produces a sequence of dicts.
+        The columns specify the elements of each dict to be drawn 
+
+        we will draw on result a graph.
         """
-        
-class Ploticus(GenericGraph):
-    """ Graph implementation using the ploticus plotting package """
-    def __init__(self,**opts):
-        import conf,os
+        ## The default graph is just a list
+        for x in gen:
+            result.row(*x)
 
-#        os.environ['PLOTICUS_PREFABS'] = config.PLOTICUS_PREFABS
-
-    def hist(self,x,y,**opts):
-        """ Draw a Histogram.
-
-        @arg x: A list of x values to use
-        @arg y: A list of y values to use
-        @arg opts: The currently supported options are:
-             - xlabels (list): specifies that the x list should be treated as labels
-        """
-        cmd = " -prefab vbars data=stdin x=1 y=2 delim=csv "
-        options = [ "%s=%r" % (k,v) for k,v in opts.items() ]
-        self.cmd = cmd + " ".join(options)
-        self.input = ''
-        ## Now work out the input:
-        for i,j in zip(x,y):
-            self.input += '"%s","%s"\n' % (i,j)
-
-    def pie(self,lables,values,**opts):
-        """ Draw a Pie Chart.
-
-        @arg lables: A list of labels
-        @arg values: A list of y values to use
-        @arg opts: Options
-        """
-        #Array with all the colors in it:
-        colors="red orange green purple yellow blue magenta tan1 coral tan2 claret pink brightgreen brightblue limegreen yellowgreen lavender powderblue redorange lightorange".split(" ")
-
-        try:
-            colors = opts['colors'].split(" ")
-            del opts['colors']
-        except KeyError:
-            pass
-        
-        cmd = " -prefab pie data=stdin labels=1 values=2 colorfld=3 delim=csv "
-        options = [ "%s=%s" % (k,v) for k,v in opts.items() ]
-        self.cmd = cmd + " ".join(options)
-        self.input = ''
-
-        while len(colors) < len(values):
-            colors += colors
-        
-        ## Now work out the input:
-        for i,j,k in zip(lables,values,colors):
-            self.input += '"%s","%s",%s\n' % (i,j,k)
-        
-    def line(self,x,y,**opts):
-        """ Draws a line plot.
-
-        @arg x: A list of x values to use
-        @arg y: A list of y values to use
-        @arg opts: The currently supported options are:
-             - xlabels (list): specifies that the x list should be treated as labels
-
-        """
-        ## Here we just need to work out the command line:
-        cmd = " -prefab lines data=stdin x=1 y=2 delim=csv "
-        if opts.has_key("xlabels"):
-            cmd += " cats=yes "
-
-        self.cmd = cmd
-
-        self.input = ''
-        ## Now work out the input:
-        for i,j in zip(x,y):
-            self.input += '"%s","%s"\n' % (i,j)
-
-    def display(self):
-        import popen2
-
-        p = popen2.Popen3("%s  -%s -o stdout  %s " % (config.PLOTICUS,self.out_format,self.cmd))
-        p.tochild.write(self.input)
-        p.tochild.close()
-        data=p.fromchild.read()
-        return data
-
-Graph = Ploticus
+Graph = GenericGraph
 
 ## We use the python imaging library to manipulate all the images:
 import PIL.Image

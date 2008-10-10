@@ -523,9 +523,6 @@ if __name__ == "__main__":
         import pyflag.HTMLUI as HTMLUI
         UI.UI = HTMLUI.HTMLUI
 
-    import pyflag.Graph as Graph
-    Graph.Graph = Graph.Ploticus
-
     ## Start the workers
     import pyflag.Farm as Farm
     Farm.start_workers()

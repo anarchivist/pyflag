@@ -470,6 +470,7 @@ TABLE_RENDERERS = None
 ACTIONS = None
 PRECANNED = None
 FSLOADERS = None
+GRAPHERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -578,6 +579,10 @@ def Init():
 
     global FSLOADERS
     FSLOADERS = ScannerRegistry(FileSystemLoader)
+
+    global GRAPHERS
+    import pyflag.Graph as Graph
+    GRAPHERS = ScannerRegistry(Graph.GenericGraph)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)
