@@ -314,7 +314,8 @@ def mysql_connect(case):
         mysql_connection_args['cursorclass'] = PyFlagCursor
     else:
         mysql_connection_args['cursorclass'] = MySQLdb.cursors.DictCursor
-
+        mysql_connection_args['cursorclass']._last_executed_sequence = []
+        
     try:
         #Try to connect over TCP
         dbh = MySQLdb.Connect(**mysql_connection_args)
@@ -487,9 +488,12 @@ class PooledDBO:
                 ## We terminate the current connection and reconnect
                 ## to the DB
                 pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed_sequence))
-                                
-                self.cursor.kill_connection()
-                del self.dbh
+
+                try:
+                    self.cursor.kill_connection()
+                    del self.dbh
+                except AttributeError:
+                    pass
                 
                 global db_connections
                 db_connections -=1
@@ -903,6 +907,8 @@ class PooledDBO:
 
 class DirectDBO(PooledDBO):
     """ A class which just makes a new connection for each handle """
+    dbh = None
+    
     def get_dbh(self, case):
         self.dbh = mysql_connect(case)
 
@@ -915,7 +921,8 @@ class DirectDBO(PooledDBO):
                 self.drop(i)
         except: pass
         self.mass_insert_commit()
-        self.dbh.close()
+        if self.dbh:
+            self.dbh.close()
 
 config.add_option("DB_CONNECTION_TYPE", default="direct",
                   help="Type of database connections (direct, pooled)")

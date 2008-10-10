@@ -5,7 +5,7 @@ static) - you do not need pyflag to view them, just a web browser.
 
 This is a good way of delivering a report.
 """
-import os, os.path, tempfile
+import os, os.path, tempfile, sys
 import pyflag.UI as UI
 import csv, cStringIO
 import pyflag.DB as DB
@@ -343,6 +343,10 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         except: self.limit = 0
         try:    self.end_limit = int(query.get('end_limit',0))
         except: self.end_limit = 0
+
+        ## Doesnt make sense to finish before we started
+        if self.end_limit <= self.limit:
+            self.end_limit = sys.maxint
 
         dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit))
         count = 0

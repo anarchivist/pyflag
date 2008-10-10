@@ -485,8 +485,7 @@ class InodeTable(FlagFramework.CaseTable):
     index = [ "inode", ]
     
     def __init__(self):
-        scanners = [ "%s" % s.__name__ for s in Registry.SCANNERS.classes ]
-        print scanners
+        scanners = set([ "%s" % s.__name__ for s in Registry.SCANNERS.classes ])
         self.columns = self.columns + [ [ SetType,
                                           dict(name='Scanner Cache', column='scanner_cache',
                                                states = scanners)
