@@ -5,22 +5,31 @@ like:
 apt-get install python-matplotlib
 
 """
+import pyflag.DB as DB
 import pyflag.Graph as Graph
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
 
-import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-
-import matplotlib.image as image
-import matplotlib.figure as figure
-import StringIO
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import tempfile
+try:
+    import matplotlib
+    matplotlib.use('Agg')
     
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.figure import Figure
+    
+    import numpy as np
+
+    import matplotlib.image as image
+    import matplotlib.figure as figure
+    import StringIO
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    import tempfile
+except ImportError:
+    active = False
+
 class LinePlot(Graph.GenericGraph):
     name = 'Line Plot'
+
+    def form(self, query, result):
+        pass
 
     def plot(self, gen, query, result):
         fig = figure.Figure()
@@ -31,7 +40,7 @@ class LinePlot(Graph.GenericGraph):
             x.append(a)
             y.append(b)
         
-        ax.plot(x,y , '-o', ms=20, lw=2, alpha=0.7, mfc='orange')
+        ax.plot(x,y , '.')
         ax.grid()
 
         ## Make a temporary file name:

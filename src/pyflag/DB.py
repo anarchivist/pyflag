@@ -498,7 +498,7 @@ class PooledDBO:
                 global db_connections
                 db_connections -=1
                 self.get_dbh(self.case)
-                self.dbh.ignore_warnings = self.cursor.ignore_warnings
+                #self.dbh.ignore_warnings = self.cursor.ignore_warnings
                 
                 self.cursor = self.dbh.cursor()
 
@@ -555,7 +555,7 @@ class PooledDBO:
         elif row['status'] == 'progress':
             ## Spin until its ready
             count = config.TABLE_QUERY_TIMEOUT
-            while count>0:
+            while count > 0:
                 self.execute("select * from sql_cache where id=%r and status!='progress' limit 1", row['id'])
                 row2=self.fetch()
                 if row2:
@@ -606,6 +606,7 @@ class PooledDBO:
             try:
                 dbh.execute("create table cache_%s %s limit %s,%s",
                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
+                for row in dbh: pass
                 dbh.execute("update sql_cache set status='cached' where id=%r" , id)
                 dbh.execute("commit")
             except Exception,e:
@@ -623,8 +624,20 @@ class PooledDBO:
         if worker.isAlive():
             raise DBError("Query still executing - try again soon")
 
-        return self.execute("select * from cache_%s limit %s,%s",
-                            (id,limit - lower_limit,length))
+        for i in range(config.TABLE_QUERY_TIMEOUT):
+            try:
+                return self.execute("select * from cache_%s limit %s,%s",
+                                    (id,limit - lower_limit,length))
+            except DBError,e:
+                ## Sometimes it takes a while for the table to be
+                ## available to the two threads. (Is this normal -
+                ## this seems like a weird race?)
+                if "doesn't exist" in e.__str__():
+                    time.sleep(1)
+                else:
+                    break
+
+        raise e
             
     def __iter__(self):
         return self
