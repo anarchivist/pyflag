@@ -121,6 +121,13 @@ CLASS(TCPStream, Object)
      void METHOD(TCPStream, add, PyPacket *packet);
 END_CLASS
 
+/* This is a stream handler for UDP packet. Although UDP does not
+   have sequence numbers its important to track UDP communications
+   sometimes.
+*/
+CLASS(UDPStream, TCPStream)
+END_CLASS
+
 /** The loading factor for the hash table */
 #define TCP_STREAM_TABLE_SIZE 256
 

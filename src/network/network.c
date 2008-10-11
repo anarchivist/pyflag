@@ -399,11 +399,14 @@ int UDP_Read(Packet self, StringIO input) {
 VIRTUAL(UDP, Packet)
      INIT_STRUCT(packet, udp_Format);
 
+     NAME_ACCESS(packet, src_port, source, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, dest_port, dest, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, src_port, src_port, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, dest_port, dest_port, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, length, length, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, checksum, checksum, FIELD_TYPE_SHORT_X);
      NAME_ACCESS_SIZE(packet, data, data, FIELD_TYPE_STRING, data_len);
+     NAME_ACCESS(packet, data_len, data_len, FIELD_TYPE_INT);
 
      VMETHOD(super.Read) = UDP_Read;
 END_VIRTUAL

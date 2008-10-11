@@ -196,7 +196,7 @@ class StreamFile(File):
                 min_packet_id = row['packet_id']
 
             # First time we saw this stream - the seq is the ISN
-            if initials[index]:
+            if initials[index] and row['seq']:
                 deltas[index] -= row['seq'] - row['cache_offset']
                 initials[index] = False
 
@@ -410,23 +410,14 @@ class StreamFile(File):
 
         result.row("Stream %s" % self.inode, tmp, **{'class':'explainrow'})
 
-class ViewConnections(Reports.report):
+class ViewConnections(Reports.PreCannedCaseTableReoports):
     """ View the connection table """
     description = "View the connection table"
-    name = "View Connections"
+    name = "/Network Forensics/View Connections"
     family = "Network Forensics"
-
-    def display(self, query,result):
-        result.table(
-            elements = [ InodeIDType(case=query['case']),
-                         TimestampType('Timestamp','ts_sec'),
-                         IPType('Source','src_ip', case=query['case']),
-                         IntegerType('Src Port','src_port'),
-                         IPType('Destination','dest_ip', case=query['case']),
-                         IntegerType('Dest Port','dest_port')],
-            table = 'connection_details',
-            case = query['case'],
-            )
+    default_table = "ConnectionDetailsTable"
+    columns = ['Inode', "Timestamp", "Source IP", "Source Port", "Destination IP",
+               "Destination Port", "Type"]
 
 config.add_option("MAX_SESSION_AGE", default=100000, type='int',
                   help="Maximum age (in packets) for a session before it "

@@ -324,6 +324,25 @@ VIRTUAL(TCPStream, Object)
      VMETHOD(add) = TCPStream_add;
 END_VIRTUAL
 
+/** The UDPStream implementation is simpler - we dont keep any packet
+    queues and just dump them into the stream in the order they are
+    encountered. 
+*/
+void UDPStream_add(TCPStream self, PyPacket *packet) {
+  IP ip = (IP)find_packet_instance(packet->obj, "IP");
+  if(!ip) return;
+
+  /** Call our callback with this */
+  self->state = PYTCP_DATA;
+  if(self->callback) self->callback(self, packet);
+  
+  return;
+};
+
+VIRTUAL(UDPStream, TCPStream)
+     VMETHOD(super.add) = UDPStream_add;
+END_VIRTUAL
+
 TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
   int i;
 
@@ -363,6 +382,8 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   u_int32_t forward_hash, reverse_hash;
   struct tuple4 forward,reverse;
   TCPStream i,j;
+  int udp_packet=0;
+  int tcp_packet=0;
 
   if(!ip) return NULL;
 
@@ -378,9 +399,11 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
       FIXME: A possible optimization would be to create a class hash
       which we can use instead of a string comparison.
    */
-  if(!ISNAMEINSTANCE(tcp,"TCP")) {
-    return NULL;
-  };
+  if(ISNAMEINSTANCE(tcp,"TCP")) {
+    tcp_packet = 1;
+  } else if(ISNAMEINSTANCE(tcp,"UDP")) {
+    udp_packet = 1;
+  } else return NULL;
   
   forward.saddr  = ip->packet.header.saddr;
   forward.daddr  = ip->packet.header.daddr;
@@ -437,7 +460,11 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
       so we need to make a forward/reverse stream pair.
   */
   /** Build a forward stream */
-  i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward, self->con_id++);
+  if(udp_packet) {
+    i = (TCPStream)CONSTRUCT(UDPStream, TCPStream, super.Con, self, &forward, self->con_id++);
+  } else {
+    i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward, self->con_id++);
+  };
   i->callback = self->callback;
   i->hash = self;
   i->direction = TCP_FORWARD;
@@ -445,7 +472,12 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   list_add(&(i->global_list),&(self->sorted->global_list));
 
   /** Now a reverse stream */
-  j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse, self->con_id++);
+  if(udp_packet) {
+    j = (TCPStream)CONSTRUCT(UDPStream, TCPStream, super.Con, i, &reverse, self->con_id++);
+  } else {
+    j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse, self->con_id++);
+  };
+
   j->callback = self->callback;
   j->hash = self;
   j->direction = TCP_REVERSE;
