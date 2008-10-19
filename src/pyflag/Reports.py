@@ -283,6 +283,8 @@ class CaseTableReports(report):
 
 class PreCannedCaseTableReoports(CaseTableReports, Registry.PreCanned):
     """ A Convenience class to create Inlined precanned reports """
+    hidden = True
+    
     def display(self, query,result):
         import pyflag.FlagFramework as FlagFramework
         for k,v in self.args.items():

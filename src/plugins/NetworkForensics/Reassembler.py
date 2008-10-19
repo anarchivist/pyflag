@@ -196,13 +196,13 @@ class StreamFile(File):
                 min_packet_id = row['packet_id']
 
             # First time we saw this stream - the seq is the ISN
-            if initials[index] and row['seq']:
+            if initials[index]:
                 deltas[index] -= row['seq'] - row['cache_offset']
                 initials[index] = False
 
             # We need to find if we grew the output file at all:
             initial_len = outfd_len
-            if row['seq']+deltas[index]>0:
+            if row['seq'] + deltas[index]>0:
                 outfd_position = row['seq']+deltas[index]
             
             # We only allow 64k to be written ahead - this is commonly

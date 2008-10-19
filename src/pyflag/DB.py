@@ -534,7 +534,9 @@ class PooledDBO:
         if its cached return it.
         
         """
-        self.expire_cache()
+        if config.SQL_CACHE_MODE=="realtime":
+            self.expire_cache()
+            
         self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r order by id limit 1 for update""", (sql, limit, limit + length))
         row = self.fetch()
         if not row:
@@ -923,7 +925,10 @@ class DirectDBO(PooledDBO):
     dbh = None
     
     def get_dbh(self, case):
-        self.dbh = mysql_connect(case)
+        try:
+            self.dbh = mysql_connect(case)
+        except Exception,e:
+            raise DBError("Unable to connects - does the DB Exist?: %s" % e)
 
     def __del__(self):
         if self.transaction:

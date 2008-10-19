@@ -3,7 +3,9 @@
 http://moyix.blogspot.com/2008/08/auditing-system-call-table.html
 """
 
+import VolatilityCommon
 import re
+from VolatilityCommon import MemoryOffset
 import pyflag.Registry as Registry
 import pyflag.FlagFramework as FlagFramework
 from pyflag.ColumnTypes import InodeIDType, IntegerType, StringType, TimestampType, BigIntegerType
@@ -12,7 +14,6 @@ import pyflag.DB as DB
 import pyflag.Time as Time
 import forensics.registry as MemoryRegistry
 import pyflag.Reports as Reports
-from VolatilityCommon import MemoryOffset
 
 MemoryRegistry.Init()
 
