@@ -184,6 +184,11 @@ def expand(sql, params):
 
     return result
 
+class PyFlagDirectCursor(MySQLdb.cursors.DictCursor):
+    def execute(self, string):
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
+        return MySQLdb.cursors.DictCursor.execute(self, string)
+
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     """ This cursor combines client side and server side result storage.
 
@@ -313,7 +318,7 @@ def mysql_connect(case):
     if config.DB_SS_CURSOR:
         mysql_connection_args['cursorclass'] = PyFlagCursor
     else:
-        mysql_connection_args['cursorclass'] = MySQLdb.cursors.DictCursor
+        mysql_connection_args['cursorclass'] = PyFlagDirectCursor
         mysql_connection_args['cursorclass']._last_executed_sequence = []
         
     try:
@@ -392,6 +397,11 @@ class Pool(Queue):
 
             return result
         except Exception,e:
+            ## We just failed to connect - i bet the cached variables
+            ## are totally wrong - invalidate the cache:
+            global mysql_connection_args
+            
+            mysql_connection_args = None            
             raise DBError("Unable to connect - does the DB Exist?: %s" % e)
 
 class PooledDBO:
@@ -928,6 +938,11 @@ class DirectDBO(PooledDBO):
         try:
             self.dbh = mysql_connect(case)
         except Exception,e:
+            ## We just failed to connect - i bet the cached variables
+            ## are totally wrong - invalidate the cache:
+            global mysql_connection_args
+            
+            mysql_connection_args = None            
             raise DBError("Unable to connects - does the DB Exist?: %s" % e)
 
     def __del__(self):

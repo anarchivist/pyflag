@@ -219,8 +219,8 @@ class PCAPFS(DBFS):
                     dbh.case,
                     "I%s|S%s" % (iosource_name, connection['inode_id']))
 
-                if tcp.data_len > 0:
-                    Callback('data', packet, connection)
+                #if tcp.data_len > 0:
+                #    Callback('data', packet, connection)
 
             elif mode=='data':
                 ip = packet.find_type("IP")
