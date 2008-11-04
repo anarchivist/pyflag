@@ -275,9 +275,9 @@ class AFF(Standard):
 
     def create(self, name, case, query):
         offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
-        filename = query['filename']
-        fd = pyaff.open(filename)
-        return OffsettedFDFile(fd, offset)
+        filenames = self.glob_filenames(query.getarray('filename'))
+        fd = pyaff.open(filenames[0])
+        return OffsettedFDFile((fd,), offset)
 
 ## Optionally turn off the classes which are not supported (due to
 ## lack of c modules)
