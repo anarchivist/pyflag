@@ -565,7 +565,11 @@ class StringType(ColumnType,LogParserMixin):
               ["matches", "string", False],
               ["regex", "[0-9]+", False],
               ]
-              
+
+    def make_index(self, dbh, table):
+        """ Creates an index on table using dbh """
+        dbh.check_index(table, self.column, length=50)
+
     def __init__(self, *args, **kwargs):
         self.text = kwargs.get('text',False)
         self.width = kwargs.get('width',2000)
@@ -904,7 +908,7 @@ class InodeIDType(IntegerType):
     tests = [ [ "contains", "|G", False ],
               [ "=", "Itest", False ],
               ]
-    
+
     def __init__(self, name='Inode', column='inode_id', **kwargs):
         ColumnType.__init__(self,  name=name, column=column, **kwargs)
         self.table = 'inode'

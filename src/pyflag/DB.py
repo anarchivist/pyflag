@@ -188,6 +188,16 @@ class PyFlagDirectCursor(MySQLdb.cursors.DictCursor):
     def execute(self, string):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
         return MySQLdb.cursors.DictCursor.execute(self, string)
+    
+    def _warning_check(self):
+        last = self._last_executed
+        if self._warnings:
+            self.execute("SHOW WARNINGS")
+            while 1:
+                a=self.fetchone()
+                if not a: break
+                pyflaglog.log(pyflaglog.WARNINGS,"query %r: %s" % (last,a['Message']))
+
 
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     """ This cursor combines client side and server side result storage.

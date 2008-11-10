@@ -214,7 +214,9 @@ class Log:
         ## db:
         tablename = name+"_log"
         ## Set the table for our columns:
-        for f in self.fields: f.table = tablename
+        for f in self.fields:
+            if f:
+                f.table = tablename
         
         ## First we create the table. We do this by asking all the
         ## column types for their create clause:
@@ -266,6 +268,8 @@ class Log:
                 for i in range(min(len(self.fields),len(fields))):
                     try:
                         c = self.fields[i]
+                        if not c: continue
+                        
                         v = fields[i]
                         columns[c.column] = v
 

@@ -276,6 +276,7 @@ class HTTPScanner(StreamScannerFactory):
     """
     default = True
     group = "NetworkScanners"
+    depends = ['TypeScan']
     
     class Drawer(Scanner.Drawer):
         description = "Network Scanners"

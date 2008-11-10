@@ -37,6 +37,11 @@ import pyflag.Registry as Registry
 import pyflag.Store as Store
 import textwrap
 
+## This is required to shut up some stupid python warnings
+import warnings
+warnings.filterwarnings('ignore',
+                        message=r'Module .*? was already imported', append=True)
+
 ## This global tells us if we checked the configuration already - we
 ## only check configuration the first time we are run.
 config_checked = False
@@ -990,6 +995,7 @@ class CaseTable:
         import pyflag.ColumnTypes as ColumnTypes
         
         tmp = []
+        indexes = []
         for x in self.columns:
             column_cls = x[0]
             args = x[1]
@@ -1007,6 +1013,8 @@ class CaseTable:
                 pass
             
             tmp.append(string)
+            if c.name in self.index or c.column in self.index:
+                indexes.append(c)
 
         columns = ',\n'.join(tmp)
         if self.primary:
@@ -1017,8 +1025,8 @@ class CaseTable:
         dbh.execute(sql)
 
         ## Check indexes:
-        for i in self.index:
-            dbh.check_index(self.name, i)
+        for i in indexes:
+            i.make_index(dbh, self.name)
 
 ## The following functions are for unicode support and are mostly
 ## borrowed from django:

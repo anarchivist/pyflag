@@ -955,14 +955,15 @@ class HTMLUI(UI.GenericUI):
         </select> <a href=# onclick='document.getElementById("%s").value += document.getElementById("filter_column").value;'>Insert </a></td></tr>
         """ % (message,
                "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name)
-                          for e in elements if e.operators()]),
+                          for e in elements if e and e.operators()]),
                filter_context)
 
         ## Round up all the possible methods from all colmn types:
         operators = {}
         for e in elements:
-            for k,v in e.operators().items():
-                operators[k]=v
+            if e:
+                for k,v in e.operators().items():
+                    operators[k]=v
 
         methods = operators.keys()
         methods.sort()

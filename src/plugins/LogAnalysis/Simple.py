@@ -238,7 +238,7 @@ class SimpleLog(LogFile.Log):
         except KeyError:
             self.delimiter=re.compile(delimiters.values()[0])
             query['delimiter']=self.delimiter
-                    
+
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
