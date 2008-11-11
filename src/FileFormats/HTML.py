@@ -16,6 +16,7 @@ import pyflag.DB as DB
 from pyflag.DB import expand
 from FlagFramework import query_type, normpath, get_bt_string, smart_str, smart_unicode, iri_to_uri
 import pyflag.FileSystem as FileSystem
+import pyflag.FlagFramework as FlagFramework
 
 XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
                                   '"' : "quote",
@@ -428,6 +429,9 @@ class ResolvingHTMLTag(SanitizingTag):
         elif self.method:
             ## FIXME: This leads to references without methods:
             reference="%s/%s" % (self.base_url, reference)
+            if reference.startswith("http://"):
+                reference='http:/'+FlagFramework.normpath(reference[6:])
+
         ## If we get here the reference is not absolute, and we dont
         ## have a method - chances are that its in the VFS:
         else:

@@ -262,6 +262,10 @@ struct udp_struct {
   uint16_t length;
   uint16_t checksum;
 
+  // This is a psuedo sequence number we may use to treat a UDP stream
+  // as a stream.
+  uint32_t seq;
+
   int data_len;
   char *data;
 };

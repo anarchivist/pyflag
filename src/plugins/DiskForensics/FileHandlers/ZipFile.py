@@ -334,7 +334,8 @@ class ZipFile(File):
 
         result.row("Zip File", "Decompress ZipFileHeader structure at "
                    "offset %s with length %s" % (self.offset, self.compressed_length))
-
+        result.row("","Filename - %s" % self.header['zip_path'])
+        
 class GZ_file(File):
     """ A file like object to read gzipped files. """
     specifier = 'G'

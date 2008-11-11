@@ -330,11 +330,17 @@ END_VIRTUAL
 */
 void UDPStream_add(TCPStream self, PyPacket *packet) {
   IP ip = (IP)find_packet_instance(packet->obj, "IP");
+  UDP udp;
   if(!ip) return;
+  udp = (UDP)ip->packet.payload;
+  
+  udp->packet.seq = self->next_seq;
 
   /** Call our callback with this */
   self->state = PYTCP_DATA;
   if(self->callback) self->callback(self, packet);
+
+  self->next_seq += udp->packet.data_len;
   
   return;
 };
@@ -569,7 +575,11 @@ int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
     */
     if(tcp->packet.header.syn)
       i->next_seq = tcp->packet.header.seq+1;
-    else i->next_seq = tcp->packet.header.seq;
+
+    // If its a UDP stream is does not have an ISN
+    else if(!ISINSTANCE(i, UDPStream))
+      i->next_seq = tcp->packet.header.seq;
+
     i->state = PYTCP_JUST_EST;
     
     /** Notify the callback of the establishment of the new connection */

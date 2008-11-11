@@ -108,7 +108,7 @@ class IEIndex(Scanner.GenScanFactory):
                         index = event['directory_index'].get_value()
                         tmp_path = FlagFramework.normpath((FlagFramework.joinpath([
                             path, history.directories[index]])))
-                    except KeyError:
+                    except:
                         continue
                     
                     dbh.execute("select inode, inode_id from file where path='%s/' and name=%r",
@@ -135,7 +135,10 @@ class IEIndex(Scanner.GenScanFactory):
                                                            "%s%s" % (row['inode'],
                                                                      encoding_driver),
                                                            "%s/%s" % (tmp_path,
-                                                                      args['filename']))
+                                                                      args['filename']),
+                                                           _mtime = args.get('_modified'),
+                                                           _atime = args.get('_accessed')
+                                                           )
 
                         http_args = dict(
                             inode_id = inode_id,
