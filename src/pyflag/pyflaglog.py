@@ -89,8 +89,8 @@ class LoggingThread(threading.Thread):
                 if not dbh:
                     dbh = self.try_to_connect()
                     
-                if dbh:
-                    dbh.insert('logs', level=level, message=message[:250], _fast=True)
+                #if dbh:
+                #    dbh.insert('logs', level=level, message=message[:250], _fast=True)
             except Exception,e:
                 sys.stdout.write( "Logging service: %s\nIf PyFlag is not configured yet just connect to its URL. (http://%s:%s/)\n" % (e,config.HTTPSERVER_BINDIF, config.HTTPSERVER_PORT))
                 sys.stdout.flush()
@@ -115,20 +115,20 @@ def start_log_thread():
 
 def log(level,message, *args):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
-    try:
-        log_fd = open(config.LOGFILE,"ab")
-    except Exception,e:
-        log_fd = sys.stderr
-
-    import pyflag.DB as DB
-
-    try:
-        string = DB.expand("%s(%s): %s" % (os.getpid(),lookup[level],message), args)
-    except Exception,e:
-        log_fd.write("%s\n" % e)
-        string = message
-
     if config.LOG_LEVEL >= level:
+        try:
+            log_fd = open(config.LOGFILE,"ab")
+        except Exception,e:
+            log_fd = sys.stderr
+
+        import pyflag.DB as DB
+
+        try:
+            string = DB.expand("%s(%s): %s" % (os.getpid(),lookup[level],message), args)
+        except Exception,e:
+            log_fd.write("%s\n" % e)
+            string = message
+
         ## Pass the message to the logger queue:
         try:
             LOG_QUEUE.put((level,message), False)

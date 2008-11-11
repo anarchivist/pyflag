@@ -123,6 +123,7 @@ class MagicResolver:
                 ## We could not find it in the mime table - lets do magic
                 ## ourselves:
                 data = fd.read(1024)
+                fd.seek(0)
                 
             type, content_type = self.cache_type(case, inode_id, data)
 

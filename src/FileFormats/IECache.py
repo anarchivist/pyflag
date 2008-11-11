@@ -55,7 +55,10 @@ class Hash(LONG_ARRAY):
     """
     def read(self):
         data = []
-        magic=STRING(self.buffer,length=4)
+        try:
+            magic=STRING(self.buffer,length=4)
+        except: raise IOError("Cant read any more")
+        
         # Check the magic for this section
         if magic!='HASH':
             raise IOError("Location %s is not a hash array - This file may be empty!!"%(data.offset))
@@ -95,7 +98,10 @@ class HIST_STR_PTR(LONG):
         data=self.buffer.set_offset(self.section_offset)
 
         ## Return the null terminated string:
-        return TERMINATED_STRING(data[offset:])
+        result = TERMINATED_STRING(data[offset:])
+        result.inclusive = False
+        
+        return result
 
     def __str__(self):
         result="%s" % (self.data,)
@@ -163,15 +169,23 @@ class URLEntry(SimpleStruct):
             [ 'size', LONG ], #In multiples of the blocksize
             [ 'modified_time', WIN_FILETIME ],
             [ 'accessed_time', WIN_FILETIME ],
-            [ 'unknown', LONG_ARRAY, {'count':0x7} ],
-            [ 'url', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
-            [ 'unknown', BYTE ],
-            [ 'directory_index', BYTE ],
-            [ 'unknown', WORD ],
-            [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
-            [ '0x00200001', ULONG, ],
-            [ 'content', PContent, dict(relative_offset = lambda x: x['type'].buffer.offset -4) ],
-            ] 
+            [ 'url', HIST_STR_PTR, dict(section_offset=self.buffer.offset,
+                                        offset=0x34)],
+            [ 'directory_index', BYTE, dict(offset=0x38) ],
+            [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset, offset=0x3c)],
+            [ 'content', PContent, dict(offset=0x44,
+                                        relative_offset = lambda x: x['type'].buffer.offset -4) ],
+            ]
+
+class DirectoryEntry(SimpleStruct):
+    fields = [
+        [ "name", STRING, dict(length=8) ],
+        [ 'type', STRING, dict(length=4) ]
+        ]
+
+class Directories(StructArray):
+    target_class = DirectoryEntry
+
 class IEHistoryFile:
     """ A Class to access the records in an IE History index.dat file.
 
@@ -193,12 +207,20 @@ class IEHistoryFile:
         
         hash_offset = self.header['hash_offset'].get_value()
         self.hashes = []
-        
-        while hash_offset > 0:
-            h=Hash(self.buffer[hash_offset:],1)
-            self.hashes.extend(h.data)
-            hash_offset = h.next_hash_offset
 
+        self.directories = []
+        for d in Directories(self.buffer[0x50:], count=50):
+            name = d['name'].get_value()
+            if name.isalnum():
+                self.directories.append(name)
+
+        while hash_offset > 0:
+            try:
+                h=Hash(self.buffer[hash_offset:],1)
+                self.hashes.extend(h.data)
+                hash_offset = h.next_hash_offset
+            except IOError: break
+            
     def __iter__(self):
         self.hash_iter=self.hashes.__iter__()
         return self
@@ -219,7 +241,8 @@ class IEHistoryFile:
         if entry_type == 'URL ':
             entry=URLEntry(self.buffer[offset:])
             result['event']=entry
-            for key in ('type','modified_time','accessed_time','url','filename','size'):
+            for key in ('type','modified_time','accessed_time','url','filename',
+                        'size','directory_index'):
                 result[key]=entry[key]
             result['offset'] = offset
             c=entry['content'].get_value()

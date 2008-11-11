@@ -196,7 +196,7 @@ class HTTPCaseTable(FlagFramework.CaseTable):
         [ IntegerType, dict(name = 'Parent', column = 'parent') ],
         [ IntegerType, dict(name = 'Request Packet', column='request_packet') ],
         [ StringType, dict(name='Method', column='method', width=10)],
-        [ StringType, dict(name='URL', column='url', width=500)],
+        [ StringType, dict(name='URL', column='url', width=2000)],
         [ IntegerType, dict(name = "Response Packet", column='response_packet')],
         [ IntegerType, dict(name = 'Status', column='status')],
         [ StringType, dict(name='Content Type', column='content_type')],

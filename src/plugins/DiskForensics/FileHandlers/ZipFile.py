@@ -93,7 +93,7 @@ class ZipScan(GenScanFactory):
                 inodes.append(inode)
                 
                 inode_id = self.ddfs.VFSCreate(None,
-                                               inode,pathname+"/"+namelist[i],
+                                               inode,DB.expand("%s/%s",(pathname,namelist[i])),
                                                size=info.file_size,
                                                mtime=t)
                 

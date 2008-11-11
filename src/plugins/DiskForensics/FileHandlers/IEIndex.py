@@ -23,7 +23,7 @@
 
 We use the files's magic to trigger the scanner off - so its imperative that the TypeScan scanner also be run or this will not work. We also provide a report to view the history files.
 """
-import os.path, cStringIO
+import os.path, cStringIO, re
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
@@ -33,6 +33,9 @@ import pyflag.DB as DB
 from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType, LongStringType, IntegerType
 import pyflag.FlagFramework as FlagFramework
 
+content_type_re = re.compile(r"Content-Type:\s+([^\s]+)")
+content_encoding_re = re.compile(r"Content-Encoding:\s+([^\s]+)")
+
 class IECaseTable(FlagFramework.CaseTable):
     """ IE History Table - Stores all Internet Explorer History """
     name = 'ie_history'
@@ -41,7 +44,7 @@ class IECaseTable(FlagFramework.CaseTable):
         [ IntegerType, dict(name='Offset', column='offset')],
         [ IntegerType, dict(name="Length", column='length')],
         [ StringType, dict(name='Type', column='type', width=20) ],
-        [ StringType, dict(name='URL', column='url', width=500) ],
+        [ StringType, dict(name='URL', column='url', width=1000) ],
         [ TimestampType, dict(name='Modified', column='modified') ],
         [ TimestampType, dict(name='Accessed', column='accessed') ],
         [ StringType, dict(name='Filename', column='filename', width=500) ],
@@ -67,20 +70,84 @@ class IEIndex(Scanner.GenScanFactory):
 
         def external_process(self,fd):
             dbh=DB.DBO(self.case)
+            dbh._warnings = False
             dbh.mass_insert_start('ie_history')
             inode_id = self.fd.lookup_id()
+            
+            ## Find our path
+            dbh.execute("select path from file where inode_id = %r", inode_id)
+            row = dbh.fetch()
+            path = row['path']
+            
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:
-                    dbh.mass_insert(inode_id = inode_id,
-                                    type = event['type'],
-                                    offset = event['offset'],
-                                    length = event['size'].get_value() * IECache.blocksize,
-                                    url = event['url'],
-                                    _modified = 'from_unixtime(%d)' % event['modified_time'].get_value(),
-                                    _accessed = 'from_unixtime(%d)' % event['accessed_time'].get_value(),
-                                    filename = event['filename'],
-                                    headers = event['data'])
+                    url = event['url'].get_value()
+                    url.inclusive = False
+                    url = url.get_value()
+                    
+                    args = dict(inode_id = inode_id,
+                                type = event['type'],
+                                offset = event['offset'],
+                                length = event['size'].get_value() * IECache.blocksize,
+                                url = url,
+                                filename = event['filename'],
+                                headers = event['data'].get_value(),)
+
+                    m = event['modified_time'].get_value()
+                    if m>1000:
+                        args['_modified'] = 'from_unixtime(%d)' % m
+                    a = event['accessed_time'].get_value()
+                    if a>1000:
+                        args['_accessed'] = 'from_unixtime(%d)' % a
+
+                    dbh.mass_insert(**args)
+
+                    ## Try to locate the actual inode
+                    try:
+                        index = event['directory_index'].get_value()
+                        tmp_path = FlagFramework.normpath((FlagFramework.joinpath([
+                            path, history.directories[index]])))
+                    except KeyError:
+                        continue
+                    
+                    dbh.execute("select inode, inode_id from file where path='%s/' and name=%r",
+                                tmp_path,
+                                args['filename'])
+                    row = dbh.fetch()
+                    if row:
+                        inode_id = row['inode_id']
+                        headers = args['headers']
+                        encoding_driver = None
+                        
+                        m = content_encoding_re.search(headers)
+                        if m:
+                            ## Is it gzip encoding?
+                            if m.group(1) == 'gzip':
+                                encoding_driver = "|G1"
+                            elif m.group(1) == 'deflate':
+                                encoding_driver = '|d1'
+                            else:
+                                print "I have no idea what %s encoding is" % m.group(1)
+                                
+                        if encoding_driver:
+                            inode_id = self.ddfs.VFSCreate(None,
+                                                           "%s%s" % (row['inode'],
+                                                                     encoding_driver),
+                                                           "%s/%s" % (tmp_path,
+                                                                      args['filename']))
+
+                        http_args = dict(
+                            inode_id = inode_id,
+                            url = url,
+                            )
+
+                        ## Populate http table if possible
+                        m = content_type_re.search(headers)
+                        if m:
+                            http_args['content_type'] = m.group(1)
+                            
+                        dbh.insert('http', **http_args )
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh

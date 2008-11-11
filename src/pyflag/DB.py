@@ -196,7 +196,7 @@ class PyFlagDirectCursor(MySQLdb.cursors.DictCursor):
             while 1:
                 a=self.fetchone()
                 if not a: break
-                pyflaglog.log(pyflaglog.WARNINGS,"query %r: %s" % (last,a['Message']))
+                pyflaglog.log(pyflaglog.WARNINGS,"query %r: %s" % (last[:100],a['Message']))
 
 
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
@@ -930,7 +930,7 @@ class PooledDBO:
             key = "%s" % (self.case)
             if self.DBH and not self.discard:
                 pool = self.DBH.get(key)
-                pool.put((self.dbh, self.mysql_bin_string))
+                pool.put(self.dbh)
                 
         except (TypeError,AssertionError,AttributeError, KeyError),e:
             #print "dbh desctrucr: %s " % e
