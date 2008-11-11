@@ -1,3 +1,24 @@
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+
 # This is a module to proccess VOIP calls using SIP.
 #
 # SIP is a very complex protocol which is particularly badly designed
@@ -41,16 +62,21 @@
 # packets.
 
 """ This is a module to parse SIP communications """
+import sys,os.path
+sys.path.append(os.path.dirname(__file__) + "/../")
+
 import pyflag.Packets as Packets
 from format import *
 from plugins.FileFormats.BasicFormats import *
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
-import struct,re
+import struct,re, math
 from pyflag.ColumnTypes import StringType, PacketType, IPType
 import pyflag.Store as Store
-
-disable =True
+import pyflag.pyflaglog as pyflaglog
+import NetworkScanner
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
+#disable =True
 
 ## This keeps track of outstanding invitations.
 SIPInvites = Store.Store()
@@ -65,10 +91,11 @@ class SDP:
             value = value.strip()
             
             if attribute=='m':
-                print "details %s" % value
                 self.details = value
+            elif attribute=='c':
+                self.con_details = value.split(" ")
 
-class SIPAttribute:
+class SIPParser:
     message = None
     sequence = None
     sdp = None
@@ -81,10 +108,6 @@ class SIPAttribute:
     def parse_request(self, method, uri, data):
         if method=="INVITE":
             self.parse_data(data)
-            ## Make sure we remeber this invite
-            self.sdp.to = self.to
-            self.sdp._from = self._from
-            SIPInvites.put(self.sdp, key=self.sequence)
 
     def record_sdp_session(self, sdp, _from, to):
         details = sdp.details.split()
@@ -119,8 +142,9 @@ class SIPAttribute:
         
     def parse_response(self, start_code, reason, data):
         if start_code=="200":
+            print "Parsing 200"
             self.parse_data(data)
-            print "Parsed %s %r " % (self.sequence, self.sdp)
+            #print "Parsed %s %r " % (self.sequence, self.sdp)
             if self.sdp:
                 invite_sdp = SIPInvites.get(self.sequence)
                 forward, reverse = self.record_sdp_session(invite_sdp, invite_sdp._from, invite_sdp.to)
@@ -142,7 +166,8 @@ class SIPAttribute:
                 header = self.dispatch.get(header, header)
                 getattr(self, header)(value)
             except AttributeError:
-                print "Unable to handle header %s: %s" % (header, value)
+                pass
+#                print "Unable to handle header %s: %s" % (header, value)
 
     def content_type(self, ct):
         print "Content Type is %s" % ct
@@ -159,44 +184,91 @@ class SIPAttribute:
     def _from(self, _from):
         self._from = _from
 
-class SIPInit(FlagFramework.EventHandler):
-    def create(self, dbh, case):
-        ## This table is used to record sdp sessions detected
-        dbh.execute(
-            """Create table if not exists `mmsessions` (
-            `id` int auto_increment,
-            `packet_id` int,
-            `from` VARCHAR(255) NOT NULL,
-            `to` VARCHAR(255) NOT NULL,
-            `type` VARCHAR(255) NOT NULL,
-            `session_id` VARCHAR(255) NOT NULL,
-            key(id)
-            )""")
+class VOIPTable(FlagFramework.CaseTable):
+    """ VOIP Table - Keep all VOIP transactions """
+    name = 'voip'
+    columns = [
+        [ InodeIDType, {} ],
+        [ TimestampType, dict(name='Start Time', column='start') ],
+        [ TimestampType, dict(name='End Time', column='end') ],
+        [ IPType, dict(name='Source Addr', column='source') ],
+        [ IntegerType, dict(name="Source Port", column='source_port') ],
+        [ IPType, dict(name='Dest Addr', column='dest') ],
+        [ IntegerType, dict(name="Dest Port", column='dest_port') ],
+        
+        [ StringType, dict(name='Protocol', column='protocol') ],
+        ]
 
+import pyflag.Magic as Magic
 
-class SIPHandler(Packets.PacketHandler):
+class SIPRequestMagic(Magic.Magic):
+    """ Identify SIP request streams """
+    type = "SIP Request"
+    mime = "protocol/x-sip-request"
+
+    regex_rules = [
+        ( "[A-Z]+ [^ ]{1,600} SIP/2.", (0,500)),
+        ]
+
+    samples = [
+        ( 100, "INVITE sip:xxxxxx@voice.mibroadband.com.au SIP/2.0"),
+        ( 100, "ACK sip:xxxxxx@voice.mibroadband.com.au SIP/2.0"),
+        ]
+
+class SIPResponseMagic(Magic.Magic):
+    """ Identify SIP response streams """
+    type = "SIP Response"
+    mime = "protocol/x-sip-response"
+    regex_rules = [
+        ( r"SIP/2.0 \d\d\d ", (0,500)),
+        ]
+    
+    samples = [
+        ( 100, "SIP/2.0 407 Proxy Authentication Required"),
+        ( 100, "SIP/2.0 200 OK"),
+        ]
+    
+class SIPScanner(NetworkScanner.StreamScannerFactory):
     """ SIP is a HTTP Like protocol based on UDP packets """
     request_re = re.compile(r"(?sm)(([A-Z]+) ([^ ]+) (SIP/\d.\d))\r\n(.+)",re.DOTALL)
-    response_re = re.compile(r"(?sm)((SIP/\d\.\d) (\d\d\d) ([A-Za-z]+))\r\n(.+)", re.DOTALL)
+    response_re = re.compile(r"(?sm)((SIP/\d\.\d) (\d\d\d) ([A-Za-z ]+))\r\n(.+)", re.DOTALL)
+
+    default = True
+    group = "NetworkScanners"
+    depends = ['TypeScan']
     
-    def handle(self, packet):
+    def process_stream(self, stream, factories):
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         try:
-            udp = packet.find_type("UDP")
-            data = udp.data
+            fd = self.fsfd.open(inode=combined_inode)
+            ## If we cant open the combined stream, we quit (This could
+            ## happen if we are trying to operate on a combined stream
+            ## already
+        except IOError: return
+        self.parser = SIPParser(self.case)
+        
+        pyflaglog.log(pyflaglog.DEBUG, "Openning %s for SIP" % combined_inode)
+        for packet_id, cache_offset, data in fd.packet_data():
+            self.handle(data)
+
+    class Scan(NetworkScanner.StreamTypeScan):
+        types = [ 'protocol/x-sip-request' ]
+    
+    def handle(self, data):
+        try:
             m = self.request_re.match(data)
-            attributes = SIPAttribute(self.case)
             if m:
-                print "SIP request found %r" % m.group(1)
+                #print "SIP request found %r" % m.group(1)
                 try:
-                    attributes.parse_request(m.group(2), m.group(3), m.group(5))
+                    self.parser.parse_request(m.group(2), m.group(3), m.group(5))
                 except Exception, e:
                     pass
 
             m = self.response_re.match(data)
             if m:
-                print "SIP response found %s" % m.group(1)
+                #print "SIP response found %s" % m.group(1)
                 try:
-                    attributes.parse_response(m.group(3), m.group(4), m.group(5))
+                    self.parser.parse_response(m.group(3), m.group(4), m.group(5))
                 except Exception, e:
                     pass
                     #print e
@@ -204,6 +276,67 @@ class SIPHandler(Packets.PacketHandler):
                 
         except (AttributeError, TypeError):
             pass
+
+def calculate_stream_stats(case, stream_id):
+    """ This function calculate stream statistics such as jitter and
+    average bit rate. These statistics help us determine if the stream
+    is likely to be VOIP. Decoding the stream is a totally different
+    matter though.
+    """
+    dbh = DB.DBO(case)
+    ## The following creates a temporary table with data points
+    ## relating to the stream's packet arrival times and cache
+    ## offsets. We substract the absolute time from the stream to
+    ## control numerical overflows.
+    dbh.execute("select @i:=0, unix_timestamp(ts_sec) as t_offset from "
+                "connection join pcap on "
+                "connection.packet_id = pcap.id where inode_id=%r limit 1", stream_id)
+    row = dbh.fetch()
+
+    table_name = "temp_stream_stats_%s" % stream_id
+    
+    dbh.execute("create temporary table %s "
+                "select @i:=@i+1 as i, "
+                "unix_timestamp(ts_sec) + ts_usec * 1e-6 - %s as t, "
+                "cache_offset as o from connection join pcap on "
+                "connection.packet_id = pcap.id where inode_id=%r",
+                table_name, row['t_offset'], stream_id)
+    
+    ## Now collect some values for calculating stats
+    dbh.execute("select count(i) as n, sum(i) as s_i, sum(i * i) as s_i2,"
+                "sum(t) as s_t, sum(t*t) as s_t2, sum(i*t) as s_cp_i_t, "
+                "sum(o) as s_o, sum(o*o) as s_o2, sum(o*t) as s_cp_o_t from "
+                "%s", table_name)
+
+    row = dbh.fetch()
+    ## Make sure they are all floats
+    for k in row: row[k]=float(row[k])
+    
+    ## Now calculate Pearsons r for time vs. packet count (measure of
+    ## jitter) and stream offset vs. time (measure of data rate).
+    n = row['n']
+    tmp_i_t = (n * row['s_cp_i_t'] - row['s_i'] * row['s_t'] )
+    tmp_o_t = (n * row['s_cp_o_t'] - row['s_o'] * row['s_t'] )
+    tmp_i = (n * row['s_i2'] - row['s_i'] ** 2 )
+    tmp_t = (n * row['s_t2'] - row['s_t'] ** 2 )
+    tmp_o = (n * row['s_o2'] - row['s_o'] ** 2 )
+
+    ## This is the time jitter rate
+    r_jitter = tmp_i_t / math.sqrt(tmp_i * tmp_t)
+
+    ## This is the packet rate (packets per second)
+    b_rate = tmp_i_t / tmp_t
+
+    ## This is the data jitter rate
+    r_data = tmp_o_t / math.sqrt(tmp_o * tmp_t)
+
+    ## This is the avg data rate (in kbit/s) note that it may be
+    ## slightly bigger than the codecs data rate due to RTP headers
+    b_data = tmp_o_t / tmp_t * 8 / 1000
+
+    return r_jitter, b_rate, r_data, b_data
+
+
 
 class RDPPacket(SimpleStruct):
     fields = [
@@ -265,13 +398,23 @@ class RDPHandler(Packets.PacketHandler):
         fd.write(data)
 
 import pyflag.tests as tests
+import pyflag.pyflagsh as pyflagsh
 
 class SIPTests(tests.ScannerTest):
     """ Test SIP Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "internode-voip-radio-raw.pcap"
-    subsystem = "Advanced"
+    test_file = "voip.pcap"
+    subsystem = "Standard"
     fstype = "PCAP Filesystem"
 
+    def test01HTTPScanner(self):
+        """ Test HTTP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "SIPScanner",
+                                   ])                   ## List of Scanners
+
 if __name__=='__main__':
-    pass
+    print calculate_stream_stats("PyFlagTestCase", 17)

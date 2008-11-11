@@ -90,19 +90,14 @@ class StreamFile(File):
         self.inode_ids = [ int(x) for x in inode[1:].split("/")]
 
         ## Fill in some vital stats
-        dbh.execute("select inode.inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` join inode on inode.inode_id = connection_details.inode_id where inode.inode=%r limit 1", self.inode)
+        dbh.execute("select inode.inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec, type from `connection_details` join inode on inode.inode_id = connection_details.inode_id where inode.inode=%r limit 1", self.inode)
         row=dbh.fetch()
         if not row:
-            dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id = %r", self.inode_ids[0])
+            dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec, type from `connection_details` where inode_id = %r", self.inode_ids[0])
             row = dbh.fetch()
 
-        self.src_port = row['src_port']
-        self.dest_port = row['dest_port']
-        self.reverse = row['reverse']
-        self.ts_sec = row['ts_sec']
-        self.dest_ip = row['dest_ip']
-        self.src_ip = row['src_ip']
-        self.inode_id = row['inode_id']
+        ## This updates our properties from the db
+        self.__dict__.update(row)
 
         ## We allow the user to ask for a number of streams which will
         ## be combined at the same time. This allows us to create a
@@ -296,16 +291,27 @@ class StreamFile(File):
 
         if self.packet_list==None:
             dbh = DB.DBO(self.case)
-            dbh.execute("""select packet_id,cache_offset from `connection` where inode_id = (select inode_id from inode where inode=%r limit 1) order by cache_offset desc, length desc """,
+            dbh.execute("""select packet_id,cache_offset,length from `connection` where inode_id = (select inode_id from inode where inode=%r limit 1) order by cache_offset asc, length desc """,
                         (self.inode))
-            self.packet_list = [ (row['packet_id'],row['cache_offset']) for row in dbh ]
+            self.packet_list = [ (row['packet_id'],row['cache_offset'],row['length']) for row in dbh ]
 
         ## Now try to find the packet_id in memory:
-        for packet_id,cache_offset in self.packet_list:
+        result = 0
+        for packet_id,cache_offset,length in self.packet_list:
             if cache_offset < position:
-                return packet_id
+                result = packet_id
+            else:
+                return result
 
         return 0
+
+    def packet_data(self):
+        """ A generator which generates a packet at a time """
+        self.get_packet_id(0)
+        for packet_id,cache_offset,length in self.packet_list:
+            self.seek(cache_offset)
+            data = self.read(length)
+            yield packet_id, cache_offset, data
 
     def get_packet_ts(self, position=None):
         """ Returns the timestamp of the current packet """

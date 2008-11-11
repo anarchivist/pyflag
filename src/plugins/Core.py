@@ -458,7 +458,7 @@ class FileTable(FlagFramework.CaseTable):
                 [ StringType, dict(name = 'Status', column = 'status', width=8)],
                 [ FilenameType, {}],
                 ]
-    index = [ 'inode_id']
+    index = [ 'inode_id', 'inode']
 
 class InodeTable(FlagFramework.CaseTable):
     """ Inode Table - stores information related to VFS Inodes """
@@ -482,7 +482,7 @@ class InodeTable(FlagFramework.CaseTable):
                 [ IntegerType, dict(name = 'Desired Version', column='desired_version')],
                 ]
 
-    index = [ "inode", ]
+    index = [ "Inode String", ]
     
     def __init__(self):
         scanners = set([ "%s" % s.__name__ for s in Registry.SCANNERS.classes ])
