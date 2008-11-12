@@ -191,7 +191,7 @@ ewffile_seek(ewffile *self, PyObject *args, PyObject *kwds) {
     }
 
     if(libewf_seek_offset(self->handle, self->readptr) < 0)
-      return PyErr_Format(PyExc_IOError, "libewf_seek_offset failed (tried to seek to %llu - %llu)", self->readptr), self->size;
+      return PyErr_Format(PyExc_IOError, "libewf_seek_offset failed (tried to seek to %llu - %llu)", self->readptr, self->size);
 
     // holy crap this is aweful code!
     if(hack) {

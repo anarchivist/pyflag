@@ -63,9 +63,12 @@ class FindTasks(Registry.FileSystemLoader):
                                                           loader.types, task)
             
             ## Create time
-            row['time'] = vmodules.process_create_time(loader.addr_space,
-                                                       loader.types, task)
+            create_time = vmodules.process_create_time(
+                loader.addr_space,
+                loader.types, task)
 
+            row['_time'] = "from_unixtime(%s)" % create_time
+            
             ## The process address space
             process_address_space = vmodules.process_addr_space(loader.addr_space,
                                                                 loader.types, task,
@@ -84,8 +87,10 @@ class FindTasks(Registry.FileSystemLoader):
 
             ## Insert one row for the task
             new_inode = "%s/%s/%s" % (loader.mount_point, row['pid'], row['name'])
-            row['inode_id'] = loader.VFSCreate(None, "I%s|A%s" % (
-                loader.iosource_name, row['pid']), new_inode)
+            row['inode_id'] = loader.VFSCreate(
+                None, "I%s|A%s" % (loader.iosource_name, row['pid']), new_inode,
+                _ctime = create_time, _mtime = create_time
+                )
             dbh.insert('windows_tasks', _fast = True, **row)
 
             for module in modules:

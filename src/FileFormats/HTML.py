@@ -299,7 +299,7 @@ class SanitizingTag(Tag):
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
                 attributes += DB.expand(' href="javascript: alert(%r)"',
-                                        iri_to_uri(self.attributes['href'][:100]))
+                                        iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
@@ -502,6 +502,7 @@ class ResolvingHTMLTag(SanitizingTag):
         if build_reference:
             result += " reference=\"%s\" " % reference
 
+        print "Not found %s" % reference
         return result
 
 class HTMLParser(lexer.Lexer):
@@ -653,7 +654,6 @@ class HTMLParser(lexer.Lexer):
         if self.tag.name=='meta' and self.current_attribute=='content':
             m = re.search("charset=([^ \"]+)", self.tag[self.current_attribute])
             if m:
-                print "Setting charset to %s" % m.group(1)
                 self.charset[0] = m.group(1)
 
 if __name__ == '__main__':

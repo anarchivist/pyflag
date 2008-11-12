@@ -94,13 +94,16 @@ class IEIndex(Scanner.GenScanFactory):
                                 filename = event['filename'],
                                 headers = event['data'].get_value(),)
 
-                    m = event['modified_time'].get_value()
-                    if m>1000:
-                        args['_modified'] = 'from_unixtime(%d)' % m
-                    a = event['accessed_time'].get_value()
-                    if a>1000:
-                        args['_accessed'] = 'from_unixtime(%d)' % a
-
+                    modified = event['modified_time'].get_value()
+                    if modified>1000:
+                        args['_modified'] = 'from_unixtime(%d)' % modified
+                    else: modified = None
+                    
+                    accessed = event['accessed_time'].get_value()
+                    if accessed>1000:
+                        args['_accessed'] = 'from_unixtime(%d)' % accessed
+                    else: accessed = None
+                    
                     dbh.mass_insert(**args)
 
                     ## Try to locate the actual inode
@@ -136,8 +139,8 @@ class IEIndex(Scanner.GenScanFactory):
                                                                      encoding_driver),
                                                            "%s/%s" % (tmp_path,
                                                                       args['filename']),
-                                                           _mtime = args.get('_modified'),
-                                                           _atime = args.get('_accessed')
+                                                           _mtime = modified,
+                                                           _atime = accessed
                                                            )
 
                         http_args = dict(

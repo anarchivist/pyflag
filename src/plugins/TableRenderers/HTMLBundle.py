@@ -5,7 +5,7 @@ static) - you do not need pyflag to view them, just a web browser.
 
 This is a good way of delivering a report.
 """
-import os, os.path, tempfile, sys
+import os, os.path, tempfile, sys, time
 import pyflag.UI as UI
 import csv, cStringIO
 import pyflag.DB as DB
@@ -59,7 +59,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if not os.access(directory, os.F_OK):
             os.makedirs(directory)
         
-        outfd = open(output_file_name, 'w')
+        outfd = open(output_file_name, 'wb')
         try:
             while 1:
                 data = infd.read(1024*1024)
@@ -83,7 +83,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if not os.access(directory, os.F_OK):
             os.makedirs(directory)
         
-        outfd = open(output_file_name, 'w')
+        outfd = open(output_file_name, 'wb')
         outfd.write(string)
         outfd.close()
 
@@ -231,7 +231,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                 ('javascript/functions.js', None),
                                 ]:
             if not dest: dest = filename
-            self.add_file(dest, open("%s/%s" % (config.DATADIR, filename)))
+            self.add_file(dest, open("%s/%s" % (config.DATADIR, filename),'rb'))
 
     def inodes_in_archive(self, inode_id):
         """ returns True if the inode is already present in the
@@ -302,7 +302,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                        row['description'],
                        row['start_value'],
                        row['end_value'],
-                       **{'class':'alternateRow'})
+                       **{'class':'hoverRow'})
         result.end_table()
 
         result.raw("<p><p>\n<font size='-5' color=red>Report Produced using PyFlag Ver. %s</font>" % config.VERSION)
@@ -584,6 +584,7 @@ def render_html(self, inode_id, table_renderer):
                command = "Export",
                arg1 = case,
                arg2 = inode_id,
+               cookie = int(time.time())
                )
 
     filename, content_type, fd = table_renderer.make_archive_filename(inode_id)

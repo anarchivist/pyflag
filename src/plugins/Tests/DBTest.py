@@ -65,7 +65,7 @@ class DBOTest(tests.ScannerTest):
         #Make the timeout 1 second for testing
         dbh.cursor.timeout = 1
 
-        dbh.execute("select sleep(2) as sleep")
+        dbh.execute("select sleep(20) as sleep")
         result = dbh.fetch()['sleep']
         self.assertEqual(result, 1)
         dbh.cursor.timeout = 0

@@ -53,7 +53,7 @@ table.PyFlagTable tr.selected td.table-cell {
   padding: 2px;
 }
 
-table.PyFlagTable tr:hover td.table-cell,table.PyFlagTable tr.alternateRow:hover td.sorted-column,
+table.PyFlagTable tr:hover td.table-cell,table.PyFlagTable tr.alternateRow:hover td.sorted-column, table.PyFlagTable tr.hoverRow:hover,
 table.PyFlagTable tr:hover td.sorted-column {
   background: #a6c2e7;
 }

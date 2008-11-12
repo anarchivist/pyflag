@@ -129,6 +129,10 @@ class MountedFS(DBFS):
         DBFS.load(self, mount_point, iosource_name)
         iosrc = self.iosource
         path = iosrc.directory
+        if not path.startswith(posixpath.normpath(config.UPLOADDIR)):
+            path = FlagFramework.sane_join(config.UPLOADDIR, path)
+
+        path = path.encode("ascii","ignore")
         pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % path)
         dbh_file=DB.DBO(self.case)
         dbh_file.mass_insert_start('file')
@@ -195,7 +199,7 @@ class MountedFS(DBFS):
 #            dbh.execute("insert into inode_%s set inode='M%s',uid=%r,gid=%r, mtime=%r,atime=%r,ctime=%r,mode=%r,links=%r,link=%r,size=%r",(self.table,s.st_ino,s.st_uid,s.st_gid,s.st_mtime,s.st_atime,s.st_ctime,str(oct(s.st_mode))[1:],s.st_nlink,link,s.st_size))
 
         ## Just walk over all the files and stat them all building the tables.
-        for root, dirs, files in os.walk(iosrc.directory):
+        for root, dirs, files in os.walk(path):
             for name in dirs:
                 insert_into_table('d/d',root,name)
             for name in files:
@@ -231,6 +235,9 @@ class MountedFS_file(File):
         
         path = path[len(mount_point):]
         path=basepath+'/'+path+"/"+row['name']
+        if not path.startswith(posixpath.normpath(config.UPLOADDIR)):
+            path = FlagFramework.sane_join(config.UPLOADDIR, path)
+
         self.fd = open(path,'r')
 
         s = os.stat(path)

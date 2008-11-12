@@ -324,9 +324,9 @@ class DBFS(FileSystem):
             pass
 
         for t in ['ctime','atime','mtime']:
-            try:
+            if properties.get("_"+t):
                 inode_properties["_"+t] = "from_unixtime(%r)" % int(properties["_"+t])
-            except KeyError:
+            else:
                 try:
                     inode_properties[t] = properties[t]
                 except KeyError: pass
