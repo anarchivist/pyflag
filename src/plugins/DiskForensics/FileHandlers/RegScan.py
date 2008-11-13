@@ -255,7 +255,7 @@ class BrowseRegistryKey(BrowseRegistry):
         path=query['path']
         key=query['key']
         result.heading("Registry Key Contents")
-        result.text(DB.expand("Key %s/%s:", (path,key),style='red',font='typewriter'))
+        result.text(DB.expand("Key %s/%s:", (path,key)),style='red',font='typewriter')
         dbh=DB.DBO(query['case'])
 
         def hexdump(query,out):

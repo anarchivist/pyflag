@@ -103,7 +103,6 @@ class StreamFile(File):
         ## be combined at the same time. This allows us to create a
         ## VFS node for both forward and reverse streams, or even
         ## totally unrelated streams which happen at the same time.
-
         self.look_for_cached()
         self.read(0)
         
@@ -170,7 +169,8 @@ class StreamFile(File):
         initials = [ True,] * len(stream_ids)
 
         # The output file
-        out_fd = CacheManager.MANAGER.create_cache_seakable_fd(dbh.case, self.inode)
+        out_fd = CacheManager.MANAGER.create_cache_seakable_fd(dbh.case, self.inode,
+                                                               inode_id=self.inode_id)
 
         min_packet_id = sys.maxint
         
@@ -214,7 +214,7 @@ class StreamFile(File):
                 raise
 
             # Only try to write if there is a reverse file.
-            if fds[index]>0:
+            if fds[index]:
                 fds[index].seek(row['cache_offset'])
                 data = fds[index].read(row['length'])
                 #print "Writing %s %r" % (row['length'],data)
@@ -298,10 +298,9 @@ class StreamFile(File):
         ## Now try to find the packet_id in memory:
         result = 0
         for packet_id,cache_offset,length in self.packet_list:
-            if cache_offset < position:
-                result = packet_id
-            else:
-                return result
+            #print self.inode_id, position, packet_id,cache_offset,length
+            if cache_offset + length >= position:
+                return packet_id
 
         return 0
 

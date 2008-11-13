@@ -225,6 +225,8 @@ def parse(timestr, case=None, evidence_tz=None, **options):
 
 def convert(timeval, case=None, evidence_tz=None):
     """ Convert a datetime or time tuple from evidence timezone to case timezone """
+    if not timeval: return
+    
     evidence_tz = gettz(evidence_tz)
     case_tz = get_case_tz(case)
 

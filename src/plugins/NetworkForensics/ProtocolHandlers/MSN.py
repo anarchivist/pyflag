@@ -96,6 +96,7 @@ class Message:
         self.participants = []
         self.contact_list_groups = {}
         self.otherDir = None
+        self.attachment_fds = {}
        
         self.done = False
 
@@ -199,18 +200,22 @@ class Message:
                 tr_id = -1
         
         dbh=DB.DBO(self.case)
-        dbh.insert("msn_session",
-                   inode_id=self.fd.inode_id,
-                   packet_id=self.get_packet_id(),
-                   sender=sender,
-                   recipient=recipient,
-                   type=type,
-                   transaction_id=tr_id,
-                   data=data,
-                   session_id=sessionid,
-                   p2p_file = p2pfile,
-                   )
-        
+        args = dict(inode_id=self.fd.inode_id,
+                    packet_id=self.get_packet_id(),
+                    sender=sender,
+                    recipient=recipient,
+                    type=type,
+                    transaction_id=tr_id,
+                    data=data,
+                    session_id=sessionid,
+                    p2p_file = p2pfile,
+                    )
+
+        for i in ['transaction_id','data','session_id','p2p_file']:
+            if not args[i]: del args[i]
+
+        dbh.insert("msn_session", **args)
+
     def insert_user_data(self,nick,data_type,data,tr_id=-1,sessionid=None):
         """
         Insert user data into the table.  We only keep each type of
@@ -1520,7 +1525,7 @@ class Message:
                 #date_str = mtime.split(" ")[0]
 
                 try:
-                   path=self.ddfs.lookup(inode_id=self.fd.inode_id)
+                   path, inode, inode_id=self.ddfs.lookup(inode_id=self.fd.inode_id)
                    path=posixpath.normpath(path+"/../../../../../")
                 except Exception, e:
                     print e
@@ -1555,11 +1560,11 @@ class Message:
                 ## We also touch the file, just in case... (for example
                 ## what happens if this file is later declined
                 ## but we never see the decline message
-                CacheManager.MANAGER.create_cache_from_data(\
-                    dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, 
-                                               headers['sessionid'],
-                                               self.session_id),
-                    "COULD NOT GET MSN FILE DATA!")
+                #CacheManager.MANAGER.create_cache_from_data(\
+                #    dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, 
+                #                               headers['sessionid'],
+                #                               self.session_id),
+                #    "COULD NOT GET MSN FILE DATA!")
                 
             elif (self.declineRegex.match(request_type)):
                 # Ok, so now a file has been declined.
@@ -1643,18 +1648,19 @@ class Message:
         ## We have a real channel id so this is an actual file:
         else:
             dbh=DB.DBO(self.case)
-            fd = CacheManager.MANAGER.create_cache_from_fd(\
-                dbh.case,"%s|CMSN%s-%s" % (self.fd.inode,
-                                           channel_sid,self.session_id))
+            new_inode = "%s|CMSN%s-%s" % (self.fd.inode, channel_sid,self.session_id)
+            if new_inode not in self.attachment_fds:
+                self.attachment_fds[new_inode] = CacheManager.MANAGER.create_cache_seakable_fd(
+                    dbh.case, new_inode)
             
-            fd.seek(offset)
-            bytes = fd.write(data)
+            self.attachment_fds[new_inode].seek(offset)
+            #print "Writing %s at offset %s" % (len(data), offset)
+            self.attachment_fds[new_inode].write(data)
 
-            if bytes < message_size:
-                pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as "\
-                              "much data as needed into MSN p2p file. "\
-                              "Needed %s, wrote %d." %(message_size,bytes))
-            os.close(fd)
+            #if bytes < message_size:
+            #    pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as "\
+            #                  "much data as needed into MSN p2p file. "\
+            #                  "Needed %s, wrote %s." %(message_size,bytes))
             
     ct_dispatcher = {
         #Ignore list:
@@ -2096,7 +2102,8 @@ class MSNScanner(StreamScannerFactory):
                             "sender='Unknown (Target)' and inode_id=%r",
                             (m.client_id,inode_ids[iter]))
             iter += 1
-
+            for v in m.attachment_fds.values():
+                v.close()
         # Old
     
         #dbh.execute("delete from msn_users where session_id=-1 and "\
@@ -2329,8 +2336,13 @@ MIME-Version: 1.0
 Content-Type: text/x-msmsgscontrol
 TypingUser: user022714@hotmail.com
 """)]
-        
 
+
+#class MSNMessages(Reports.PreCannedCaseTableReoports):
+#    """ View MSN chat messages """
+#    family = 'Network Forensics'
+#    description = 'View MSN Chat messages'
+#    name = "/Network Forensics/Communications/Chat/MSN"
 
 ## UnitTests:
 import unittest
@@ -2497,7 +2509,6 @@ class MSNTests7(MSNTests):
         ## Test it has what we expect in it
         fsfd = DBFS(self.test_case)
         test = fsfd.open(inode_id=row['p2p_file'])
-
         # Check that we got the contents of the file correct
         
         data = test.read(3000000)
@@ -2519,7 +2530,6 @@ class MSNTests8(MSNTests):
     """ Test MSN P2P Multi User Ver 15 """ 
     test_file = "NetworkForensics/ProtocolHandlers/" \
                 "MSN/MSN_Cap8_Ver15_MultiUserChat.pcap"
-
     def test02Scanner(self):
         ## What should we have found?
         dbh = DB.DBO(self.test_case)

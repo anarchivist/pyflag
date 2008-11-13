@@ -33,6 +33,7 @@ from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
+import FileFormats.HTML as HTML
 import re,time,cgi,Cookie
 import TreeObj
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
@@ -411,7 +412,7 @@ class HTTPScanner(StreamScannerFactory):
         for f in p.parse():
             if not f: continue
             offset, size = f
-
+            
             ## Create the VFS node:
             new_inode="%s|H%s:%s" % (combined_inode,offset,size)
             
@@ -435,10 +436,9 @@ class HTTPScanner(StreamScannerFactory):
             except KeyError:
                 pass
 
-
             ## stream.ts_sec is already formatted in DB format
             ## need to convert back to utc/gmt as paths are UTC
-            timestamp =  stream.get_packet_ts(offset)
+            timestamp =  fd.get_packet_ts(offset)
             ds_timestamp = Time.convert(timestamp, case=self.case, evidence_tz="UTC")
             try:
                 date_str = ds_timestamp.split(" ")[0]
@@ -469,7 +469,7 @@ class HTTPScanner(StreamScannerFactory):
             ## Store information about this request in the
             ## http table:
             host = p.request.get("host",IP2str(stream.dest_ip))
-            url = p.request.get("url")
+            url = HTML.url_unquote(p.request.get("url"))
             try:
                 date = p.response.get("date")
                 date = Time.parse(date, case=self.case, evidence_tz=None) 

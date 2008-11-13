@@ -326,10 +326,8 @@ class DBFS(FileSystem):
         for t in ['ctime','atime','mtime']:
             if properties.get("_"+t):
                 inode_properties["_"+t] = "from_unixtime(%r)" % int(properties["_"+t])
-            else:
-                try:
+            elif properties.get(t):
                     inode_properties[t] = properties[t]
-                except KeyError: pass
 
         if inode_id and update_only:
             dbh.update('inode', where="inode_id=%s" % inode_id,
@@ -637,7 +635,6 @@ class File:
         try:
             ## open the previously cached copy
             self.cached_fd = CacheManager.MANAGER.open(self.case, self.inode)
-
             ## Find our size (This may not be important but we leave it for now):
             self.cached_fd.seek(0,2)
             self.size=self.cached_fd.tell()

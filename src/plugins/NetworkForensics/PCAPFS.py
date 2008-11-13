@@ -56,7 +56,7 @@ class NetworkingInit(FlagFramework.EventHandler):
         ### find the data section of this packet.
         case_dbh.execute("""CREATE TABLE if not exists `pcap` (
         `id` INT NOT NULL auto_increment,
-        `ipid` SMALLINT UNSIGNED NOT NULL default 0,
+        `ipid` SMALLINT UNSIGNED default 0,
         `iosource` varchar(50),
         `offset` BIGINT NOT NULL ,
         `length` INT NOT NULL ,
@@ -217,7 +217,8 @@ class PCAPFS(DBFS):
                 ## This is where we write the data out
                 connection['data'] = CacheManager.MANAGER.create_cache_fd(
                     dbh.case,
-                    "I%s|S%s" % (iosource_name, connection['inode_id']))
+                    "I%s|S%s" % (iosource_name, connection['inode_id']),
+                    inode_id = connection['inode_id'])
 
                 #if tcp.data_len > 0:
                 #    Callback('data', packet, connection)
