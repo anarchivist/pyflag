@@ -31,7 +31,65 @@ config=pyflag.conf.ConfObject()
 import email, email.Utils,time
 from pyflag.FileSystem import File
 import pyflag.Time as Time
+import pyflag.Magic as Magic
 
+class MBox(Magic.Magic):
+    type = "MBox mail file"
+    mime = "message/x-application-mbox"
+    default_score = 19
+
+    literal_rules = [
+        ( "from ", (0,0)),
+        ( "\nmime-version: ", (0,1000)),
+        ( "\nreceived: ", (0,1000)),
+        ( "\nfrom: ", (0,1000)),
+        ( "\nmessage_id: ",(0,1000)),
+        ( "\nto: ", (0,1000)),
+        ( "\nsubject: ", (0,1000)),
+        ( "\nreturn-path: ", (0,1000))
+        ]
+
+    samples = [ (95, """From \"Michael Cohen\" Thu Jan  6 14:49:13 2005
+Message-ID: <42BE76A2.8090608@users.sourceforge.net>
+Date: Sun, 26 Jun 2005 19:34:26 +1000
+From: scudette <scudette@users.sourceforge.net>
+User-Agent: Debian Thunderbird 1.0.2 (X11/20050602)
+X-Accept-Language: en-us, en
+MIME-Version: 1.0
+To:  scudette@users.sourceforge.net
+Subject: The Queen
+Content-Type: multipart/mixed;
+boundary="-.-----------020606020801030004000306"
+"""
+                 ) ]
+
+class RFC2822Magic(Magic.Magic):
+    type = "RFC2822 Mime message"
+    mime = "message/rfc2822"
+    default_score = 20
+
+    literal_rules = [
+        ( "\nmime-version:", (0,1000)),
+        ( "\nreceived:", (0,1000)),
+        ( "\nfrom:", (0,1000)),
+        ( "\nmessage_id:",(0,1000)),
+        ( "\nto:", (0,1000)),
+        ( "\nsubject:", (0,1000)),
+        ( "\nreturn-path:", (0,1000))
+        ]
+
+    samples = [ (80, """Message-ID: <42BE76A2.8090608@users.sourceforge.net>
+Date: Sun, 26 Jun 2005 19:34:26 +1000
+From: scudette <scudette@users.sourceforge.net>
+User-Agent: Debian Thunderbird 1.0.2 (X11/20050602)
+X-Accept-Language: en-us, en
+MIME-Version: 1.0
+To:  scudette@users.sourceforge.net
+Subject: The Queen
+Content-Type: multipart/mixed;
+boundary="-.-----------020606020801030004000306"
+"""
+                 ) ]
 
 class RFC2822(Scanner.GenScanFactory):
     """ Scan RFC2822 Mail messages and insert record into email table"""
@@ -44,16 +102,58 @@ class RFC2822(Scanner.GenScanFactory):
         dbh=DB.DBO(self.case)
 
     class Scan(Scanner.StoreAndScanType):
-        types = [ 'message/rfc2822' ]
+        types = [ 'message/rfc2822', 'message/x-application-mbox' ]
 
-        def external_process(self,fd):		    
+        def external_process(self, fd):
+            if self.mime_type==self.types[0]:
+                self.process_message(fd)
+            else:
+                self.process_mbox(fd)
+
+        def process_mbox(self, fd):
+            """ This is borrowed from python's mailbox module """
+            path, inode, inode_id = self.ddfs.lookup(inode = fd.inode)
+            
+            starts, stops = [], []
+            while True:
+                line_pos = fd.tell()
+                line = fd.readline()
+                if line.startswith('From '):
+                    if len(stops) < len(starts):
+                        stops.append(line_pos - len(os.linesep))
+                    starts.append(line_pos)
+                elif line == '':
+                    stops.append(line_pos)
+                    break
+                
+            for i in range(len(starts)):
+                new_inode = "o%s:%s" % (starts[i], stops[i] - starts[i])
+                new_inode_id = self.ddfs.VFSCreate(inode, new_inode,
+                                                   "Msg %s" % i)
+                
+                tmpfd = self.ddfs.open(inode_id = new_inode_id)
+                self.process_message(tmpfd)
+                                       
+        def process_message(self, fd):
             count = 0
             try:
-                a=email.message_from_file(fd)
+                new_path, new_inode, new_inode_id = self.ddfs.lookup(inode = fd.inode)
+                
+                a = email.message_from_file(fd)
+                try:
+                    subject = a['subject']
+                    if len(subject)>50:
+                        subject = subject[:50] + " ..."
+                        
+                    new_name = "%s: %s" % (new_path, subject)
+                    self.ddfs.VFSRename(new_inode_id, new_name)
+                except KeyError:
+                    pass
 
-                pyflaglog.log(pyflaglog.DEBUG,"Found an email message in %s" % self.inode)
-		
-		#Mysql is really picky about the date formatting
+                pyflaglog.log(pyflaglog.DEBUG,"Found an email message in %s: %s" % (
+                    new_inode, a['subject']))
+
+                #Mysql is really picky about the date formatting
                 date = email.Utils.parsedate(a.get('Date'))
                 if not date:
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
@@ -85,19 +185,19 @@ class RFC2822(Scanner.GenScanFactory):
 
                     if not filename: filename="Attachment %s" % count
 
-                    ## Create the VFS node:
-                    self.ddfs.VFSCreate(self.inode,"m%s" % count, filename,
-                                        mtime = time.mktime(date), size=len(data)
-                                        )
+                    ## Create the VFSs node:
+                    new_inode_id = self.ddfs.VFSCreate(
+                        new_inode,"m%s" % count, filename,
+                        _mtime = time.mktime(date), size=len(data)
+                        )
 
                     ## Now call the scanners on new file:
-                    new_inode = "%s|m%s" % (self.inode,count)
-                    fd=self.ddfs.open(inode=new_inode)
-                    Scanner.scanfile(self.ddfs,fd,self.factories)
-                    fd.close()
-                    
+                    new_fd = self.ddfs.open(inode_id=new_inode_id)
+                    Scanner.scanfile(self.ddfs,new_fd,self.factories)
+                    new_fd.close()
+
                     count+=1
-                    
+
             except Exception,e:
                 pyflaglog.log(pyflaglog.DEBUG,"RFC2822 Scan: Unable to parse inode %s as an RFC2822 message (%s)" % (self.inode,e))
                 

@@ -51,9 +51,6 @@ mysql_connection_args = None
 config.add_option("FLAGDB", default='pyflag',
                 help="Default pyflag database name")
 
-config.add_option("FLAG_BIN", default='/usr/bin/mysql',
-                help="Location of the mysql client")
-
 config.add_option("DBUSER", default='root',
                 help="Username to connect to db with")
 
@@ -71,9 +68,6 @@ config.add_option("DBPORT", default=3306, type='int',
                 help="database port to connect to")
 
 config.add_option("DBUNIXSOCKET", default="/var/run/mysqld/mysqld.sock",
-                help="path to mysql socket")
-
-config.add_option("MYSQL_BIN", default="/usr/bin/mysql",
                 help="path to mysql socket")
 
 config.add_option("DBCACHE_AGE", default=60, type='int',

@@ -6,41 +6,14 @@ import pyflag.Registry as Registry
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 
-class RFC2822(Magic.Magic):
-    type = "RFC2822 Mime message"
-    mime = "message/rfc2822"
-    default_score = 20
-
-    literal_rules = [
-        ( "\nmime-version:", (0,1000)),
-        ( "\nreceived:", (0,1000)),
-        ( "\nfrom:", (0,1000)),
-        ( "\nmessage_id:",(0,1000)),
-        ( "\nto:", (0,1000)),
-        ( "\nsubject:", (0,1000)),
-        ( "\nreturn-path:", (0,1000))
-        ]
-
-    samples = [ (80, """Message-ID: <42BE76A2.8090608@users.sourceforge.net>
-Date: Sun, 26 Jun 2005 19:34:26 +1000
-From: scudette <scudette@users.sourceforge.net>
-User-Agent: Debian Thunderbird 1.0.2 (X11/20050602)
-X-Accept-Language: en-us, en
-MIME-Version: 1.0
-To:  scudette@users.sourceforge.net
-Subject: The Queen
-Content-Type: multipart/mixed;
-boundary="-.-----------020606020801030004000306"
-"""
-                 ) ]
-
 class HTML(Magic.Magic):
     type = "HTML Document"
     mime = "text/html"
-    default_score = 60
+    default_score = 30
     
     literal_rules = [
         ( "<html", (0,500)),
+        ( "<body", (0,500)),
         ( "<div", (0,500)),
         ( "<title", (0,500)),
         ( "<table", (0,500)),
@@ -51,7 +24,7 @@ class HTML(Magic.Magic):
 
     samples = [ (60, """<html>
 <body>
-</body></html>"""), (100, """<table><tr><th>From</th><th>""")
+</body></html>"""), (120, """<table><tr><th>From</th><th>""")
                 ]
 
 import magic
@@ -108,16 +81,21 @@ class MagicTest(unittest.TestCase):
         """ Test that common headers are correctly identified """
         m = Magic.MagicResolver()
         for cls in Registry.MAGIC_HANDLERS.classes:
-            print "\nTesting %s" % cls,
+            print "\nTesting %s" % cls
             for sample_score, sample in cls.samples:
+                print "Best match %s" % m.get_type(sample,None,None)[0]
+
                 max_score, scores = m.estimate_type(sample, None, None)
                 print "scores: "
                 for k,v in scores.items():
                     if v>0:
                         print "      %s, %s (%s)" %( k.__class__, k.type_str(), v)
+
+                self.assertEqual(max_score[1].__class__, cls,
+                                 "Sample matched %s better than %s" % (
+                    max_score[1].__class__, cls))
                     
-                for x in scores.keys():
-                    if x.__class__ == cls:
-                        print x.type_str(),
-                        self.assertEqual(scores[x], sample_score)
-                        print "OK"
+                self.assertEqual(sample_score, max_score[0],
+                                 "Unexpected score %s, expected %s" % (
+                    max_score[0], sample_score) )
+                    

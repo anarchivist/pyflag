@@ -549,7 +549,7 @@ class HTTPRequestMagic(Magic.Magic):
     mime = "protocol/x-http-request"
 
     regex_rules = [
-        ( "[A-Z]+ [^ ]{1,600} HTTP/1.", (0,500)),
+        ( "[A-Z]+ [^ ]{1,600} HTTP/1.", (0,0)),
         ]
     
     samples = [

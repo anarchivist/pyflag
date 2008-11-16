@@ -268,6 +268,13 @@ class DBFS(FileSystem):
         ## Ensure that we have the IOSource available
         self.iosource = IO.open(self.case, iosource_name)
 
+    def VFSRename(self, inode_id, filename):
+        """ Renames the inode to a new filename (moves it in the VFS) """
+        dirname, basename = os.path.split(filename)
+        dbh = DB.DBO(self.case)
+        dbh.update('file', where='inode_id = %s' % inode_id,
+                   path = dirname+'/', name = basename)
+
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777,
                   _fast=False, inode_id=None, update_only=False,
                   **properties):

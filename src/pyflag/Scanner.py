@@ -276,10 +276,14 @@ class StoreAndScan(BaseScanner):
                 self.file.close()
             except: pass
             
-            ## Reopen the file to read
-            fd = open(self.name,'rb')
+            ## We reuse our own fd for this - each external process
+            ## gets the same fd but we rewind it first. External
+            ## processes can act on the fd directly or call
+            ## CacheManager.MANAGER.provide_cache_filename() to get a
+            ## cached filename.
+            fd = self.fd
+            fd.seek(0)
             self.external_process(fd)
-            fd.close()
 
         if self.file:
             self.file.close()

@@ -77,6 +77,7 @@ class CacheFile:
             self.fd.seek(0,2)
             self.size = self.fd.tell()
             self.fd.seek(0,0)
+            self.name = cache_path
 
     def tell(self):
         return self.offset
@@ -114,6 +115,7 @@ class TemporaryCacheFile:
         cache_filename = make_cache_filename(case, filename)
         self.fd = open(cache_filename, mode)
         self.filename = filename
+        self.name = cache_filename
         self.inode_id = inode_id
         self.closed = False
         self.case = case
@@ -145,7 +147,7 @@ class TemporaryCacheFile:
         try:
             dbh.execute("lock table cachefile write")
         except DB.DBError:
-            self.check_table(self.case)
+            check_table(self.case)
             dbh.execute("lock table cachefile write")
 
         name = self.fd.name
@@ -250,24 +252,48 @@ class DirectoryCacheManager:
 
     def create_cache_seakable_fd(self, case, inode, inode_id=None):
         """ Return an fd with a write method for a new cache object """
-        return TemporaryCacheFile(case, self.get_temp_path(case, inode), inode_id)
+        return TemporaryCacheFile(case, make_cache_filename(case,
+                          self.get_temp_path(case, inode)), inode_id)
         #return open(self.get_temp_path(case, inode),'wb')
 
     def create_cache_from_data(self, case, inode, data, inode_id=None):
         """ Create a new cache entry from data. Data is expected to be
         in binary (not unicode)
         """
-        out_fd = TemporaryCacheFile(case, self.get_temp_path(case, inode), inode_id)
+        out_fd = TemporaryCacheFile(case, make_cache_filename(
+            case,
+            self.get_temp_path(case, inode)),
+                                    inode_id=inode_id)
         out_fd.write(data)
         out_fd.close()
         
         return len(data)
 
+    def create_cache_from_file(self, case, inode, filename, inode_id=None):
+        """ Given a file on disk we add it into the cache by moving it
+        in (The original file will be unlinked).
+
+        This is efficient because files will only be merged into the
+        cache if they are small otherwise will be named appropriately.
+        """
+        sane_filename = self.get_temp_path(case,inode)
+        
+        cached_filename = make_cache_filename(case, sane_filename)
+        if filename != cached_filename:
+            os.rename(filename, cached_filename)
+
+        fd = TemporaryCacheFile(case, sane_filename, mode='rb')
+        ## Move it into the cache if needed
+        fd.close()
+        
     def create_cache_from_fd(self, case, inode, fd, inode_id=None):
         """ Creates a new cache object for inode by repeadadely
         reading fd."""
 
-        out_fd = TemporaryCacheFile(case, self.get_temp_path(case, inode),
+        out_fd = TemporaryCacheFile(case,
+                                    make_cache_filename(
+            case,
+            self.get_temp_path(case, inode)),
                                     inode_id=inode_id)
         size = 0
         
@@ -281,6 +307,34 @@ class DirectoryCacheManager:
         out_fd.close()
         
         return size
+
+    def provide_cache_filename(self, case, inode, inode_id = None):
+        """ This function creates a separate file in the cache
+        directory by copying the file out of the consolidated
+        cache. This is used when we want to shell out to other
+        programs which require the file to be opened. This should not
+        happen too much as most helpers should be using python file
+        like objects.
+        """
+        filename = make_cache_filename(
+            case,
+            self.get_temp_path(case, inode))
+
+        outfd = open(filename,"wb")
+        import pyflag.FileSystem as FileSystem
+
+        fsfd = FileSystem.DBFS(case)
+
+        infd = fsfd.open(inode=inode, inode_id=inode_id)
+        while 1:
+            data = infd.read(1e6)
+            if len(data)==0: break
+
+            outfd.write(data)
+
+        outfd.close()
+        
+        return filename
 
     def open(self, case, inode, inode_id = None):
         filename = self.get_temp_path(case, inode)

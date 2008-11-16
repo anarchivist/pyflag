@@ -371,6 +371,9 @@ config.add_option("UPLOADDIR", default="/tmp/",
 config.add_option("DATADIR", default="@DATADIR@", readonly=False,
                   help = "Directory where pyflag installation files go")
 
+config.add_option("FLAG_BIN", default="@bin@",
+                  help = "Directory where pyflag binaries are called from")
+
 config.add_option("RESULTDIR", default="/tmp/",
                   help = "Directory to store temporary analysed data.")
 

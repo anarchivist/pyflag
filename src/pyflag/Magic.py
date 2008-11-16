@@ -87,13 +87,17 @@ class MagicResolver:
                     if offset == rule[1]:
                         scores[cls] += cls.score_hit(data, match, pending)
             
-            ## Maintain the higher score in the list:
-            if scores[cls] > max_score[0]:
-                max_score = [ scores[cls], cls]
+                ## Maintain the higher score in the list:
+                if scores[cls] > max_score[0]:
+                    max_score = [ scores[cls], cls]
 
-            ## When one of the scores is big enough we quit:
+                ## When one of the scores is big enough we quit:
+                if max_score[0] >= 100:
+                    break
+
             if max_score[0] >= 100:
                 break
+
             
         ## Return the highest score:
         return max_score, scores
@@ -150,7 +154,10 @@ class Magic:
     type = None
     mime = 'application/octet-stream'
     default_score = 100
-    
+
+    ## Note that these must be unique to this Magic instance since the
+    ## indexer uses the unique IDs to identify this class. This might
+    ## be a future limitation.
     regex_rules = []
     literal_rules = []
 

@@ -207,7 +207,7 @@ class SIPRequestMagic(Magic.Magic):
     mime = "protocol/x-sip-request"
 
     regex_rules = [
-        ( "[A-Z]+ [^ ]{1,600} SIP/2.", (0,500)),
+        ( "[A-Z]+ [^ ]{1,600} SIP/2.", (0,0)),
         ]
 
     samples = [
