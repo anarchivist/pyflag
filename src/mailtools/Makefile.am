@@ -1,12 +1,8 @@
 include $(top_srcdir)/config/Makefile.rules
 
-noinst_LTLIBRARIES 	= pst.la
-nodist_pkgpyexec_PYTHON	= pst$(PYTHON_EXTENSION)
+bin_PROGRAMS		= readpst
+noinst_HEADERS 		= libpst.h libstrfunc.h timeconv.h common.h vbuf.h lzfu.h
 
-noinst_HEADERS 		= libpst.h libstrfunc.h timeconv.h common.h
-
-pst_la_SOURCES		= libpst.c pst.c timeconv.c libstrfunc.h timeconv.h common.h
-pst_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-pst_la_LDFLAGS 		= -module $(PYTHON_LDFLAGS)
-pst_la_LIBADD		= ../lib/liboo.la
+readpst_SOURCES		= libpst.c timeconv.c libstrfunc.c timeconv.h common.h \
+			  vbuf.c debug.c readpst.c lzfu.c
 

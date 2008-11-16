@@ -24,9 +24,9 @@ the c layer. */
 
 void *g_context;
 
-void *xmalloc(size_t size) {
-  return talloc_size(g_context, size);
-};
+//void *xmalloc(size_t size) {
+//  return talloc_size(g_context, size);
+//};
 
 typedef struct {
   PyObject_HEAD
@@ -38,9 +38,10 @@ typedef struct {
 PyObject *PstItem_str(PstItem *self, PyObject *args) {
   PyObject *result=NULL;
 
-  if(self->item->type == PST_TYPE_FOLDER || self->item->folder) {
-    result = PyString_FromFormat("%s", self->item->file_as);
-  } else if(self->item->type == PST_TYPE_NOTE && self->item->email) {
+  //if(self->item->type == PST_TYPE_FOLDER || self->item->folder) {
+  //  result = PyString_FromFormat("%s", self->item->file_as);
+  // } else 
+  if(self->item->type == PST_TYPE_NOTE && self->item->email) {
     result = PyString_FromFormat("%s", self->item->email->subject->subj);
     
   } else if(self->item->type == PST_TYPE_APPOINTMENT && self->item->email) {
@@ -56,10 +57,11 @@ PyObject *PstItem_str(PstItem *self, PyObject *args) {
 PyObject *PstItem_repr(PstItem *self, PyObject *args) {
   PyObject *result=NULL;
 
-  if(self->item->type == PST_TYPE_FOLDER || self->item->folder) {
-    result = PyString_FromFormat("(%d) Folder: %s", self->ptr->id,
-				 self->item->file_as);
-  } else if(self->item->type == PST_TYPE_NOTE && self->item->email) {
+  //  if(self->item->type == PST_TYPE_FOLDER || self->item->folder) {
+  //  result = PyString_FromFormat("(%d) Folder: %s", self->ptr->id,
+  //				 self->item->file_as);
+  //} else 
+  if(self->item->type == PST_TYPE_NOTE && self->item->email) {
     result = PyString_FromFormat("(%d) Email. Subject: %s" ,self->ptr->id,
 				 self->item->email->subject->subj);
     
@@ -111,6 +113,7 @@ PyObject *PstItem_Properties(PstItem *self, PyObject *args) {
   SET_TIME(result, "modify_date", self->item->modify_date);
 
   // FOLDERS
+#if 0
   if(self->item->type == PST_TYPE_FOLDER && self->item->folder) {
 #define SET_ITEM_S(value) SET_ITEM(result, #value, "%s", self->item->value)
     SET_ITEM_S(file_as);
@@ -118,7 +121,9 @@ PyObject *PstItem_Properties(PstItem *self, PyObject *args) {
     SET_ITEM(result, "Count", "%d", (char *)self->item->folder->email_count);
 
     // CONTACTS:
-  } else if(self->item->type == PST_TYPE_CONTACT && self->item->contact) {
+  } else 
+#endif
+    if(self->item->type == PST_TYPE_CONTACT && self->item->contact) {
 #define SET_CONTACT(value)	 SET_ITEM(result, #value, "%s", self->item->contact->value)
     SET_CONTACT(fullname);
     SET_CONTACT(access_method);
@@ -211,7 +216,7 @@ PyObject *PstItem_Properties(PstItem *self, PyObject *args) {
 
     // TASKS
   } else if(self->item->type == PST_TYPE_NOTE && self->item->email) {
-    struct _pst_item_attach *attachment=self->item->attach;
+      struct pst_item_attach *attachment=self->item->attach;
 
 #define SET_EMAIL(value)	 SET_ITEM(result, #value, "%s", self->item->email->value)
     SET_TIME(result, "arrival_date", self->item->email->arrival_date);
@@ -251,7 +256,7 @@ PyObject *PstItem_Properties(PstItem *self, PyObject *args) {
       */
       for(;attachment;attachment=attachment->next) {
 	PyObject *attach_dict = PyDict_New();
-	unsigned char *buff = NULL;
+	char *buff = NULL;
 	int size;
 
 	PyObject *body;
@@ -262,7 +267,7 @@ PyObject *PstItem_Properties(PstItem *self, PyObject *args) {
 	  size = pst_attach_to_mem(self->pst, attachment, &buff);
 	  body = PyString_FromStringAndSize(buff, size);
 
-	  if(buff) talloc_free(buff);
+	  //if(buff) talloc_free(buff);
 	};
 	SET_ITEM(attach_dict, "filename1", "%s", attachment->filename1);
 	SET_ITEM(attach_dict, "filename2", "%s", attachment->filename2);
@@ -437,7 +442,7 @@ static int PstFile_init(PstFile *self, PyObject *args) {
   g_context = self->context;
 
   // Try to open the file:
-  if(pst_open(&self->pst, filename, "r") < 0) {
+  if(pst_open(&self->pst, filename) < 0) {
     PyErr_Format(PyExc_IOError, "Unable to open %s" , filename);
     return -1;
   };
@@ -455,7 +460,7 @@ static int PstFile_init(PstFile *self, PyObject *args) {
   } else {
     self->root = PyObject_New(PstItem, &PstItemType);
     self->root->pst = &self->pst;
-    self->root->item = _pst_parse_item(&self->pst, self->pst.d_head);
+    self->root->item = pst_parse_item(&self->pst, self->pst.d_head);
     self->root->ptr = pst_getTopOfFolders(&self->pst, self->root->item);
   };
 
@@ -463,14 +468,14 @@ static int PstFile_init(PstFile *self, PyObject *args) {
 };
 
 static PyObject *PstFile_get_item_by_id(PstFile *self, PyObject *args) {
-  struct _pst_desc_tree *ptr;
+  pst_desc_ll *ptr;
   int item_id;
   PstItem *item;
 
   if(!PyArg_ParseTuple(args, "l", &item_id))
     return NULL;
 
-  ptr = _pst_getDptr(&self->pst, item_id);
+  ptr = pst_getDptr(&self->pst, item_id);
 
   if(!ptr)
     return PyErr_Format(PyExc_RuntimeError, "Unable to find Item");
@@ -479,7 +484,7 @@ static PyObject *PstFile_get_item_by_id(PstFile *self, PyObject *args) {
   if(item) {
     item->ptr = ptr;
     item->pst = &self->pst;
-    item->item = _pst_parse_item(&self->pst, ptr);
+    item->item = pst_parse_item(&self->pst, ptr);
   };
 
   return (PyObject *)item;
@@ -487,7 +492,7 @@ static PyObject *PstFile_get_item_by_id(PstFile *self, PyObject *args) {
 
 static PyObject *PstFile_listitems(PstFile *self, PyObject *args) {
   PyObject *result;
-  struct _pst_desc_tree *ptr;
+  pst_desc_ll *ptr;
   PstItem *item=self->root;
 
   if(!PyArg_ParseTuple(args, "|O", &item))
@@ -509,7 +514,7 @@ static PyObject *PstFile_listitems(PstFile *self, PyObject *args) {
       goto error;
 
     new_item->pst = &self->pst;
-    new_item->item = _pst_parse_item(&self->pst, ptr);
+    new_item->item = pst_parse_item(&self->pst, ptr);
     new_item->ptr = ptr;
 
     PyList_Append(result, (PyObject *)new_item);
