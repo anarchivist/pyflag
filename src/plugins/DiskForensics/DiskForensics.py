@@ -176,14 +176,18 @@ class BrowseFS(Reports.report):
                     pagesize=10,
                     filter="filter2",
                     )
+
+                target = tmp.defaults.get('open_tree','/')
+                tmp.toolbar(text=DB.expand("Scan %s",target),
+                            icon="examine.png",
+                            link=query_type(family="Load Data", report="ScanFS",
+                                            path=target,
+                                            case=query['case']), pane='popup'
+                            )
+
+
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
-            main_result.toolbar(text="Scan this directory",icon="examine.png",
-                                link=query_type(family="Load Data", report="ScanFS",
-                                                path=query['open_tree'],
-                                                case=query['case']), pane='popup'
-                                )
-            
         
         result.notebook(
             names=["Tree View","Table View"],
