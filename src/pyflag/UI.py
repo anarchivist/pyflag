@@ -576,6 +576,7 @@ class TableRenderer:
         could take a while which is why its a popup."""
         def count_cb(query, result):
             sql = self._make_sql(query).split("from",1)[1]
+            #sql = self._make_sql(query)[len("select "):]
 
             dbh=DB.DBO(self.case)
             dbh.execute("select count(*) as total from " + sql)

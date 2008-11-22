@@ -30,13 +30,13 @@ from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type
-from NetworkScanner import *
+from plugins.NetworkForensics.NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import FileFormats.HTML as HTML
 import re,time,cgi,Cookie
 import TreeObj
-from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date, PCAPTime
 import pyflag.Time as Time
 import pyflag.CacheManager as CacheManager
 
@@ -205,8 +205,10 @@ class HTTPCaseTable(FlagFramework.CaseTable):
         [ TimestampType, dict(name='Date', column='date')],
         [ StringType, dict(name='Host', column='host')],
         [ StringType, dict(name='User Agent', column='useragent')],
+        [ StringType, dict(name='TLD', column='tld', width=50)],
         ]
-    index = ['url','inode_id']
+    index = ['url','inode_id','tld','domain']
+    extras = [ [PCAPTime, dict(name='Timestamp', column='response_packet') ], ]
 
 class AttachmentColumnType(IntegerType):
     """ View file Attachment in HTTP parameters """
@@ -233,44 +235,6 @@ class HTTPParameterCaseTable(FlagFramework.CaseTable):
         [ AttachmentColumnType, {}],
         ]
     index = [ 'inode_id', 'key' ]
-
-class HTTPTables(FlagFramework.EventHandler):
-    def create(self, dbh, case):
-        ## This is the information we store about each http request:
-        ## inode - the inode which represents the response to this request
-        ## request_packet - the packet id the request was sent in
-        ## method - method requested
-        ## url - the URL requested (This is the fully qualified url with host header included if present).
-        ## response_packet - the packet where the response was seen
-        ## content_type - The content type
-        
-##        dbh.execute(
-##            """CREATE TABLE if not exists `http` (
-##            `inode_id` INT(11) not null,
-##            `parent` INT(11) default 0 not null,
-##            `request_packet` int null,
-##            `method` VARCHAR( 10 ) NULL ,
-##            `url` text NULL,
-##            `response_packet` int null,
-##            `content_type` VARCHAR( 255 ) NULL,
-##            `referrer` text NULL,
-##            `date` timestamp NULL,
-##            `host` VARCHAR(255),
-##            `useragent` VARCHAR(255)
-##            )""")
-
-##        dbh.execute(
-##            """CREATE TABLE if not exists `http_parameters` (
-##            `id` int(11) not null auto_increment,
-##            `inode_id` int not null,
-##            `key` VARCHAR(255) not null,
-##            `value` mediumblob not null,
-##            primary key (`id`)
-##            ) """)
-
-        dbh.check_index("http", "url", 100)
-        dbh.check_index("http", "inode_id")
-        dbh.check_index("http_parameters", "inode_id")
         
 class HTTPScanner(StreamScannerFactory):
     """ Collect information about HTTP Transactions.
@@ -385,6 +349,17 @@ class HTTPScanner(StreamScannerFactory):
                    inode_id = inode_id,
                    key = key,
                    value = value.value)
+
+    def make_tld(self, host):
+        domains = host.lower().split(".")
+        tlds = "com.gov.edu.co.go.org.net".split('.')
+        for t in tlds:
+            try:
+                i = domains.index(t)
+                return '.'.join(domains[i-1:])
+            except ValueError: pass
+
+        return '.'.join(domains[-2:])
             
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
@@ -512,6 +487,7 @@ class HTTPScanner(StreamScannerFactory):
                        date           = date,
                        referrer       = referer,
                        host           = host,
+                       tld            = self.make_tld(host),
                        useragent      = p.request.get('user-agent', '-'),
                        )
 #                       parent         = parent)                            
@@ -845,6 +821,35 @@ class HTTPTree(TreeObj.TreeObj):
     """
     node_name = "inode_id"
 
+class HTTPRequestTree(Reports.CaseTableReports):
+    """
+    Browse HTTP Request tree - Visualise HTTP requests in a tree form.
+
+    """
+    name = "HTTP Request Tree"
+    family = "Network Forensics"
+    default_table = 'HTTPCaseTable'
+    columns = ['Timestamp', 'Inode', 'URL', 'Content Type', 'TLD']
+
+    def display(self, query, result):
+        def tree_cb(path):
+            if path=='/':
+                dbh = DB.DBO(query['case'])
+                dbh.execute("select tld from http where content_type like 'text/html%%' group by tld order by tld")
+                for row in dbh:
+                    tld = row['tld']
+                    yield ((tld,tld,'leaf'))
+
+        def pane_cb(path, result):
+            tlds = path.split("/")
+            try:
+                result.defaults.set('filter', DB.expand('TLD = %r and "Content Type"  contains html',tlds[1]))
+                Reports.CaseTableReports.display(self, query, result)
+            except IndexError:
+                result.para("Click on a TLD to view all URLs from that TLD")
+
+        result.tree(tree_cb = tree_cb, pane_cb = pane_cb)
+
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
@@ -871,3 +876,20 @@ class HTTPTests(tests.ScannerTest):
         row = dbh.fetch()
         print "Number of HTTP transfers found %s" % row['total']
         self.failIf(row['total']==0,"Count not find any HTTP transfers?")
+
+if __name__=='__main__':
+    ## update the tld field in all the HTTP columns:
+    import sys
+    
+    s = HTTPScanner()
+    
+    dbh = DB.DBO(sys.argv[1])
+    dbh2 = dbh.clone()
+    dbh.execute("select * from http where isnull(tld)")
+    for row in dbh:
+        if row['host']:
+            tld = s.make_tld(row['host'])
+            dbh2.update("http", _fast = True,
+                        where = 'inode_id = %s' % row['inode_id'],
+                        tld = tld)
+        

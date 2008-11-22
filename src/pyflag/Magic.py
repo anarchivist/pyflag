@@ -62,11 +62,11 @@ class MagicResolver:
         ## Give all handlers a chance to rate the data
         for cls in self.magic_handlers:
             scores[cls] = cls.score(data, case, inode_id)
-        
+            
             ## Maintain the higher score in the list:
             if scores[cls] > max_score[0]:
                 max_score = [ scores[cls], cls]
-                
+
         ## Index the data using the indexer:
         for offset, matches in self.indexer.index_buffer(data, unique=0):
             for match in matches:

@@ -990,12 +990,32 @@ class CaseTable:
         raise RuntimeError("Column %s not found in table %s" % (
             column_name, self.__class__.__name__))
 
-    def create(self, dbh):
-        """ Returns an SQL CREATE statement from our schema description """
+    def check(self, dbh):
+        """ Checks the table in dbh to ensure that all the columns defined are present
+        """
+        columns = [ c for c in self.instantiate_columns() ]
+
+        try:
+            dbh.execute("desc %s", self.name)
+        except DB.DBError,e:
+            pyflaglog.log(pyflaglog.INFO, "Table %s does not exist in case %s - Creating" % (self.name, dbh.case))
+            self.create(dbh)
+            return
+
+        existing = [ row['Field'] for row in dbh ]
+        
+        for c in columns:
+            if c.column not in existing:
+                pyflaglog.log(pyflaglog.INFO, "In table %s.%s, Column `%s` missing. Adding." % (dbh.case, self.name, c.column))
+                try:
+                    dbh.execute("alter table %s add %s", self.name, c.create())
+                    if c.name in self.index or c.column in self.index:
+                        dbh.check_index(c.name)
+                except: pass
+                
+    def instantiate_columns(self):
         import pyflag.ColumnTypes as ColumnTypes
         
-        tmp = []
-        indexes = []
         for x in self.columns:
             column_cls = x[0]
             args = x[1]
@@ -1005,10 +1025,23 @@ class CaseTable:
                 c = column_cls(**args)
 
             c.table = c.table or self.name
+            try:
+                c.misc = x[2]
+            except IndexError:
+                c.misc = ''
+                
+            yield c
+
+    def create(self, dbh):
+        """ Returns an SQL CREATE statement from our schema description """
+        tmp = []
+        indexes = []
+
+        for c in self.instantiate_columns():
             ## is there any extra specified?
             string = c.create()
             try:
-                string += " " + x[2]
+                string += " " + c.misc
             except IndexError:
                 pass
             
@@ -1135,3 +1168,20 @@ def calculate_offset_suffix(offset):
         multiplier = 512
 
     return int(m.group(1), base)* multiplier
+
+def check_schema():
+    """ Checks the schema of all current cases for compliance """
+    case_tables = [ c() for c in Registry.CASE_TABLES.classes ]
+    pdbh = DB.DBO()
+    pdbh.execute("select value from meta where property='flag_db'")
+    for row in pdbh:
+        try:
+            case = row['value']
+            dbh = DB.DBO(case)
+            
+            for c in case_tables:
+                c.check(dbh)
+                
+        except Exception,e:
+            pyflaglog.log(pyflaglog.ERROR, "Error: %s" % e)
+    

@@ -139,13 +139,14 @@ class GenScanFactory:
     ## under in the GUI:
     group = ''
     
-    def __init__(self,fsfd):
+    def __init__(self,fsfd=None):
         """ Factory constructor.
 
         @arg fsfd: A filesystem object for the filesystem we are about to scan.
         """
         self.fsfd = fsfd
-        self.case = fsfd.case
+        if fsfd:
+            self.case = fsfd.case
 
     def prepare(self):
         """ This is called before the scanner is used.

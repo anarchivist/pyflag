@@ -530,6 +530,9 @@ if __name__ == "__main__":
     ## Start the logging thread:
     pyflaglog.start_log_thread()
 
+    ## Check the schema:
+    FlagFramework.check_schema()
+
     try:
         try:
             Server(HandlerClass = FlagServerHandler)
