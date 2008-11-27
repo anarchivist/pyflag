@@ -30,14 +30,14 @@ class pslist_ex_1(forensics.commands.command):
 
     # Declare meta information associated with this plugin
     
-    meta_info = forensics.commands.command.meta_info 
-    meta_info['author'] = 'AAron Walters'
-    meta_info['copyright'] = 'Copyright (c) 2007,2008 AAron Walters'
-    meta_info['contact'] = 'awalters@volatilesystems.com'
-    meta_info['license'] = 'GNU General Public License 2.0 or later'
-    meta_info['url'] = 'https://www.volatilesystems.com/default/volatility'
-    meta_info['os'] = 'WIN_32_XP_SP2'
-    meta_info['version'] = '1.0'
+    meta_info = dict(
+        author = 'AAron Walters',
+        copyright = 'Copyright (c) 2007,2008 AAron Walters',
+        contact = 'awalters@volatilesystems.com',
+        license = 'GNU General Public License 2.0 or later',
+        url = 'https://www.volatilesystems.com/default/volatility',
+        os = 'WIN_32_XP_SP2',
+        version = '1.0')
         
     # This module makes use of the standard parser. Thus it is not 
     # necessary to override the forensics.commands.command.parse() method.
@@ -60,14 +60,29 @@ class pslist_ex_1(forensics.commands.command):
     # provided by the standard parse would would provide the following
     # attributes: self.opts.filename, self.opts.base, self.opts.type.
 
-    def execute(self):
+    def render_text(self,outfd, data):
+        outfd.write("%-20s %-6s %-6s %-6s %-6s %-6s\n"%(
+            'Name','Pid','PPid','Thds','Hnds','Time'))
 
+        for (image_file_name,
+             process_id,
+             inherited_from,
+             active_threads,
+             handle_count,
+             create_time) in data:
+            outfd.write("%-20s %-6d %-6d %-6d %-6d %-26s\n" % (
+                image_file_name,
+                process_id,
+                inherited_from,
+                active_threads,
+                handle_count,
+                create_time))
+            
+    def calculate(self):
 	(addr_space, symtab, types) = load_and_identify_image(self.op, self.opts)
 
         all_tasks = process_list(addr_space,types,symtab)
-
-        print "%-20s %-6s %-6s %-6s %-6s %-6s"%('Name','Pid','PPid','Thds','Hnds','Time')
-
+        
         for task in all_tasks:
             if not addr_space.is_valid_address(task):
                 continue
@@ -98,9 +113,9 @@ class pslist_ex_1(forensics.commands.command):
             else:
                 create_time=strftime("%a %b %d %H:%M:%S %Y",gmtime(create_time))     
 
-            print "%-20s %-6d %-6d %-6d %-6d %-26s" % (image_file_name,
-                                                   process_id,
-                                                   inherited_from,
-                                                   active_threads,
-                                                   handle_count,
-                                                   create_time)
+            yield (image_file_name,
+                   process_id,
+                   inherited_from,
+                   active_threads,
+                   handle_count,
+                   create_time)

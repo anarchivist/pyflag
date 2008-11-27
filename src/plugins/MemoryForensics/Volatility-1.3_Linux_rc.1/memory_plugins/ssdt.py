@@ -1045,6 +1045,7 @@ class ssdt(forensics.commands.command):
         return  "Display SSDT entries"
     
     def execute(self):
+        print self.meta_info
         from vtypes import xpsp2types
         
         xpsp2types['_ETHREAD'][1]['ThreadListEntry'] = [ 0x22c, ['_LIST_ENTRY']]

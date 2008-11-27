@@ -26,16 +26,17 @@ class pstree(forensics.commands.command):
             } ],
             } )
 
-        data = self.calculate()
-        self.render(data)
+        ## Call our base class
+        forensics.commands.command.execute(self)
 
-    def render(self, data):
-        print "%-20s %-6s %-6s %-6s %-6s %-6s"%('Name','Pid','PPid','Thds','Hnds','Time')
+    def render_text(self, outfd, data):
+        outfd.write("%-20s %-6s %-6s %-6s %-6s %-6s\n" %(
+            'Name','Pid','PPid','Thds','Hnds','Time'))
 
         def draw_branch(pad, inherited_from):
             for task, task_info in data.items():
                 if task_info['inherited_from'] == inherited_from:
-                    print "%s 0x%08X:%-20s %-6d %-6d %-6d %-6d %-26s" % (
+                    outfd.write("%s 0x%08X:%-20s %-6d %-6d %-6d %-6d %-26s\n" % (
                         "." * pad,
                         task_info['eprocess'],
                         task_info['image_file_name'],
@@ -43,13 +44,16 @@ class pstree(forensics.commands.command):
                         task_info['inherited_from'],
                         task_info['active_threads'],
                         task_info['handle_count'],
-                        task_info['create_time'])
+                        task_info['create_time']))
 
                     if self.opts.verbose:
                         try:
-                            print "%s    cmd: %s" % (' '*pad, task_info['command_line'])
-                            print "%s    path: %s" % (' '*pad, task_info['ImagePathName'])
-                            print "%s    audit: %s" % (' '*pad, task_info['Audit ImageFileName']) 
+                            outfd.write("%s    cmd: %s\n" % (
+                                ' '*pad, task_info['command_line']))
+                            outfd.write("%s    path: %s\n" % (
+                                ' '*pad, task_info['ImagePathName']))
+                            outfd.write("%s    audit: %s\n" % (
+                                ' '*pad, task_info['Audit ImageFileName']) )
                         except KeyError: pass
                         
                     draw_branch(pad + 1, task_info['process_id'])

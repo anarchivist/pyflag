@@ -62,5 +62,33 @@ class command:
 
         self.op = get_standard_parser(self.cmdname)
 
+    def calculate(self):
+        """ This function is responsible for calculating all calculations needed
+
+        We should not have any output functions (e.g. print) in this
+        function at all.
+
+        If this function is expected to take a long time to return
+        some data, the function should return a generator.
+        """
+        
     def execute(self):
         """ Executes the plugin command."""
+        ## Executing plugins in done in two stages - first we calculate
+        data = self.calculate()
+
+        ## Then we render the result in some way based on the
+        ## requested output mode:
+        function_name = "render_%s" % self.opts.output
+        if not self.opts.out_file:
+            outfd = sys.stdout
+        else:
+            outfd = open(self.opts.out_file,'w')
+            
+        try:
+            func = getattr(self, function_name)
+        except AttributeError:
+            print "Plugin %s is unable to produce output in format %r. Please send a bug report" % (self.__class__.__name__, self.opts.output)
+            return
+
+        func(outfd, data)
