@@ -821,6 +821,22 @@ class HTTPTree(TreeObj.TreeObj):
     """
     node_name = "inode_id"
 
+class HTTPTLDRequests(Reports.PreCannedCaseTableReoports):
+    family = ' Network Forensics'
+    description = 'View TLDs requested'
+    name = '/Network Forensics/Communications/Web/Domains'
+    default_table = 'HTTPCaseTable'
+    columns = ['Timestamp', 'Inode', 'URL', 'InodeTable.Size', 'TLD']
+    args = {'_hidden':4}
+    def display(self, query,result):
+        if not query.has_key('grouped'):
+            self.options = {'groupby':'TLD'}
+            #result.defaults.clear('limit')
+            
+        self.options['where'] = 'content_type like "%html%"'
+        result.defaults.set('grouped',1)
+        Reports.PreCannedCaseTableReoports.display(self, query, result)
+    
 class HTTPRequestTree(Reports.CaseTableReports):
     """
     Browse HTTP Request tree - Visualise HTTP requests in a tree form.
@@ -835,7 +851,7 @@ class HTTPRequestTree(Reports.CaseTableReports):
         def tree_cb(path):
             if path=='/':
                 dbh = DB.DBO(query['case'])
-                dbh.execute("select tld from http where content_type like 'text/html%%' group by tld order by tld")
+                dbh.cached_execute("select tld from http where content_type like 'text/html%%' group by tld order by tld")
                 for row in dbh:
                     tld = row['tld']
                     yield ((tld,tld,'leaf'))
@@ -882,14 +898,22 @@ if __name__=='__main__':
     import sys
     
     s = HTTPScanner()
-    
+
     dbh = DB.DBO(sys.argv[1])
     dbh2 = dbh.clone()
-    dbh.execute("select * from http where isnull(tld)")
-    for row in dbh:
+    while 1:
+     count = 0
+     print "|",
+     sys.stdout.flush()
+     dbh.execute("select * from http where isnull(tld) limit 10000")
+     for row in dbh:
+        count += 1
+	if count % 1000 == 0:
+             print ".",
+             sys.stdout.flush()
         if row['host']:
             tld = s.make_tld(row['host'])
             dbh2.update("http", _fast = True,
                         where = 'inode_id = %s' % row['inode_id'],
                         tld = tld)
-        
+     if count==0: break 

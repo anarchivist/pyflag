@@ -260,7 +260,7 @@ class CaseTableReports(report):
     ## default_table.
     default_table = ''
     columns = []
-    def display(self, query, result):
+    def display(self, query, result, **opts):
         elements = []
         ## Search case tables for the elements:
         for t in self.columns:
@@ -279,18 +279,20 @@ class CaseTableReports(report):
         result.table(
             elements = elements,
             case = query['case'],
+            **opts
             )
 
 class PreCannedCaseTableReports(CaseTableReports, Registry.PreCanned):
     """ A Convenience class to create Inlined precanned reports """
     hidden = True
+    options = {}
     
     def display(self, query,result):
         import pyflag.FlagFramework as FlagFramework
         for k,v in self.args.items():
             result.defaults.default(k, v)
 
-        CaseTableReports.display(self, query, result)
+        CaseTableReports.display(self, query, result, **self.options)
 
         if query.has_key('open_tree'):
             result.toolbar(link = FlagFramework.query_type(family = self.family,

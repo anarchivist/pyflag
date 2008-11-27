@@ -548,6 +548,7 @@ class TableRenderer:
                     filter_expression += "'%s'='%%s'" % e.name
                     new_query['__target_format__'] = filter_expression
                     new_query['__target__'] = self.filter
+                    new_query.clear('limit')
                     e.link = new_query
                     e.link_pane = 'parent'
 
