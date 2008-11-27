@@ -207,7 +207,7 @@ class StreamFile(File):
                 outfd_position = initial_len
 
             try:
-                #print "(Packet %s) Seeking to %s" % (row['packet_id'], outfd_position,),
+                #print "(Packet %s) Seeking to %s" % (row['packet_id'], outfd_position,)
                 out_fd.seek(outfd_position)
             except Exception,e:
                 print FlagFramework.get_bt_string(e)
@@ -415,7 +415,7 @@ class StreamFile(File):
 
         result.row("Stream %s" % self.inode, tmp, **{'class':'explainrow'})
 
-class ViewConnections(Reports.PreCannedCaseTableReoports):
+class ViewConnections(Reports.PreCannedCaseTableReports):
     """ View the connection table """
     description = "View the connection table"
     name = "/Network Forensics/View Connections"

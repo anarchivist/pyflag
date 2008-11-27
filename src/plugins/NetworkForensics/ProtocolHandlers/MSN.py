@@ -1881,7 +1881,7 @@ class MSNTables(FlagFramework.EventHandler):
 
 import re
 
-class ChatMessages(Reports.PreCannedCaseTableReoports):
+class ChatMessages(Reports.PreCannedCaseTableReports):
     args = { 'filter': ' "Type" = MESSAGE',
              'order':0, 'direction':1,
              '_hidden': 1}

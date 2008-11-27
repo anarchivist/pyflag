@@ -108,7 +108,7 @@ class FindTasks(Registry.FileSystemLoader):
 
                 dbh.insert("windows_modules", _fast=True, **row2)
 
-class ViewWindowsTasks(Reports.PreCannedCaseTableReoports):
+class ViewWindowsTasks(Reports.PreCannedCaseTableReports):
     """ List running tasks from windows memory images """
     hidden = True
     family = "Memory Forensics"

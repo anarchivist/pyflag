@@ -54,6 +54,7 @@ class CacheFile:
             if inode_id:
                 dbh.execute("select * from cachefile where inode_id=%r", inode_id)
             else:
+                dbh.check_index('cachefile','filename',100)
                 dbh.execute("select * from cachefile where filename=%r", filename)
 
             row = dbh.fetch()

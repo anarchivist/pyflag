@@ -189,7 +189,7 @@ class GenScanFactory:
     class Scan(BaseScanner):
         """ The Scan class must be defined as an inner class to the factory. """
 
-StoreAndScanFiles = []
+StoreAndScanFiles = set()
 
 class MemoryScan(BaseScanner):
     """ A scanner designed to scan buffers of text in memory.
@@ -216,9 +216,13 @@ class MemoryScan(BaseScanner):
         """
 
 class StoreAndScan(BaseScanner):
-    """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
+    """ A Scanner designed to store a temporary copy of the scanned
+    file to be able to invoke an external program on it.
 
-    Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
+    Note that this is a scanner inner class (which should be defined
+    inside the factory class). This class should be extended by
+    Scanner factories to provide real implementations to the 'boring'
+    and 'external_process' methods.
     """
     def __init__(self, inode,ddfs,outer,factories=None,fd=None):
         BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
@@ -248,27 +252,17 @@ class StoreAndScan(BaseScanner):
             ## the same name). This allows more efficient streamlining
             ## as all StoreAndScan derivatives can use the same file,
             ## but only one is actually responsible for creating it.
-            if not self.name:
-                self.name = self.make_filename()
-                
-            if not self.file and not self.boring_status and self.name not in StoreAndScanFiles:
-                StoreAndScanFiles.append(self.name)
-                self.file = open(self.name,'wb')
+            if not self.file and not self.boring_status and \
+                   self.file.name not in StoreAndScanFiles:
+                self.file = CacheManager.MANAGER.create_cache_fd(self.case,
+                                                                 self.inode)
+                StoreAndScanFiles.add(self.file.name)
+
         except KeyError:
             pass
 
         if self.file:
             self.file.write(data)
-
-    def make_filename(self):
-        """ This function should return a fairly unique name for saving the file in the tmp directory.
-
-        This class implementes a standard filename formatting convention:
-        $RESULTDIR/case_$case/$filesystem_$inode
-
-        Where $inode is the filename in the filesystem.
-        """
-        return CacheManager.MANAGER.get_temp_path(self.case, self.inode)
 
     def finish(self):
         if not self.boring_status:
@@ -289,7 +283,7 @@ class StoreAndScan(BaseScanner):
         if self.file:
             self.file.close()
             ## We now remove the file from the central storage place:
-            StoreAndScanFiles.remove(self.name)
+            StoreAndScanFiles.remove(self.file.name)
 
     def external_process(self,fd):
         """ This function is invoked by the scanner to process a temporary file.
@@ -344,11 +338,8 @@ class StringIOType(StoreAndScanType):
             if self.boring_status:
                 self.boring_status = self.boring(metadata, data=data)
 
-            if not self.name:
-                self.name = self.make_filename()
-                
-            if not self.file and not self.boring_status and self.name not in StoreAndScanFiles:
-                StoreAndScanFiles.append(self.name)
+            if not self.file and not self.boring_status and self.inode not in StoreAndScanFiles:
+                StoreAndScanFiles.append(self.inode)
                 self.file = StringIO.StringIO()
         except KeyError:
             pass
@@ -358,7 +349,7 @@ class StringIOType(StoreAndScanType):
 
     def finish(self):
         if self.file:
-            StoreAndScanFiles.remove(self.name)
+            StoreAndScanFiles.remove(self.inode)
 
         if not self.boring_status:
             self.file.seek(0)

@@ -63,7 +63,7 @@ class ImFeelingLucky(Reports.report):
 
         result.tree(tree_cb = left_pane_cb, pane_cb = right_pane_cb)
 
-class Images(Reports.PreCannedCaseTableReoports):
+class Images(Reports.PreCannedCaseTableReports):
     """ Display a preview of images """
     args = {'filter':' "Thumbnail"  has_magic image and  "Size"  > 20000 ',
             'order': 1, 'direction':0}
@@ -88,3 +88,13 @@ class HTMLURLs(Registry.PreCanned):
     description = 'View all HTML URLs'
     name = [ "/Network Forensics/Web Applications/HTML URLs" ]
 
+class GoogleSearches(Reports.PreCannedCaseTableReports):
+    description = "Shows possible Google searches."
+    name = [ "/Network Forensics/Web Applications/Google Searches" ]
+    family = 'Network Forensics'
+    args = {'filter': 'Parameter = q'}
+    columns = ['HTTPCaseTable.Timestamp',
+               'HTTPCaseTable.Inode',
+               'HTTPParameterCaseTable.Parameter',
+               'HTTPParameterCaseTable.Value',
+               'HTTPCaseTable.URL']

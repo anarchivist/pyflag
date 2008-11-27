@@ -281,7 +281,7 @@ class CaseTableReports(report):
             case = query['case'],
             )
 
-class PreCannedCaseTableReoports(CaseTableReports, Registry.PreCanned):
+class PreCannedCaseTableReports(CaseTableReports, Registry.PreCanned):
     """ A Convenience class to create Inlined precanned reports """
     hidden = True
     

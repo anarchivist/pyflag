@@ -63,7 +63,7 @@ class SSTD(Registry.FileSystemLoader):
 
                 dbh.insert("windows_ssdt", _fast = True, **row)
 
-class SSDTPrecan(Reports.PreCannedCaseTableReoports):
+class SSDTPrecan(Reports.PreCannedCaseTableReports):
     """ Display the System Service Descriptor Table (SSDT). You can then click on the function handlers to see a disassembly of each. Note also which module the handler routine resides in for an indication if something is hooking this entry. """
     hidden = True
     family = "Memory Forensics"

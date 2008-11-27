@@ -23,7 +23,7 @@
 
 We use the files's magic to trigger the scanner off - so its imperative that the TypeScan scanner also be run or this will not work. We also provide a report to view the history files.
 """
-import os.path, cStringIO, re
+import os.path, cStringIO, re, cgi
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
@@ -153,8 +153,23 @@ class IEIndex(Scanner.GenScanFactory):
                         if m:
                             http_args['content_type'] = m.group(1)
                             
-                        dbh.insert('http', **http_args )
+                        dbh.insert('http', _fast=True, **http_args )
 
+                        ## Now populate the http parameters from the
+                        ## URL GET parameters:
+                        try:
+                            base, query = url.split("?",1)
+                        except ValueError:
+                            continue
+                        
+                        qs = cgi.parse_qs(query)
+                        for k,values in qs.items():
+                            for v in values:
+                                dbh.insert('http_parameters', _fast=True,
+                                           inode_id = inode_id,
+                                           key = k,
+                                           value = v)
+                            
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
 

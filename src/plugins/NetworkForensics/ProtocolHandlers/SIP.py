@@ -85,6 +85,9 @@ SIPInvites = Store.Store()
 SIPSessions = Store.Store()
 
 class SDP:
+    con_details = None
+    details = None
+    
     def parse(self, data):
         for line in data.splitlines():
             attribute, value = line.split("=",1)
@@ -94,6 +97,9 @@ class SDP:
                 self.details = value
             elif attribute=='c':
                 self.con_details = value.split(" ")
+
+    def __str__(self):
+        return "Connection details %s and %s" % (self.details, self.con_details)
 
 class SIPParser:
     message = None
@@ -108,6 +114,8 @@ class SIPParser:
     def parse_request(self, method, uri, data):
         if method=="INVITE":
             self.parse_data(data)
+            print "Invitation from %s to %s" % (self._from, self.to)
+            print "My SDP %s" % self.sdp
 
     def record_sdp_session(self, sdp, _from, to):
         details = sdp.details.split()
@@ -144,7 +152,6 @@ class SIPParser:
         if start_code=="200":
             print "Parsing 200"
             self.parse_data(data)
-            #print "Parsed %s %r " % (self.sequence, self.sdp)
             if self.sdp:
                 invite_sdp = SIPInvites.get(self.sequence)
                 forward, reverse = self.record_sdp_session(invite_sdp, invite_sdp._from, invite_sdp.to)
@@ -165,12 +172,11 @@ class SIPParser:
             try:
                 header = self.dispatch.get(header, header)
                 getattr(self, header)(value)
-            except AttributeError:
+            except AttributeError,e:
                 pass
 #                print "Unable to handle header %s: %s" % (header, value)
 
     def content_type(self, ct):
-        print "Content Type is %s" % ct
         if ct.lower() == "application/sdp":
             self.sdp = SDP()
             self.sdp.parse(self.message)
@@ -194,8 +200,7 @@ class VOIPTable(FlagFramework.CaseTable):
         [ IPType, dict(name='Source Addr', column='source') ],
         [ IntegerType, dict(name="Source Port", column='source_port') ],
         [ IPType, dict(name='Dest Addr', column='dest') ],
-        [ IntegerType, dict(name="Dest Port", column='dest_port') ],
-        
+        [ IntegerType, dict(name="Dest Port", column='dest_port') ],        
         [ StringType, dict(name='Protocol', column='protocol') ],
         ]
 
@@ -331,7 +336,7 @@ def calculate_stream_stats(case, stream_id):
     r_data = tmp_o_t / math.sqrt(tmp_o * tmp_t)
 
     ## This is the avg data rate (in kbit/s) note that it may be
-    ## slightly bigger than the codecs data rate due to RTP headers
+    ## slightly bigger than the codecs data rate due to RDP headers
     b_data = tmp_o_t / tmp_t * 8 / 1000
 
     return r_jitter, b_rate, r_data, b_data

@@ -61,7 +61,7 @@ class ZipScan(GenScanFactory):
 
         def external_process(self,fd):
             """ This is run on the extracted file """
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.inode)
             cache_key = "%s:%s" % (self.case , self.fd.inode)
 
             ## Try to read the fd as a zip file
@@ -95,7 +95,7 @@ class ZipScan(GenScanFactory):
                 inode_id = self.ddfs.VFSCreate(None,
                                                inode,DB.expand("%s/%s",(pathname,namelist[i])),
                                                size=info.file_size,
-                                               mtime=t)
+                                               mtime=t, _fast=True)
                 
             for inode in inodes:
                 ## Now call the scanners on this new file (FIXME limit
