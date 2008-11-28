@@ -100,8 +100,16 @@ class GoogleImageScanner(Gmail.GmailScanner):
                                                "xGimage",
                                                "Gimage")
 
-                tag = self.parser.root.find("td", {'id':'resultStats'})
-                print tag.attributes
+                ## Update the http and http_parameters table to point
+                ## to this new Inode instead:
+                dbh = DB.DBO(self.case)
+                dbh.update('http_parameters',
+                           where = DB.expand("inode_id=%r",self.inode_id),
+                           inode_id = inode_id)
+
+                dbh.update('http',
+                           where = DB.expand("inode_id=%r",self.inode_id),
+                           inode_id = inode_id)
 
                 page = self.parser.root.innerHTML()
                 page = page.encode("utf","ignore")
