@@ -1129,7 +1129,7 @@ def iri_to_uri(iri):
     if iri is None:
         return iri
 
-    return urllib.quote(smart_str(iri), safe='/%[]=:;$&()+,!?*')
+    return urllib.quote(smart_str(iri), safe='/%[]=:;$&()+,!?*# ')
 
 def pyflag_escape_string(string):
     result = []

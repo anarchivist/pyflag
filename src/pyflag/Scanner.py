@@ -252,12 +252,18 @@ class StoreAndScan(BaseScanner):
             ## the same name). This allows more efficient streamlining
             ## as all StoreAndScan derivatives can use the same file,
             ## but only one is actually responsible for creating it.
+
+            ## Whats happening here is that a number of StoreAndScan
+            ## scanners may be called in turn. The first one will open
+            ## the file and add to the StoreAndScanFiles set. All
+            ## subsequent scanners will ignore the file. The first
+            ## scanner is responsible for writing the file into the
+            ## cache file.
             if not self.file and not self.boring_status and \
-                   self.file.name not in StoreAndScanFiles:
+                   self.inode not in StoreAndScanFiles:
                 self.file = CacheManager.MANAGER.create_cache_fd(self.case,
                                                                  self.inode)
-                StoreAndScanFiles.add(self.file.name)
-
+                StoreAndScanFiles.add(self.inode)
         except KeyError:
             pass
 
@@ -283,7 +289,7 @@ class StoreAndScan(BaseScanner):
         if self.file:
             self.file.close()
             ## We now remove the file from the central storage place:
-            StoreAndScanFiles.remove(self.file.name)
+            StoreAndScanFiles.remove(self.inode)
 
     def external_process(self,fd):
         """ This function is invoked by the scanner to process a temporary file.

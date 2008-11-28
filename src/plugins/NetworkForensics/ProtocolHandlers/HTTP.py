@@ -821,7 +821,7 @@ class HTTPTree(TreeObj.TreeObj):
     """
     node_name = "inode_id"
 
-class HTTPTLDRequests(Reports.PreCannedCaseTableReoports):
+class HTTPTLDRequests(Reports.PreCannedCaseTableReports):
     family = ' Network Forensics'
     description = 'View TLDs requested'
     name = '/Network Forensics/Communications/Web/Domains'
@@ -835,7 +835,7 @@ class HTTPTLDRequests(Reports.PreCannedCaseTableReoports):
             
         self.options['where'] = 'content_type like "%html%"'
         result.defaults.set('grouped',1)
-        Reports.PreCannedCaseTableReoports.display(self, query, result)
+        Reports.PreCannedCaseTableReports.display(self, query, result)
     
 class HTTPRequestTree(Reports.CaseTableReports):
     """

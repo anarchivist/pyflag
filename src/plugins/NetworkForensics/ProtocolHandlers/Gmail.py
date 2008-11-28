@@ -80,21 +80,36 @@ def gmail_unescape(string):
 
 class GmailScanner(LiveCom.HotmailScanner):
     """ Detect Gmail web mail sessions """
+    depends = ['HotmailScanner']
 
     class Scan(LiveCom.HotmailScanner.Scan):
         parser = None
         javascript = None
         service = "Gmail"
 
+        def get_url(self, metadata):
+            try:
+                metadata['host']
+                metadata['url']
+                metadata['content_type']
+            except KeyError:
+                dbh = DB.DBO(self.case)
+                dbh.execute("select content_type,url,host from http where inode_id=%r limit 1", self.fd.inode_id)
+                row = dbh.fetch()
+                if not row: return True
+
+                metadata['url'] = row['url']
+                metadata['host'] = row['host']
+                metadata['content_type'] = row['content_type']
+
         def boring(self, metadata, data=''):
-            dbh = DB.DBO(self.case)
-            dbh.execute("select content_type,url,host from http where inode_id=%r limit 1", self.fd.inode_id)
-            row = dbh.fetch()
-            if row and row['host']=='mail.google.com' and \
-                   row['url'].startswith("http://mail.google.com/mail/"):
-                if row['content_type'].startswith("text/javascript"):
+            self.get_url(metadata)
+            
+            if metadata['host']=='mail.google.com' and \
+                   metadata['url'].startswith("http://mail.google.com/mail/"):
+                if metadata['content_type'].startswith("text/javascript"):
                     self.javascript = ''
-                elif row['content_type'].startswith("text/html"):
+                elif metadata['content_type'].startswith("text/html"):
                     self.parser =  HTMLParser(verbose=0)
                 else:
                     return True

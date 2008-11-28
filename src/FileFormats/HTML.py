@@ -98,7 +98,7 @@ class Tag:
 
     def __str__(self):
         attributes = "".join([expand(" %s='%s'",(k,iri_to_uri(v))) for k,v \
-                              in self.attributes.items() if v ])
+                              in self.attributes.items() if v != None ])
         
         if self.type == 'selfclose':
             return expand("<%s%s/>", (self.name, attributes))
@@ -243,7 +243,8 @@ class SanitizingTag(Tag):
                             'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols','media',
-                            'framespacing','frameborder','contenteditable', "dir"
+                            'framespacing','frameborder','contenteditable', "dir",
+                            "nowrap"
                             ]
 
     def css_filter(self, data):
