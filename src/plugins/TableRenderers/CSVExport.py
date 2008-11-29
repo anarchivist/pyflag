@@ -49,7 +49,13 @@ class CSVRenderer(UI.TableRenderer):
                                         dialect = 'excel')
 
             for row in g:
-                result = dict( [ (e.name , row[e.name]) for e in elements ] )
+                result = {}
+                for e in elements:
+                    try:
+                        result[e.name] = e.csv(row[e.name])
+                    except AttributeError:
+                        result[e.name] = row[e.name]
+
                 csv_writer.writerow(result)
                 data.seek(0)
                 yield data.read()

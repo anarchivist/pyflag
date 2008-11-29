@@ -56,11 +56,11 @@ class GoogleImageScanner(Gmail.GmailScanner):
             text_text = ''
             count = 0
             total_count = 0
-            regex = re.compile('dyn.Img\(([^\)]+)\);')
+            regex = re.compile('dyn.Img(\(.+?\));')
             for script in self.parser.root.search("script"):
                 data = script.innerHTML()
                 for m in regex.finditer(data):
-                    row = eval("[%s]" % m.group(1),{},{})
+                    row = eval(m.group(1),{},{})
                     image_text += '''\n<td id="tDataImage%s" nowrap="" width="16%%" valign="bottom" align="center" style="padding-top: 0px;">
                     <a href="%s">
                     <img height="%s" width="%s" src="%s?q=tbn:%s%s" style="border: 1px solid ;"/>

@@ -936,6 +936,12 @@ class InodeIDType(IntegerType):
     def html(self, value):
         return '<a href="%s">%s</a>' % (value, value)
 
+    def csv(self, value):
+        fsfd = FileSystem.DBFS(self.case)
+        path, inode, inode_id = fsfd.lookup(inode_id=value)
+
+        return inode
+    
     def column_decorator(self, table, sql, query, result):
         case = query['case']
         report = Registry.REPORTS.dispatch(family = 'Disk Forensics',
