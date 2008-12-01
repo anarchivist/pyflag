@@ -165,8 +165,10 @@ def process_handle_count(addr_space, types, task_vaddr):
     if object_table is None or not addr_space.is_valid_address(object_table):
         return None
     else:
-        handle_count = read_obj(addr_space, types,
-                                ['_HANDLE_TABLE', 'HandleCount'], object_table)
+        try:
+            handle_count = read_obj(addr_space, types,
+                                    ['_HANDLE_TABLE', 'HandleCount'], object_table)
+        except: return None
 
     return handle_count
 

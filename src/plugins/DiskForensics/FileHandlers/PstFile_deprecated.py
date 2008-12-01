@@ -39,7 +39,7 @@ from pyflag.FlagFramework import normpath, query_type
 import pyflag.FlagFramework as FlagFramework
 import Store
 from pyflag.ColumnTypes import StringType, TimestampType, InodeType
-import pst
+#import pst
 
 ## This module is deprecated
 active = False

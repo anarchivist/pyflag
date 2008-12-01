@@ -1172,7 +1172,11 @@ def calculate_offset_suffix(offset):
 def check_schema():
     """ Checks the schema of all current cases for compliance """
     case_tables = [ c() for c in Registry.CASE_TABLES.classes ]
-    pdbh = DB.DBO()
+    try:
+        pdbh = DB.DBO()
+    except:
+        return
+    
     pdbh.execute("select value from meta where property='flag_db'")
     for row in pdbh:
         try:

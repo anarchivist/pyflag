@@ -913,7 +913,16 @@ if __name__=='__main__':
              sys.stdout.flush()
         if row['host']:
             tld = s.make_tld(row['host'])
-            dbh2.update("http", _fast = True,
-                        where = 'inode_id = %s' % row['inode_id'],
-                        tld = tld)
+        else:
+            url = row['url']
+            m = re.match("[^:]+://([^/]+)/",url)
+            if m:
+                tld = s.make_tld(m.group(1))
+            else:
+                tld = "unknown"
+
+        dbh2.update("http", _fast = True,
+                    where = 'inode_id = %s' % row['inode_id'],
+                    tld = tld)
+
      if count==0: break 

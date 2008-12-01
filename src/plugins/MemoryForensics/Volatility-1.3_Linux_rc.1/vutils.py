@@ -57,7 +57,7 @@ def get_standard_parser(cmdname):
     op.add_option('-t', '--type',
                   help='(optional, default="auto") Identify the image type (pae, nopae, auto)',
                   action='store', type='string', dest='type')
-    op.add_option('-o','--output',default = 'text',
+    op.add_option('-H','--output',default = 'text',
                   help='(optional, default="text") Output format (xml, html, sql)',
                   )
     op.add_option('-O', '--out_file', default=None,
