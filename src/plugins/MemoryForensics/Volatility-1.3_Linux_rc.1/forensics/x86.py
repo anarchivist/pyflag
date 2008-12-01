@@ -228,6 +228,13 @@ class IA32PagedMemory:
                         page_list.append([start + j * 0x1000, 0x1000])
         return page_list        
 
+    def read_long_virt(self, addr):
+        string = self.read(addr, 4)
+	if string == None:
+	    return None
+        (longval, ) =  struct.unpack('=L', string)
+        return longval
+
 
 class IA32PagedMemoryPae:
     def __init__(self, baseAddressSpace, pdbr):

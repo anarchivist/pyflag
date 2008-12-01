@@ -105,3 +105,27 @@ class AddressSpace(FileSystem.File):
             return "\x00" * length
 
         return result
+
+import pyflag.tests
+
+## Unit test
+class WindowsMemoryFS(pyflag.tests.ScannerTest):
+    """ Test Windows Memory Forensic Analysis """
+    test_case = "Memory"
+#    test_file = "xp-laptop-2005-06-25.img.e01"
+#    test_file = "xp-laptop-2005-06-25.img"
+#    test_file = "labdump17.E01"
+    test_file = "megan.E01"
+#    test_file = "megan.img"
+    subsystem = "EWF"
+#    subsystem = "Standard"
+    fstype = "Windows Memory"
+    mount_point = "proc"
+
+    def test01memory(self):
+        import forensics.win32.xpress as xpress
+        print "Total time in xpress_decode %s" % xpress.TOTAL_TIME
+
+        import forensics.win32.hiber_addrspace as hiber_addrspace
+        print "Tital time spend in hiber read %s" % hiber_addrspace.TOTAL_READ_TIME
+        print "Total cached blocks %s" % hiber_addrspace.TOTAL_CACHED_BLOCKS

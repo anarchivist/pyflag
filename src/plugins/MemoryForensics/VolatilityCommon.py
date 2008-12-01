@@ -74,17 +74,6 @@ import forensics.registry as MemoryRegistry
 
 MemoryRegistry.Init()
 
-import pyflag.tests
-
-## Unit test
-class WindowsMemoryFS(pyflag.tests.ScannerTest):
-    """ Test Windows Memory Forensic Analysis """
-    test_case = "Memory"
-    test_file = "xp-laptop-2005-06-25.img.e01"
-    subsystem = "EWF"
-    fstype = "Windows Memory"
-    mount_point = "proc"
-
 ## These are common column types
 from pyflag.ColumnTypes import BigIntegerType
 

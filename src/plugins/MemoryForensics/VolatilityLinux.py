@@ -305,7 +305,7 @@ class LinuxMemory(FileSystem.DBFS):
                        offset_to_file = filep,
                        offset_to_dentry = dentry.offset,
                        offset_to_inode = inode.offset,
-                       _type = "'%s'" % inode.m('i_mode').v(),
+                       #_type = "'%s'" % inode.m('i_mode').v(),
                        path = pathname)
 
             ## Create VFS nodes for the open files
