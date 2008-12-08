@@ -167,9 +167,11 @@ def expand(sql, params):
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
-            #data = params[d['count']].decode("latin1")
             data = params[d['count']].decode("latin1")
-            result = u"_binary'%s'" % escape(data,"'")
+            #data = ''.join(r"\\x%02X" % ord(x) for x in params[d['count']])
+            #data = params[d['count']]
+            result = u"_binary'%s'" % escape(data)
+            #print result.encode("ascii","ignore")
 
         d['count'] +=1
         return result

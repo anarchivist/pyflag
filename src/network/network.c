@@ -407,7 +407,7 @@ VIRTUAL(UDP, Packet)
      NAME_ACCESS(packet, checksum, checksum, FIELD_TYPE_SHORT_X);
      NAME_ACCESS_SIZE(packet, data, data, FIELD_TYPE_STRING, data_len);
      NAME_ACCESS(packet, data_len, data_len, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, seq, seq, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, seq, seq, FIELD_TYPE_INT32);
 
      VMETHOD(super.Read) = UDP_Read;
 END_VIRTUAL

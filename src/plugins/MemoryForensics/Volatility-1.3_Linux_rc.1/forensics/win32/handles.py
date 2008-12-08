@@ -73,8 +73,10 @@ def handle_table_L3_entry(addr_space, types, table_vaddr, L2_table, L3):
                     
 
 def handle_entry_object(addr_space, types, entry_vaddr):
-    return read_obj(addr_space, types,
-                    ['_HANDLE_TABLE_ENTRY', 'Object'], entry_vaddr) & ~0x00000007
+    try:
+        return read_obj(addr_space, types,
+                        ['_HANDLE_TABLE_ENTRY', 'Object'], entry_vaddr) & ~0x00000007
+    except: return None
 
 def is_object_key(addr_space, types, obj_vaddr):
 

@@ -437,6 +437,7 @@ class PreCanned:
 
         new_query = pyflag.FlagFramework.query_type(
             case = query['case'],
+            _precanned = 1,
             report = self.report,
             family = self.family)
 

@@ -1915,7 +1915,9 @@ def procdump(cmdname,argv):
             image_file_name = process_imagename(process_address_space, types, task)
 
             peb = process_peb(process_address_space, types, task)
-            img_base = read_obj(process_address_space, types, ['_PEB', 'ImageBaseAddress'], peb)
+            try:
+                img_base = read_obj(process_address_space, types, ['_PEB', 'ImageBaseAddress'], peb)
+            except: img_base = None
 
             
             if img_base == None:

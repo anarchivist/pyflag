@@ -46,7 +46,6 @@ def check_table(case):
     length bigint,
     key (`inode_id`))""")
 
-
 class CacheFile:
     def __init__(self, case, filename=None, inode_id=None):
         dbh = DB.DBO(case)

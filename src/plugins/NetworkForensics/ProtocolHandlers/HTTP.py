@@ -195,7 +195,7 @@ class HTTPCaseTable(FlagFramework.CaseTable):
     columns = [
         [ InodeIDType, {} ],
         [ IntegerType, dict(name = 'Parent', column = 'parent') ],
-        [ IntegerType, dict(name = 'Request Packet', column='request_packet') ],
+        [ PacketType, dict(name = 'Request Packet', column='request_packet') ],
         [ StringType, dict(name='Method', column='method', width=10)],
         [ StringType, dict(name='URL', column='url', width=2000)],
         [ IntegerType, dict(name = "Response Packet", column='response_packet')],
@@ -574,8 +574,13 @@ class HTTPMagic(Magic.Magic):
 
         return 0
             
+class BrowseHTTPRequests(Reports.CaseTableReports):
+    name = "Browse HTTP Requests"
+    family = "Network Forensics"
+    default_table = 'HTTPCaseTable'
+    columns = ['InodeTable.Modified', 'Request Packet', 'Method', 'URL', 'Content Type' ]
     
-class BrowseHTTPRequests(Reports.report):
+class BrowseHTTPRequestsXXX(Reports.report):
     """
     Browse HTTP Requests
     --------------------
@@ -624,8 +629,9 @@ class BrowseHTTPRequests(Reports.report):
     This report shows the user sessions as deduced by the referer tags
     or cookies.         
     """
-    name = "Browse HTTP Requests"
+    name = "Browse HTTP RequestsXX"
     family = "Network Forensics"
+    hidden = True
     
     def display(self,query,result):    
         result.heading("Requested URLs")
@@ -830,10 +836,11 @@ class HTTPTLDRequests(Reports.PreCannedCaseTableReports):
     args = {'_hidden':4}
     def display(self, query,result):
         if not query.has_key('grouped'):
-            self.options = {'groupby':'TLD'}
-            #result.defaults.clear('limit')
+            self.options = {'groupby':'TLD',
+                            'where': 'content_type like "%html%"'}
+        else:
+            self.options = {'where': 'content_type like "%html%"'}
             
-        self.options['where'] = 'content_type like "%html%"'
         result.defaults.set('grouped',1)
         Reports.PreCannedCaseTableReports.display(self, query, result)
     

@@ -40,7 +40,7 @@ from forensics.win32.xpress import xpress_decode
 from thirdparty.progressbar import *
 from forensics.win32.datetime import *
 from vtypes import xpsp2types as types
-from forensics.x86 import IA32PagedMemory
+from forensics.x86 import IA32PagedMemory, IA32PagedMemoryPae
 import time
 
 page_shift = 12

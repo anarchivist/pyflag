@@ -341,7 +341,7 @@ void UDPStream_add(TCPStream self, PyPacket *packet) {
   if(self->callback) self->callback(self, packet);
 
   self->next_seq += udp->packet.data_len;
-  
+
   return;
 };
 

@@ -93,6 +93,7 @@ class GoogleSearches(Reports.PreCannedCaseTableReports):
     name = [ "/Network Forensics/Web Applications/Google Searches" ]
     family = 'Network Forensics'
     args = {'filter': 'Parameter = q'}
+    default_table = 'HTTPCaseTable'
     columns = ['HTTPCaseTable.Timestamp',
                'HTTPCaseTable.Inode',
                'HTTPParameterCaseTable.Parameter',

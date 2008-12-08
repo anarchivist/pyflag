@@ -154,6 +154,7 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     ignore = False
+    mode = 'Full'
 
     ## This is a list of the tests that should be run. In this format:
     ## filter string, is an exception excepted?
@@ -248,10 +249,48 @@ class ColumnType:
 
         return method(column, operator, arg)
 
-    def escape_column_name(self, column_name):
-        if self.table == None: raise RuntimeError("Table can not be None")
-        return "`%s`.`%s`" % (self.table, column_name)
+    def mode_Full(self):
+        return "%s" % (self.table, )
 
+    def mode_Recent(self):
+        if self.table == 'inode':
+            return self.mode_Full()
+        
+        ## Check that the table is up to date
+        dbh = DB.DBO(self.case)
+        dbh.execute("select max(inode_id) as max from `%s`", self.table)
+        max_inode_id = dbh.fetch()['max']
+        dbh.execute("select max(inode_id) as max from `%s_Recent`", self.table)
+        max_current_inode_id = dbh.fetch()['max']
+
+        if max_current_inode_id < max_inode_id:
+            dbh2 = dbh.clone()
+            dbh.execute("select * from `%s` order by inode_id desc limit 10", self.table)
+            for row in dbh:
+                for k,v in row.items():
+                    if not v or v=='None':
+                        del row[k]
+                        
+                dbh2.insert("%s_Recent" % self.table,
+                            _fast = True,
+                            **row)
+
+            dbh.invalidate("%s_Recent" % self.table)
+            
+        return "%s_Recent" % (self.table, )
+
+    def join_table(self):
+        table = getattr(self, "mode_%s" % self.mode)()
+        return table
+
+    def escape_column_name(self, column_name):
+        if self.table == None:
+            raise RuntimeError("Table can not be None")
+
+        ## The table we actually use depends on the current mode:
+        table = getattr(self, "mode_%s" % self.mode)()
+        return "`%s`.`%s`" % (table, column_name)
+    
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
         return lambda row: eval(DB.expand("%r %s %r", (row[self.column], operator, arg.__str__())), {})
@@ -708,7 +747,7 @@ class TimestampType(IntegerType):
         self.override_year = int(override_year)
 
     def create(self):
-        return "%s TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00'" % self.escape_column_name(self.column)
+        return "`%s` TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00'" % self.column
 
     def code_after(self, column, operator, arg):
         """ Matches if the time in the column is later than the time
@@ -752,7 +791,8 @@ class PCAPTime(TimestampType):
     LogCompatible = False
     
     def select(self):
-        return "(select ts_sec from pcap where id=%s.%s limit 1)" % (self.table, self.column)
+        return "(select ts_sec from pcap where id=%s limit 1)" % self.escape_column_name(
+            self.column)
 
     def order_by(self):
         return self.column
@@ -916,7 +956,7 @@ class InodeIDType(IntegerType):
     def operator_contains(self, column, operator, pattern):
         column = self.escape_column_name(self.column)
         return "inode.inode like '%%%s%%'" % pattern
-    
+
     def export(self, value, exportdir):
         """ Copy Inode data to the exportdir """
         print "Exporting Inode %s to %s" % (value, exportdir)
@@ -1142,7 +1182,7 @@ class InodeInfo(StringType):
                             link=link, link_pane=link_pane)
 
     def select(self):
-        return "(select `%s` from inode where inode_id=%s.inode_id limit 1)" % (self.field, self.table)
+        return "(select `%s` from inode where inode_id=%s limit 1)" % (self.field, self.escape_column_namet("inode_id"))
     
     def operator_literal(self, column, operator, pattern):
         return DB.expand("`%s` in (select inode_id from inode where `%s` %s %r)",

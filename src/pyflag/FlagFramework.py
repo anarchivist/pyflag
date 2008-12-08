@@ -950,9 +950,19 @@ class CaseTable:
     ## same column available via a number of different ColumnTypes.
     extras = []
 
+    ## Table modes are a way to divert the queries to sub tables of
+    ## the main data table. This allows us to maintain subsets of the
+    ## main table and only query that. This is neccessary when tables
+    ## get huge.
+    modes = {'Recent': "Only recent data is viewable"}
+
+
+
     def bind_columns(self, case):
         """ Returns a list of columns bound to the specified case """
         import pyflag.ColumnTypes as ColumnTypes
+        dbh=DB.DBO(case)
+        self.case_mode = dbh.get_meta("case_mode") or 'Full'
 
         possibles = self.columns + self.extras
 
@@ -960,6 +970,7 @@ class CaseTable:
             column_cls = x[0]
             args = x[1]
             args['case'] = case
+            args['mode'] = self.case_mode
             args['table'] = self.name
             if isinstance(column_cls, ColumnTypes.ColumnType):
                 yield column_cls
@@ -971,11 +982,14 @@ class CaseTable:
         bound (instantiated) column object
         """
         possibles = self.columns + self.extras
+        dbh=DB.DBO(case)
+        self.case_mode = dbh.get_meta("case_mode") or 'Full'
 
         for x in possibles:
             column_cls = x[0]
             args = x[1]
             args['case'] = case
+            args['mode'] = self.case_mode
             args['table'] = args.get('table', self.name)
             ## This is a little expensive because we instantiate each
             ## column just in order to check its name. This is
@@ -997,6 +1011,8 @@ class CaseTable:
 
         try:
             dbh.execute("desc %s", self.name)
+            for name in self.modes.keys():
+                dbh.execute("desc %s_%s", self.name,name)
         except DB.DBError,e:
             pyflaglog.log(pyflaglog.INFO, "Table %s does not exist in case %s - Creating" % (self.name, dbh.case))
             self.create(dbh)
@@ -1053,13 +1069,19 @@ class CaseTable:
         if self.primary:
             columns += ", primary key(`%s`)" % self.primary
 
-        sql = "CREATE TABLE `%s` (%s)" % (self.name, columns)
-        dbh.execute("## Creating CaseTable %s" % self)
+        self._create_table(self.name, columns, dbh, indexes)
+        for mode in self.modes.keys():
+            ## Make copies of the tables for other case modes
+            self._create_table("%s_%s" % (self.name, mode), columns, dbh, indexes)
+
+    def _create_table(self, name, columns, dbh, indexes):
+        sql = "CREATE TABLE if not exists `%s` (%s)" % (name, columns)
+        dbh.execute("## Creating CaseTable %s (%s)" % (self, name))
         dbh.execute(sql)
 
         ## Check indexes:
         for i in indexes:
-            i.make_index(dbh, self.name)
+            i.make_index(dbh, name)
 
 ## The following functions are for unicode support and are mostly
 ## borrowed from django:

@@ -469,10 +469,11 @@ def _make_join_clause(total_elements):
     ## widget automatically.
     tables = []
     for e in total_elements:
-        if e.table and e.table not in tables: tables.append(e.table)
+        table = e.join_table()
+        if table and table not in tables: tables.append(table)
 
     ## Now generate the join clause:
-    query_str += " from %s " % tables[0]
+    query_str += " from `%s` " % tables[0]
 
     for i in range(1,len(tables)):
         query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
@@ -550,7 +551,7 @@ class TableRenderer:
                     new_query['__target__'] = self.filter
                     new_query.clear('limit')
                     e.link = new_query
-                    e.link_pane = 'parent'
+                    e.link_pane = 'pane'
 
                     from pyflag.ColumnTypes import CounterType
 
