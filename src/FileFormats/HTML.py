@@ -36,11 +36,16 @@ def url_unquote(string):
     def decoder(x):
         return x.group(1).decode("hex")
 
-    result = re.sub("%(..)", decoder, string)
+    ## we can use this to handle arbitrary levels of quoting
+    while "%" in string:
+        try:
+            string = re.sub("%(..)", decoder, string)
+        except: break
+        
     ## references seem to _always_ be encoded using utf8 - even if the
     ## page is encoded using a different charset??? This whole quoting
     ## thing is very confusing.
-    return smart_unicode(result, 'utf8')
+    return smart_unicode(string, 'utf8')
 
 def decode_entity(string):
     def decoder(x):
@@ -417,7 +422,7 @@ class ResolvingHTMLTag(SanitizingTag):
             result['hint'] = hint
 
         return '"f?%s"' % result
-    
+
     def resolve_reference(self, reference, hint='', build_reference=True):
         original_reference = reference
 

@@ -25,7 +25,7 @@
 searches. This is needed now as google image search is ajax based.
 """
 import Gmail
-from FileFormats.HTML import decode_entity, HTMLParser
+from FileFormats.HTML import decode_entity, HTMLParser, url_unquote
 import pyflag.DB as DB
 import pyflag.pyflaglog as pyflaglog
 import re
@@ -38,10 +38,12 @@ class GoogleImageScanner(Gmail.GmailScanner):
         def boring(self, metadata, data=''):
             self.get_url(metadata)
 
-            if metadata['host'].startswith("images.google.com"):
-                self.parser = HTMLParser(verbose=0)
-                return False
-
+            try:
+                if metadata['host'].startswith("images.google.com"):
+                    self.parser = HTMLParser(verbose=0)
+                    return False
+            except: pass
+            
             return True
 
         def external_process(self, fd):
@@ -65,7 +67,7 @@ class GoogleImageScanner(Gmail.GmailScanner):
                     <a href="%s">
                     <img height="%s" width="%s" src="%s?q=tbn:%s%s" style="border: 1px solid ;"/>
                     </a>
-                    </td>\n''' % (total_count, row[0], row[5], row[4], row[14], row[2], row[3],)
+                    </td>\n''' % (total_count, row[0], row[5], row[4], row[14], row[2], row[3])
 
                     text_text += '''<td id="tDataText%s" width="16%%" valign="top" align="center">
                     <font face="arial,sans-serif" size="-1">

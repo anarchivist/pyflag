@@ -28,6 +28,7 @@ class ImFeelingLucky(Reports.report):
         return names
 
     def display(self, query, result):
+        query.clear('filter')
         def left_pane_cb(path):
             ## We expect a directory here:
             if not path.endswith('/'): path=path+'/'

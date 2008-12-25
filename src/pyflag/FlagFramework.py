@@ -1211,3 +1211,15 @@ def check_schema():
         except Exception,e:
             pyflaglog.log(pyflaglog.ERROR, "Error: %s" % e)
     
+def make_tld(host):
+    """ A utility function to derive a top level domain from a host name """
+    domains = host.lower().split(".")
+    tlds = "com.gov.edu.co.go.org.net".split('.')
+    for t in tlds:
+        try:
+            i = domains.index(t)
+            return '.'.join(domains[i-1:])
+        except ValueError: pass
+
+    return '.'.join(domains[-2:])
+

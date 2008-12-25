@@ -33,6 +33,8 @@ import FileFormats.MozHist as MozHist
 import FileFormats.MozCache as MozCache
 import pyflag.pyflaglog as pyflaglog
 import pyflag.Registry as Registry
+import re,cgi
+from FileFormats.HTML import decode_entity, HTMLParser, url_unquote
 
 class MozHistEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -224,7 +226,7 @@ def parse_response(meta):
 class MozCacheScan(Scanner.GenScanFactory):
     """ Scan for Mozilla Cache files """
     default = True
-    depends = []
+    depends = ['TypeScan']
     group = "FileScanners"
     
     class Scan(Scanner.StoreAndScan):
@@ -264,6 +266,7 @@ class MozCacheScan(Scanner.GenScanFactory):
                     	encoding_driver = "|d1"
 
             	# locate embedded entries 
+                length = 0
                 if record.record['DataLocation']['DataFile'] != 0:
                     fileidx, offset, length = record.get_data_location()
                     inode = '%s|o%s:%s' % (data_fds[fileidx].inode, offset, length)
@@ -290,14 +293,36 @@ class MozCacheScan(Scanner.GenScanFactory):
                 # chomp NULL from end
                 url = str(meta['KeyData'])[:-1]
                 if url.startswith("HTTP:"): url = url[len("HTTP:"):]
-                dbh.insert("http", 
-                        inode_id=inode_id, 
-                        url=url,
-                        method=method,
-                        status=status,
-                        content_type=header.getheader("content-type"),
-                        date=date,
-                        )
+
+                args = dict(inode_id=inode_id,
+                            ## urls are always stored normalised in the db
+                            url=url_unquote(url),
+                            method=method,
+                            status=status,
+                            content_type=header.getheader("content-type"),
+                            date=date)
+
+                ## Guess the host header if possible
+                m=re.match("(http://|ftp://)([^/]+)", url)
+                if m:
+                    args['host'] = m.group(2)
+                    args['tld'] = FlagFramework.make_tld(args['host'])
+
+                dbh.insert("http", _fast=True, **args)
+
+                ## Now populate the http parameters from the
+                ## URL GET parameters:
+                try:
+                    base, query = url.split("?",1)
+                    qs = cgi.parse_qs(query)
+                    for k,values in qs.items():
+                        for v in values:
+                            dbh.insert('http_parameters', _fast=True,
+                                       inode_id = inode_id,
+                                       key = k,
+                                       value = v)
+                except ValueError:
+                    pass
 
                 ## Scan the new file using the scanner train:
                 fd=self.ddfs.open(inode_id=inode_id)
@@ -305,6 +330,21 @@ class MozCacheScan(Scanner.GenScanFactory):
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
+
+class MozCacheScanTest(pyflag.tests.ScannerTest):
+    """ Test the Mozilla Cache scanner """
+    test_case = "PyFlagTestCase"
+    test_file = 'firefox_cache_test.zip'
+    subsystem = "Standard"
+    fstype = 'Raw'
+
+    def test01RunScanner(self):
+        """ Test cache scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'ZipScan'])
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'MozCacheScan','GoogleImageScanner'])
 
 class MozHistScanTest(pyflag.tests.ScannerTest):
     """ Test Mozilla History scanner """
@@ -315,7 +355,7 @@ class MozHistScanTest(pyflag.tests.ScannerTest):
     offset = "16128s"
 
     def test01RunScanner(self):
-        """ Test EventLog scanner """
+        """ Test history scanner """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'MozHistScan'])

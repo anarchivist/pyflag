@@ -45,6 +45,8 @@ def escape(uri):
     filename = FlagFramework.normpath(uri).replace('/', '_')
     return filename
 
+from pyflag.FlagFramework import make_tld
+
 class HTTP:
     """ Class used to parse HTTP Protocol """
     def __init__(self,fd,ddfs):
@@ -350,17 +352,6 @@ class HTTPScanner(StreamScannerFactory):
                    key = key,
                    value = value.value)
 
-    def make_tld(self, host):
-        domains = host.lower().split(".")
-        tlds = "com.gov.edu.co.go.org.net".split('.')
-        for t in tlds:
-            try:
-                i = domains.index(t)
-                return '.'.join(domains[i-1:])
-            except ValueError: pass
-
-        return '.'.join(domains[-2:])
-            
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
         allows us to processes HTTP connections on unusual ports. This
@@ -487,7 +478,7 @@ class HTTPScanner(StreamScannerFactory):
                        date           = date,
                        referrer       = referer,
                        host           = host,
-                       tld            = self.make_tld(host),
+                       tld            = make_tld(host),
                        useragent      = p.request.get('user-agent', '-'),
                        )
 #                       parent         = parent)                            
@@ -919,12 +910,12 @@ if __name__=='__main__':
              print ".",
              sys.stdout.flush()
         if row['host']:
-            tld = s.make_tld(row['host'])
+            tld = make_tld(row['host'])
         else:
             url = row['url']
             m = re.match("[^:]+://([^/]+)/",url)
             if m:
-                tld = s.make_tld(m.group(1))
+                tld = make_tld(m.group(1))
             else:
                 tld = "unknown"
 
