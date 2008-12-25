@@ -302,11 +302,10 @@ class MozCacheScan(Scanner.GenScanFactory):
                             content_type=header.getheader("content-type"),
                             date=date)
 
-                ## Guess the host header if possible
-                m=re.match("(http://|ftp://)([^/]+)", url)
-                if m:
-                    args['host'] = m.group(2)
-                    args['tld'] = FlagFramework.make_tld(args['host'])
+                host = FlagFramework.find_hostname(url)
+                if host:
+                    args['host'] = host
+                    args['tld'] = FlagFramework.make_tld(host)
 
                 dbh.insert("http", _fast=True, **args)
 

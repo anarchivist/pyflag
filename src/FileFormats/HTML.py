@@ -508,7 +508,7 @@ class ResolvingHTMLTag(SanitizingTag):
         if build_reference:
             result += " reference=\"%s\" " % reference
 
-        print "Not found %s" % reference
+        print "Not found '%s'" % reference
         return result
 
 class HTMLParser(lexer.Lexer):

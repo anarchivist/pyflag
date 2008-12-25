@@ -32,6 +32,7 @@ import FileFormats.IECache as IECache
 import pyflag.DB as DB
 from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType, LongStringType, IntegerType
 import pyflag.FlagFramework as FlagFramework
+from FileFormats.HTML import url_unquote
 
 content_type_re = re.compile(r"Content-Type:\s+([^\s]+)")
 content_encoding_re = re.compile(r"Content-Encoding:\s+([^\s]+)")
@@ -85,11 +86,14 @@ class IEIndex(Scanner.GenScanFactory):
                     url = event['url'].get_value()
                     url.inclusive = False
                     url = url.get_value()
+
+                    ## How big is the entry
+                    size = event['size'].get_value() * IECache.blocksize
                     
                     args = dict(inode_id = inode_id,
                                 type = event['type'],
                                 offset = event['offset'],
-                                length = event['size'].get_value() * IECache.blocksize,
+                                length = size,
                                 url = url,
                                 filename = event['filename'],
                                 headers = event['data'].get_value(),)
@@ -121,7 +125,14 @@ class IEIndex(Scanner.GenScanFactory):
                     if row:
                         inode_id = row['inode_id']
                         headers = args['headers']
-                        encoding_driver = None
+                        ## We always create a new inode for cache
+                        ## entries to guarantee they get scanned by
+                        ## other scanners _after_ http info is
+                        ## populated. This essentially means we get
+                        ## duplicated inodes for the same actual files
+                        ## which is a bit of extra overhead (cache
+                        ## files are processed twice).
+                        encoding_driver = "|o0"
                         
                         m = content_encoding_re.search(headers)
                         if m:
@@ -132,57 +143,70 @@ class IEIndex(Scanner.GenScanFactory):
                                 encoding_driver = '|d1'
                             else:
                                 print "I have no idea what %s encoding is" % m.group(1)
-                                
-                        if encoding_driver:
-                            inode_id = self.ddfs.VFSCreate(None,
-                                                           "%s%s" % (row['inode'],
-                                                                     encoding_driver),
-                                                           "%s/%s" % (tmp_path,
-                                                                      args['filename']),
-                                                           _mtime = modified,
-                                                           _atime = accessed
-                                                           )
+
+                        inode_id = self.ddfs.VFSCreate(None,
+                                                       "%s%s" % (row['inode'],
+                                                                 encoding_driver),
+                                                       "%s/%s" % (tmp_path,
+                                                                  args['filename']),
+                                                       size = size,
+                                                       _mtime = modified,
+                                                       _atime = accessed
+                                                       )
 
                         http_args = dict(
                             inode_id = inode_id,
-                            url = url,
+                            url = url_unquote(url),
                             )
 
                         ## Populate http table if possible
                         m = content_type_re.search(headers)
                         if m:
                             http_args['content_type'] = m.group(1)
-                            
+
+                        host = FlagFramework.find_hostname(url)
+                        if host:
+                            http_args['host'] = host
+                            http_args['tld'] = FlagFramework.make_tld(host)
+
                         dbh.insert('http', _fast=True, **http_args )
 
                         ## Now populate the http parameters from the
                         ## URL GET parameters:
                         try:
                             base, query = url.split("?",1)
+                            qs = cgi.parse_qs(query)
+                            for k,values in qs.items():
+                                for v in values:
+                                    dbh.insert('http_parameters', _fast=True,
+                                               inode_id = inode_id,
+                                               key = k,
+                                               value = v)
                         except ValueError:
-                            continue
-                        
-                        qs = cgi.parse_qs(query)
-                        for k,values in qs.items():
-                            for v in values:
-                                dbh.insert('http_parameters', _fast=True,
-                                           inode_id = inode_id,
-                                           key = k,
-                                           value = v)
-                            
+                            pass
+
+                        ## Scan new files using the scanner train:
+                        fd=self.ddfs.open(inode_id=inode_id)
+                        Scanner.scanfile(self.ddfs,fd,self.factories)
+
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
 
 class IECacheScanTest(pyflag.tests.ScannerTest):
     """ Test IE History scanner """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.4.dd"
+#    test_file = "pyflag_stdimage_0.4.dd"
+    test_file = "ie_cache_test.zip"
     subsystem = 'Standard'
-    offset = "16128s"
+    fstype = 'Raw'
+#    offset = "16128s"
 
     def test01RunScanner(self):
         """ Test IE History scanner """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'IEIndex'])
+                             argv=["*",'ZipScan'])
+
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'IEIndex','GoogleImageScanner'])
 

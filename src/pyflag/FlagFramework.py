@@ -1210,7 +1210,13 @@ def check_schema():
                 
         except Exception,e:
             pyflaglog.log(pyflaglog.ERROR, "Error: %s" % e)
-    
+
+def find_hostname(url):
+    """ Guess the host header if possible """
+    m=re.match("(http://|ftp://)([^/]+)", url)
+    if m:
+        return m.group(2)
+
 def make_tld(host):
     """ A utility function to derive a top level domain from a host name """
     domains = host.lower().split(".")

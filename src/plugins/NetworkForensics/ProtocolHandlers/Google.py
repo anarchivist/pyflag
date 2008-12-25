@@ -42,7 +42,7 @@ class GoogleImageScanner(Gmail.GmailScanner):
                 if metadata['host'].startswith("images.google.com"):
                     self.parser = HTMLParser(verbose=0)
                     return False
-            except: pass
+            except AttributeError: pass
             
             return True
 
