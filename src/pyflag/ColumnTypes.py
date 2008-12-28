@@ -1120,7 +1120,7 @@ class FilenameType(StringType):
     LogCompatible = False
     def __init__(self, name='Filename', inode_id='inode_id',
                  basename=False, table='file',
-                 link=None, link_pane=None, case=None):
+                 link=None, link_pane=None, case=None, **kwargs):
         if not link and not basename:
             link = query_type(case=case,
                               family='Disk Forensics',
@@ -1130,7 +1130,7 @@ class FilenameType(StringType):
         ## This is true we only display the basename
         self.basename = basename
         ColumnType.__init__(self,name=name, column=inode_id,
-                            link=link, link_pane=link_pane, table=table)
+                            link=link, link_pane=link_pane, table=table, **kwargs)
 
     def render_links_display_hook(self, value,row,result):
         if row['link']:
@@ -1173,13 +1173,13 @@ class InodeInfo(StringType):
     hidden = True
     def __init__(self, name='Size', inode_id='inode_id', field='size',
                  table=None,
-                 link=None, link_pane=None, case=None):
+                 link=None, link_pane=None, case=None, **kwargs):
 
         ## This is true we only display the basename
         self.table = table
         self.field = field
         ColumnType.__init__(self,name=name, column=inode_id,
-                            link=link, link_pane=link_pane)
+                            link=link, link_pane=link_pane, **kwargs)
 
     def select(self):
         return "(select `%s` from inode where inode_id=%s limit 1)" % (self.field, self.escape_column_namet("inode_id"))
@@ -1225,8 +1225,8 @@ class CounterType(IntegerType):
     """ This is used to count the total numbers of things (in a group by) """
     LogCompatible = False
     
-    def __init__(self, name=None):
-        IntegerType.__init__(self, name=name, column='count')
+    def __init__(self, name=None, **kwargs):
+        IntegerType.__init__(self, name=name, column='count', **kwargs)
         
     def select(self):
         return "count(*)"

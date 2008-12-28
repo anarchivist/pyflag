@@ -135,12 +135,13 @@ def MainNSRLHash(dirname):
             dbh.mass_insert(
                 ## This should be faster:
                 __md5=row[1].decode("hex"),
-                filename=row[3],
+                filename=row[3].decode("utf8","ignore")[:60],
                 productcode=row[5],
                 oscode=row[6], 
                 )
         except (ValueError,DB.DBError, TypeError),e:
-            print "SQL Error skipped %s" %e
+            result = "SQL Error skipped %s" % e
+            print result
         except IndexError:
             continue
 

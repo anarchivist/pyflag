@@ -1080,9 +1080,10 @@ class CaseTable:
         dbh.execute(sql)
 
         ## Check indexes:
-        for i in indexes:
-            i.make_index(dbh, name)
-
+        try:
+            for i in indexes:
+                i.make_index(dbh, name)
+        except: pass
 ## The following functions are for unicode support and are mostly
 ## borrowed from django:
 def smart_unicode(s, encoding='utf-8', errors='ignore'):

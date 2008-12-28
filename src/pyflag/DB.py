@@ -807,7 +807,7 @@ class PooledDBO:
         for k,v in columns.items():
             ## _field means to pass the field
             if k.startswith("__"):
-                v=db_expand("%b" % (v,))
+                v=db_expand("%b", (v,))
                 k=k[2:]
             elif k.startswith('_'):
                 k=k[1:]
