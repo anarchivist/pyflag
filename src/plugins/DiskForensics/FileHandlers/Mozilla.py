@@ -40,9 +40,9 @@ class MozHistEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""CREATE TABLE IF NOT EXISTS mozilla_history (
         `inode_id` int not null,
-        `id` int not null,
-        `name` VARCHAR(250) NOT NULL,
-        `url`  VARCHAR(500) NOT NULL,
+        `id` int not null default 0,
+        `name` VARCHAR(250) not null default '',
+        `url`  VARCHAR(500) not null default '',
         host VARCHAR(250),
         `Typed` int,
         `LastVisitDate` TIMESTAMP NULL default '0000-00-00 00:00:00',
@@ -163,9 +163,12 @@ class MozHistScan(Scanner.GenScanFactory):
                                 url  = e['URL'],
                                 _LastVisitDate = "from_unixtime('%s')" % e['LastVisitDate'][:10],
                                 _FirstVisitDate = "from_unixtime('%s')" % e['FirstVisitDate'][:10],
-                                id = e['id'])
+                                )
                         except KeyError:
                             continue
+                        
+                        try: result['id'] = int(e['id'])
+                        except: pass
 
                         try: result['Typed'] = e['Typed']
                         except: pass
@@ -282,6 +285,15 @@ class MozCacheScan(Scanner.GenScanFactory):
                                     _mtime=meta['LastModified'],
                                     _atime=meta['LastFetched'],
                                     size=length)
+
+                ## Insert a dodgy pcap entry to represent the
+                ## timestamp of this request
+                dbh.insert('pcap', _fast=True,
+                           _ts_sec = 'from_unixtime(%d)' % meta['LastModified'],
+                           ts_usec = 0,
+                           offset=0, length=0)
+                packet_id = dbh.autoincrement()
+                
                 # add to http table
                 # we parse the date, it is automatically returned in case
                 # timezone. We do not need to supply an evidence timezone as
@@ -297,6 +309,8 @@ class MozCacheScan(Scanner.GenScanFactory):
                 args = dict(inode_id=inode_id,
                             ## urls are always stored normalised in the db
                             url=url_unquote(url),
+                            request_packet = packet_id,
+                            response_packet = packet_id,
                             method=method,
                             status=status,
                             content_type=header.getheader("content-type"),

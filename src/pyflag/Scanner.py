@@ -345,7 +345,7 @@ class StringIOType(StoreAndScanType):
                 self.boring_status = self.boring(metadata, data=data)
 
             if not self.file and not self.boring_status and self.inode not in StoreAndScanFiles:
-                StoreAndScanFiles.append(self.inode)
+                StoreAndScanFiles.add(self.inode)
                 self.file = StringIO.StringIO()
         except KeyError:
             pass

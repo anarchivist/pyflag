@@ -132,20 +132,28 @@ def force_unicode(string):
 
     return unicode(string)
 
+def force_string(string):
+    if isinstance(string, unicode):
+        return string.encode("utf-8","ignore")
+    return str(string)
+
 expand_re = re.compile("%(r|s|b)")
 
-def expand(sql, params):
-    """ A utility function for interpolating into the query string.
-    
-    This class implements the correct interpolation so that %s is not escaped and %r is escaped in the mysql interpolation.
+def expand(format, params):
+    """ This version of the expand function returns a unicode object
+    after properly expanding the params into it.
 
-    @Note: We cant use the MySQLdb native interpolation because it has a brain dead way of interpolating - it always escapes _ALL_ parameters and always adds quotes around anything. So for example:
+    NOTE The Python % operator is evil - do not use it because it
+    forces the decoding of its parameters into unicode when any of the
+    args are unicode (it upcasts them). This is a very unsafe
+    operation to automatically do because the default codec is ascii
+    which will raise when a string contains a non ascii char. This is
+    basically a time bomb which will blow when you least expect it.
 
-    >>> MySQLdb.execute('select blah from %s where id=%r',table,id)
-
-    Does not work as it should, since the table name is always enclosed in quotes which is incorrect.
+    Never use %, use this function instead. This function will return
+    a unicode object.
     """
-    sql = unicode(sql)
+    format = unicode(format)
     d = dict(count = 0)
 
     if isinstance(params, basestring):
@@ -157,20 +165,72 @@ def expand(sql, params):
         params = (params,)
 
     def cb(m):
+        x = params[d['count']]
+        
         if m.group(1)=="s":
             result = u"%s" % (force_unicode(params[d['count']]))
             
         ## Raw escaping
         elif m.group(1)=='r':
             result = u"'%s'" % escape(force_unicode(params[d['count']]), quote="'")
+
+        d['count'] +=1
+        return result
+
+    result = expand_re.sub(cb,format)
+
+    return result
+
+def db_expand(sql, params):
+    """ A utility function for interpolating into the query string.
+    
+    This class implements the correct interpolation so that %s is not escaped and %r is escaped in the mysql interpolation.
+
+    @Note: We cant use the MySQLdb native interpolation because it has a brain dead way of interpolating - it always escapes _ALL_ parameters and always adds quotes around anything. So for example:
+
+    >>> MySQLdb.execute('select blah from %s where id=%r',table,id)
+
+    Does not work as it should, since the table name is always enclosed in quotes which is incorrect.
+
+    NOTE: expand always returns a string not a unicode object because
+    we might need to mix different encodings - for example we might
+    have some binary data and utf8 strings mixed together in the
+    return string. If we returned a unicode string it will be encoded
+    to utf8 when sending to the server and the binary data will be
+    corrupted.
+    """
+    sql = str(sql)
+    d = dict(count = 0)
+
+    if isinstance(params, basestring):
+        params = (params,)
+
+    try:
+        params[0]
+    except:
+        params = (params,)
+
+    def cb(m):
+        x = params[d['count']]
+        
+        if m.group(1)=="s":
+            #result = u"%s" % (force_unicode(params[d['count']]))
+            result = force_string(x)
+            
+        ## Raw escaping
+        elif m.group(1)=='r':
+            result = force_string(x)
+            result = "'%s'" % escape(result, quote="'")
+            #result = u"'%s'" % escape(force_unicode(params[d['count']]), quote="'")
             #result = u"'%s'" % escape(force_unicode(params[d['count']]))
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
-            data = params[d['count']].decode("latin1")
+            #data = params[d['count']].decode("latin1")
+            data = params[d['count']]
             #data = ''.join(r"\\x%02X" % ord(x) for x in params[d['count']])
             #data = params[d['count']]
-            result = u"_binary'%s'" % escape(data)
+            result = "_binary'%s'" % escape(data)
             #print result.encode("ascii","ignore")
 
         d['count'] +=1
@@ -439,7 +499,7 @@ class PooledDBO:
             c.execute("select value from meta where property ='TZ' limit 1")
             row = c.fetchone()
             if row:
-                c.execute(expand('set time_zone = %r', row['value']))
+                c.execute(db_expand('set time_zone = %r', row['value']))
         except Exception,e:
             pass
 
@@ -486,9 +546,8 @@ class PooledDBO:
             pass
 
         if params:
-            string = expand(query_str, params)
+            string = db_expand(query_str, params)
         else: string = query_str
-        #print string
         try:
             self.cursor.execute(string)
         #If anything went wrong we raise it as a DBError
@@ -748,12 +807,12 @@ class PooledDBO:
         for k,v in columns.items():
             ## _field means to pass the field
             if k.startswith("__"):
-                v=expand("%b" % (v,))
+                v=db_expand("%b" % (v,))
                 k=k[2:]
             elif k.startswith('_'):
                 k=k[1:]
             else:
-                v=expand("%r", (v,))
+                v=db_expand("%r", (v,))
                 
             try:
                 self.mass_insert_cache[k][self.mass_insert_row_count]=v

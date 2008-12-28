@@ -452,7 +452,7 @@ class ResolvingHTMLTag(SanitizingTag):
 
         ## Try to make reference more url friendly:
 #        reference = reference.replace(" ","%20")
-        reference = url_unquote(decode_entity(reference))
+        reference = url_unquote(decode_entity(unquote(reference)))
 
         dbh = DB.DBO(self.case)
         dbh.execute("select http.status,http.inode_id from http join inode on "\

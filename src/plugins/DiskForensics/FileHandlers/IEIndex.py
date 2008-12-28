@@ -159,6 +159,16 @@ class IEIndex(Scanner.GenScanFactory):
                             url = url_unquote(url),
                             )
 
+                        ## Put in a dodgy pcap entry for the timestamp:
+                        if '_accessed' in args:
+                            dbh.insert('pcap', _fast=True,
+                                       _ts_sec = args['_accessed'],
+                                       ts_usec = 0,
+                                       offset=0, length=0)
+                            packet_id = dbh.autoincrement()
+                            http_args['response_packet'] = packet_id
+                            http_args['request_packet'] = packet_id
+
                         ## Populate http table if possible
                         m = content_type_re.search(headers)
                         if m:
@@ -210,3 +220,7 @@ class IECacheScanTest(pyflag.tests.ScannerTest):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'IEIndex','GoogleImageScanner'])
 
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as c from http_parameters where `key`='q' and value='anna netrebko'")
+        row=dbh.fetch()
+        self.assertEqual(row['c'], 3, 'Unable to find all search URLs')

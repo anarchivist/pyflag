@@ -193,7 +193,7 @@ class LoadIOSource(Reports.report):
         ## Try to instantiate the image:
         try:
             image = Registry.IMAGES.dispatch(query['subsys'])()
-        except:
+        except Exception,e:
             result.heading("Error: Unable to create IO Source")
             result.para("Could not find a driver for requested IO"\
                         " subsystem (%s). Are you sure you spelt it "\
