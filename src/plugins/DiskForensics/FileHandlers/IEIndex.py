@@ -205,11 +205,9 @@ import pyflag.pyflagsh as pyflagsh
 class IECacheScanTest(pyflag.tests.ScannerTest):
     """ Test IE History scanner """
     test_case = "PyFlagTestCase"
-#    test_file = "pyflag_stdimage_0.4.dd"
     test_file = "ie_cache_test.zip"
     subsystem = 'Standard'
     fstype = 'Raw'
-#    offset = "16128s"
 
     def test01RunScanner(self):
         """ Test IE History scanner """

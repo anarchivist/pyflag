@@ -171,16 +171,32 @@ class DBOTest(tests.ScannerTest):
     def test10Binary(self):
         """ Test that we handle binary inserts properly """
         dbh = DB.DBO(self.test_case)
-        ## Clear the hash table (we will use the binary column for testing)
-        dbh.delete('hash', where='1', _fast=True)
         
         ## Produce a series of binary strings covering all binary
         ## chars
+        dbh.mass_insert_start('hash')
         for i in range(0,255-16,16):
-            test_string = ''.join([chr(x) for x in range(i,i+15) ])
+            ## Clear the hash table (we will use the binary column for testing)
+            dbh.delete('hash', where='1', _fast=True)
+
+            test_string = ''.join([chr(x) for x in range(i,i+16) ])
             dbh.insert("hash", _fast=True,
                        __binary_md5 = test_string,
                        )
+            dbh.execute("select * from hash limit 1")
+            row = dbh.fetch()
+            self.assert_(row['binary_md5']==test_string,
+                         "%r != %r" % (test_string, row['binary_md5']))
+
+            ## Now test the mass insert facility
+            dbh.delete('hash', where='1', _fast=True)
+            dbh.mass_insert(__binary_md5= test_string)
+            dbh.mass_insert_commit()
+            dbh.execute("select * from hash limit 1")
+            row = dbh.fetch()
+            self.assert_(row['binary_md5']==test_string,
+                         "%r != %r" % (test_string, row['binary_md5']))
+            
 
 def print_stats():
     dbh = DB.DBO("mysql")

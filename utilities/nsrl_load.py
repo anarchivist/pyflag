@@ -90,8 +90,9 @@ if config.stats:
 #Get a handle to our database
 if config.reset:
     print "Dropping NSRL tables"
-    dbh.execute("delete from NSRL_hashes")
-    dbh.execute("delete from NSRL_products")
+    ## We can just drop the whole db - it will be recreated
+    ## automatically later.
+    dbh.execute("drop database if exists `%s`", config.hashdb)
     sys.exit(-1)
 
 if config.index:

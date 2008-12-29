@@ -80,7 +80,7 @@ class HashTables(FlagFramework.EventHandler):
         # NSRL. Use the nsrl_load.py script.
         ## We initialise the nsrl database if it does not already exist:
         try:
-            dbh.execute("""CREATE database if not exists `%s`""", config.HASHDB)
+            dbh.execute("""CREATE database if not exists `%s` default character set utf8""", config.HASHDB)
             ndbh = DB.DBO(config.HASHDB)
 
             ndbh.execute("""Create table if not exists meta(
@@ -95,7 +95,7 @@ class HashTables(FlagFramework.EventHandler):
             `filename` varchar(60) NOT NULL default '',
             `productcode` int(11) NOT NULL default '0',
             `oscode` varchar(60) NOT NULL default ''
-            ) engine=MyISAM""")
+            ) character set utf8 engine=MyISAM""")
             
             ndbh.execute("""CREATE TABLE if not exists `NSRL_products` (
             `Code` mediumint(9) NOT NULL default '0',
@@ -103,7 +103,7 @@ class HashTables(FlagFramework.EventHandler):
             `Version` varchar(20) NOT NULL default '',
             `OpSystemCode` varchar(20) NOT NULL default '',
             `ApplicationType` varchar(250) NOT NULL default ''
-            ) engine=MyISAM COMMENT='Stores NSRL Products'""")
+            ) engine=MyISAM character set utf8 COMMENT='Stores NSRL Products'""")
             
             ndbh.insert("NSRL_products",
                         code=0,
