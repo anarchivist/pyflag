@@ -91,39 +91,48 @@ def is_word_in_dict(word):
 
 def insert_dictionary_word(word, word_type, classification='', binary=False):
     pdbh = DB.DBO()
-    ## Is the word in the dictionary?
-    if word_type == 'word':
-        sql = "select * from dictionary where word = %r and type = %r"
-        prefix =''
-        ## Other types are stored in binary:
-    else:
-        prefix = '__'
-        sql = "select * from dictionary where word = %b and type = %r"
-        
-    pdbh.execute(sql,
-                 word, word_type)
-    row = pdbh.fetch()
-    
-    if not row:
-        dict_version = get_dict_version()
+    ## This guarantees that only we can manipulate the dictionary
+    ## right now otherwise we can get races and duplicates
+    pdbh.execute("lock table dictionary write")
+    try:
+        ## Is the word in the dictionary?
+        if word_type == 'word':
+            sql = "select * from dictionary where word = %r and type = %r"
+            prefix =''
+            ## Other types are stored in binary:
+        else:
+            prefix = '__'
+            sql = "select * from dictionary where word = %b and type = %r"
 
-        ## The word is not in the dictionary - add it and increment
-        ## the dictionary version
-        pdbh.insert('dictionary',
-                    **{'__word': word,
-                       'type': word_type,
-                       'class': classification
-                       })
+        pdbh.execute(sql,
+                     word, word_type)
+        row = pdbh.fetch()
 
-        word_id = pdbh.autoincrement()
-        ## Tell all workers the dictionary has changed
-        pdbh.insert('jobs',
-                    command = "ReIndex",
-                    state = "broadcast",
-                    _fast = True
-                    )
-    else:
-        word_id = row['id']
+        if not row:
+            ## The word is not in the dictionary - add it and increment
+            ## the dictionary version
+            pdbh.insert('dictionary',
+                        **{'__word': word,
+                           'type': word_type,
+                           'class': classification,
+                           '_fast': True,
+                           })
+
+            pdbh.execute("unlock tables")
+            
+            word_id = pdbh.autoincrement()
+            ## Tell all workers the dictionary has changed
+            pdbh.insert('jobs',
+                        command = "ReIndex",
+                        state = "broadcast",
+                        cookie = 0,
+                        _fast = True
+                        )
+        else:
+            word_id = row['id']
+            
+    finally:
+        pdbh.execute("unlock tables")
         
     return word_id
 

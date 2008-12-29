@@ -657,7 +657,7 @@ class IRCTests(tests.ScannerTest):
     """ Tests IRC Scanner """
     test_case = "PyFlagTestCase"
     test_file = 'irc.pcap'
-    subsystem = "Advanced"
+    subsystem = "Standard"
     fstype = "PCAP Filesystem"
     def test01IRCScanner(self):
         """ Test IRC Scanner """

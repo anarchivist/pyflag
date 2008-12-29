@@ -27,7 +27,7 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
  	[2,'SECOND',	 239,	480,	None,	    'in dentry - file name'],
 	[3,'1cross1',	 271,	508,	'/file1.dat','crosses two allocated files'],
 	[4,'2cross2',	 273,	508,	'/file3.dat','crosses consecutive sectors in a file'],
-	[5,'3cross3',	 282,	1020,	'/_unallocated_/o00000002',	    'crosses in unalloc'],
+	[5,'3cross3',	 282,	1020,	'/_unallocated_/o00000001',	    'crosses in unalloc'],
 	[6,'1slack1',	 272,	396,	'/file2.dat','crosses a file into slack'],
         ## This was change to measure the offset from the start of the file:
 	[7,'2slack2',	 273,	1020,	'/file3.dat','crosses slack into a file'],
@@ -42,21 +42,37 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
     
     case_insesitive_keywords = []
     regex_keywords = [
-        [14,r'f[\w]rst',	        "should find 'first'"],
-        [15,r'f[a-z]r[0-9]?s[\s]*t',	"should find 'first'"],
-        [16,r'd[a-z]l.?t.?d',	        "should find 'deleted'"],
-        [17,r'[r-t][\s]?[j-m][\s]?[a-c]{2,2}[\s]?[j-m]', 	"should find '1slack1', '2slack2', '3slack'"],
-        [18,r'[1572943][\s]?fr.{2,3}ent[\s]?', 	"should find '1fragment', '2fragment'"],
-        [19,r'a\??[a-c]\\*[a-c]\**', 	'should find a?b\c*'],
-        [20,r'\s\??x?y?Q?[a-c]\\*u*[a-c]\**d\$[0-9]*e#','should find a?b\c*d$e#'],
+        [14,r'f[\w]rst',	        ['first']],
+        [15,r'f[a-z]r[0-9]?s[\s]*t',	["first"]],
+        [16,r'd[a-z]l.?t.?d',	        ["deleted"]],
+        [17,r'[0-9][r-t][\s]?[j-m][\s]?[a-c]{2,2}[\s]?[j-m][0-9]',
+                                        ['1slack1', '2slack2', '3slack']],
+        [18,r'[1572943][\s]?fr.{2,3}ent[\s]?',
+                                        ['1fragment', '2fragment ']],
+        [19,r'a\??[a-c]\\*[a-c]\**', 	['a?b\c*']],
+        [20,r'\s\??x?y?Q?[a-c]\\*u*[a-c]\**d\$[0-9]*e#',
+                                        ['a?b\c*d$e#']],
         ]
 
-    def find_expected_output(self, word, id, filename, offset, array):
-        for i in range(len(array)):
-            row = array[i]
+    def find_expected_output(self, word, id, filename, offset, array, data):
+        for i in range(len(self.case_sensitive_keywords)):
+            row = self.case_sensitive_keywords[i]
             if id==row[0] and filename==row[4] and offset==row[3]:
-                array.pop(i)
+                self.case_sensitive_keywords.pop(i)
                 return 
+
+            if data==row[1]:
+                self.case_sensitive_keywords.pop(i)
+                break
+
+
+        for i in range(len(self.regex_keywords)):
+            if id==self.regex_keywords[i][0]:
+                array = self.regex_keywords[i][2]
+                for j in range(len(array)):
+                    if array[j]==data:
+                        array.pop(j)
+                        return
 
         #self.fail("Unable to find a match for %s" % word)
         print "Unable to find a match for %s" % word
@@ -89,7 +105,7 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
         """ Testing output """
         dbh = DB.DBO(self.test_case)
         fsfd = FileSystem.DBFS(self.test_case)
-        dbh.execute("select inode_id, word_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where id>1000 and id<1020", config.FLAGDB)
+        dbh.execute("select inode_id, word_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=%s.dictionary.id where id>1000 and id<1020", (config.FLAGDB,config.FLAGDB))
         for row in dbh:
             patg, inode, inode_id = fsfd.lookup(inode_id = row['inode_id'])
             fd = fsfd.open(inode=inode)
@@ -97,12 +113,12 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
             fd.slack = True
             fd.seek(row['offset'])
             data = fd.read(row['length'])
-            filename = fsfd.lookup(inode = inode)
+            filename, inode,inode_id = fsfd.lookup(inode = inode)
             print "Looking for %s: Found in %s (%s) at offset %s length %s %r" % (
                 row['word'], filename, inode, row['offset'], row['length'],data)
             #self.assertEqual(data.lower(), row['word'].lower())
             self.find_expected_output(row['word'], row['word_id']-1000, filename,
-                                      row['offset'], self.case_sensitive_keywords)
+                                      row['offset'], self.case_sensitive_keywords, data)
 
         print "Left over %s" % self.case_sensitive_keywords
 
@@ -130,6 +146,9 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
     def test01RunScanner(self):
         """ Running scanners """
         env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'ZipScan', 'TarScan', 'GZScan'])
+
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'JPEGCarver', 'ZipScan', 'TarScan', 'GZScan', 'TypeScan', 'IndexScan'])
 

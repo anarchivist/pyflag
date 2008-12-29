@@ -207,20 +207,28 @@ class Sleuthkit(DBFS):
             try:
                 f = fs.open(inode=str(inode))
                 s = fs.fstat(f)
-                dbh_inode.insert( "inode",
-                                  inode = inodestr,
-                                  status = status,
-                                  uid = s.st_uid,
-                                  gid = s.st_gid,
-                                  _mtime = "from_unixtime(%d)" % s.st_mtime,
-                                  _atime = "from_unixtime(%d)" % s.st_atime,
-                                  _ctime = "from_unixtime(%d)" % s.st_ctime,
-                                  mode = s.st_mode,
-                                  links = s.st_nlink,
-                                  link = "",
-                                  size = s.st_size,
-                                  _fast = True
-                                  )
+
+                args = dict(inode = inodestr,
+                            status = status,
+                            uid = s.st_uid,
+                            gid = s.st_gid,
+                            mode = s.st_mode,
+                            links = s.st_nlink,
+                            link = "",
+                            size = s.st_size,
+                            _fast = True
+                            )
+
+                if s.st_mtime:
+                    args['_mtime'] = "from_unixtime(%d)" % s.st_mtime
+                    
+                if s.st_atime:
+                    args['_atime'] = "from_unixtime(%d)" % s.st_atime
+                    
+                if s.st_ctime:
+                    args['_ctime'] = "from_unixtime(%d)" % s.st_ctime
+
+                dbh_inode.insert( "inode", **args)
                 inode_id = dbh_inode.autoincrement()
                 
                 #insert block runs
@@ -427,7 +435,7 @@ class NTFSTests(unittest.TestCase):
         self.assertEqual(row['count'],140)
         dbh.execute("select count(*) as count from file")
         row = dbh.fetch()
-        self.assertEqual(row['count'],152)
+        self.assertEqual(row['count'],153)
 
     def test02ReadNTFSFile(self):
         """ Test reading a regular NTFS file """

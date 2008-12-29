@@ -437,7 +437,7 @@ class HTTPScanner(StreamScannerFactory):
             host = p.request.get("host",IP2str(stream.dest_ip))
             url = HTML.url_unquote(p.request.get("url"))
             try:
-                date = p.response.get("date")
+                date = p.response["date"]
                 date = Time.parse(date, case=self.case, evidence_tz=None) 
             except (KeyError,ValueError):
                 date = 0
@@ -467,20 +467,23 @@ class HTTPScanner(StreamScannerFactory):
 ##                else:
 ##                    parent = row['inode_id']
 
-            dbh.insert('http',
-                       inode_id = inode_id,
-                       request_packet = p.request.get("packet_id",0),
-                       method         = p.request.get("method","-"),
-                       url            = url,
-                       response_packet= p.response.get("packet_id"),
-                       status         = p.response.get("HTTP_code"),
-                       content_type   = p.response.get("content-type","text/html"),
-                       date           = date,
-                       referrer       = referer,
-                       host           = host,
-                       tld            = make_tld(host),
-                       useragent      = p.request.get('user-agent', '-'),
-                       )
+            args = dict(inode_id = inode_id,
+                        request_packet = p.request.get("packet_id",0),
+                        method         = p.request.get("method","-"),
+                        url            = url,
+                        response_packet= p.response.get("packet_id"),
+                        status         = p.response.get("HTTP_code"),
+                        content_type   = p.response.get("content-type","text/html"),
+                        referrer       = referer[:500],
+                        host           = host,
+                        tld            = make_tld(host),
+                        useragent      = p.request.get('user-agent', '-'),
+                        )
+
+            if date:
+                args['date'] = date
+            
+            dbh.insert('http', **args)
 #                       parent         = parent)                            
 
             ## Replicate the information about the subobjects in the

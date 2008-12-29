@@ -143,7 +143,7 @@ class IndexEventHandler(FlagFramework.EventHandler):
     def init_default_db(self, dbh, case):
         dbh.execute("""CREATE TABLE `dictionary` (
         `id` int auto_increment,
-        `word` VARCHAR( 250 ) binary NOT NULL ,
+        `word` VARBINARY( 250 ) NOT NULL ,
         `class` VARCHAR( 50 ) NOT NULL ,
         `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
         PRIMARY KEY  (`id`))""")
@@ -151,6 +151,13 @@ class IndexEventHandler(FlagFramework.EventHandler):
     def startup(self):
         ## These check that the schema is up to date
         DB.convert_to_unicode(None, 'dictionary')
+        dbh=DB.DBO()
+        dbh.execute("desc dictionary")
+        for row in dbh:
+            if row['Field'] == 'word':
+                if not 'varbinary' in row['Type']:
+                    dbh.execute("alter table dictionary modify word VARBINARY(250)")
+                    break
 
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
@@ -597,7 +604,7 @@ def reindex():
         if t == 'literal':
             INDEX.add_word(row['word'].decode("latin").encode("latin"),id, index.WORD_LITERAL)
         elif t == 'regex':
-            if type(row['word'])==type(str):
+            if type(row['word'])==str:
                 word = row['word'].decode('latin')
             else:
                 word = row['word']
@@ -900,7 +907,7 @@ class LogicalIndexTests(unittest.TestCase):
 
         data = "1234567890" * 3
         results = []
-        for offset, matches in idx.index_buffer(data):
+        for offset, matches in idx.index_buffer(data, unique=True):
             for id, length in matches:
                 print "Found hit %s" % data[offset:offset+length]
                 results.append(offset)
@@ -937,9 +944,8 @@ from pyflag.FileSystem import DBFS
 class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.4.sgz"
-    subsystem = 'SGZip'
-    #subsystem = 'advanced'
+    test_file = "pyflag_stdimage_0.5.e01"
+    subsystem = 'EWF'
     order = 20
     offset = "16128s"
 
@@ -959,7 +965,7 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
         dbh = DB.DBO(self.test_case)
         dbh2 = DB.DBO(self.test_case)
         fsfd = DBFS(self.test_case)
-        dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where word='secret'", config.FLAGDB)
+        dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=%s.dictionary.id where word='secret'", (config.FLAGDB,config.FLAGDB))
         count = 0
         for row in dbh:
             count += 1

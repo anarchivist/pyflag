@@ -275,7 +275,7 @@ import pyflag.tests as tests
 class MountedTest(pyflag.tests.ScannerTest):
     """ Test the Mounted Psuedo Filesystem driver """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.4.dd"
+    test_file = "pyflag_stdimage_0.5.dd"
     subsystem = "Mounted"
     fstype = "Mounted"
 

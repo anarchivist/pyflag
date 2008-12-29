@@ -174,8 +174,10 @@ class TarScan(GenScanFactory):
 
         def external_process(self,fd):
             """ This is run on the extracted file """
-            #Get a TarFile object
-            tar=tarfile.TarFile(name='/', fileobj=fd)
+            #Get a TarFile object - We must access a complete file
+            #here
+            fd.cache()
+            tar=tarfile.TarFile(fileobj=fd)
             
             ## List all the files in the tar file:
             inodes = []
@@ -335,7 +337,8 @@ class ZipFile(File):
         result.row("Zip File", "Decompress ZipFileHeader structure at "
                    "offset %s with length %s" % (self.offset, self.compressed_length))
         result.row("","Filename - %s" % self.header['zip_path'])
-        
+
+### FIXME - This is dangerous!!! We decompress into memory
 class GZ_file(File):
     """ A file like object to read gzipped files. """
     specifier = 'G'

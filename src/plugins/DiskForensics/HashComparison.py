@@ -194,9 +194,9 @@ import pyflag.tests
 
 class HashScanTest(pyflag.tests.ScannerTest):
     """ Hash Scanner Tests """
-    test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.4.sgz"
-    subsystem = 'SGZip'
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.5.e01"
+    subsystem = 'EWF'
     offset = "16128s"
     
     order = 20
@@ -206,4 +206,11 @@ class HashScanTest(pyflag.tests.ScannerTest):
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'ZipScan'])        
+
+        pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'MD5Scan'])        
+
+        dbh.execute("select count(*) as c,NSRL_product, NSRL_filename from hash where NSRL_product like 'Guide to Hacking %%' group by NSRL_product")
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 14, "Hashes not recognised. You might need to load the NSRL database")

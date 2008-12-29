@@ -85,6 +85,7 @@ import textwrap
 import pyflag.HTMLUI as HTMLUI
 import pyflag.Registry as Registry
 import pyflag.Graph as Graph
+import pyflag.Time as Time
 
 class WebMailTable(FlagFramework.CaseTable):
     """ Table to store Web mail related information """
@@ -251,6 +252,10 @@ class HotmailScanner(Scanner.GenScanFactory):
                     result['message'] += HTML.decode_unicode(m.group(1).decode("string_escape"))
                     break
 
+            try:
+                result['sent'] = Time.parse(result['sent'])
+            except: pass
+
             return self.insert_message(result)            
 
         def process_editread(self, fd):
@@ -385,6 +390,10 @@ class Live20Scanner(HotmailScanner):
             tag = parser.root.find('div', {'mid':'.'})
             if tag:
                 result['message_id'] = tag['mid']
+
+            try:
+                result[context] = Time.parse(result[context])
+            except: pass
 
             return self.insert_message(result, inode_template = 'l%s')
 

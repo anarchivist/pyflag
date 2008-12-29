@@ -293,6 +293,8 @@ class CaseTableReports(report):
             if cls.__name__ == self.default_table:
                 case_table = cls()
 
+        print "default table %s" % self.default_table
+
         modes = {'Full': 'All table data will be viewable'}
         modes.update(case_table.modes)
 
