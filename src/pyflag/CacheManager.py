@@ -150,41 +150,47 @@ class TemporaryCacheFile:
             check_table(self.case)
             dbh.execute("lock table cachefile write")
 
-        name = self.fd.name
-        self.fd.close()
-        fd = open(name, "rb")
+        try:
+            name = self.fd.name
+            self.fd.close()
+            ## The file sometimes disappears because another thread
+            ## has merged it already
+            try:
+                fd = open(name, "rb")
+            except: return
 
-        cache_path = make_cache_filename(self.case, config.CACHE_FILENAME)
-        
-        outfd = open(cache_path,"ab")
-        outfd.seek(0,2)
-        
-        ## Get the offset at the end
-        offset = outfd.tell()
-        length = 0
-        
-        while 1:
-            data = fd.read(1024*1024)
-            if len(data)==0:
-                break
+            cache_path = make_cache_filename(self.case, config.CACHE_FILENAME)
 
-            outfd.write(data)
-            length += len(data)
+            outfd = open(cache_path,"ab")
+            outfd.seek(0,2)
 
-        outfd.close()
-        args = dict(offset = offset, length = length,
-                    filename = os.path.basename(self.filename),)
-        
-        if self.inode_id:
-            args['inode_id'] = self.inode_id
+            ## Get the offset at the end
+            offset = outfd.tell()
+            length = 0
 
-        dbh.insert('cachefile',**args)
-        dbh.execute("unlock tables")
-        
-        ## Remove the file
-        os.unlink(name)
-        self.closed = True
+            while 1:
+                data = fd.read(1024*1024)
+                if len(data)==0:
+                    break
 
+                outfd.write(data)
+                length += len(data)
+
+            outfd.close()
+            args = dict(offset = offset, length = length,
+                        filename = os.path.basename(self.filename),)
+
+            if self.inode_id:
+                args['inode_id'] = self.inode_id
+
+            dbh.insert('cachefile',**args)
+
+            ## Remove the file
+            os.unlink(name)
+            self.closed = True
+        finally:
+            dbh.execute("unlock tables")
+            
 class CachedWriter:
     """ A class which caches data in memory and then flushes to disk
     when ready. This does not tie up file descriptors.
