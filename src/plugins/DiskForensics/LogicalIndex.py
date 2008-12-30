@@ -1000,6 +1000,7 @@ class HashTrieIndexTests(unittest.TestCase):
             ## We want to load words from the dictionary in random
             ## order so we dont have a bias due to the fact the
             ## dictionary is sorted.
+            print "Randomizing dictionary words"
             for line_count in range(0,count):
                 if len(words)==0: break
                 i = random.randint(0,len(words)-1)

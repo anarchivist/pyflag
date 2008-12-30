@@ -185,8 +185,12 @@ class TemporaryCacheFile:
 
             dbh.insert('cachefile',**args)
 
-            ## Remove the file
-            os.unlink(name)
+            ## Remove the file (This might fail on windows because
+            ## someone has it open)
+            try:
+                os.unlink(name)
+            except: pass
+            
             self.closed = True
         finally:
             dbh.execute("unlock tables")

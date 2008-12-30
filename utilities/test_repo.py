@@ -134,7 +134,7 @@ def process_file(file_record):
         copy(resolve_path(path),
              create(file_record['file']))
 
-        fd = zipfile.ZipFile(file_record['file'])
+        fd = zipfile.ZipFile("%s/%s" % (config.TARGET, file_record['file']))
         for info in fd.infolist():
             if info.filename.endswith("/"): continue
             
