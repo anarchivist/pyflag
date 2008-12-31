@@ -6,17 +6,23 @@ import re, os.path
 
 class RAIDFD(Images.OffsettedFDFile):
     """ A RAID file like object - must be initialised with the correct parameters """
-    def __init__(self, fds, blocksize, map, offset):
+    def __init__(self, fds, blocksize, map, offset, physical_period):
         self.readptr = 0
         self.fds = fds
         ## The number of disks in the set
         self.disks = len(fds)
         self.blocksize = blocksize
+        
+        ## The physical period is the number of blocks before the map
+        ## repeats in each disk
+        self.physical_period = physical_period
         self.parse_map(map)
         self.offset = offset
+
         ## We estimate the size:
-        fds[0].seek(0,2)
-        self.size = fds[0].tell() * self.physical_period
+        if fds:
+            fds[0].seek(0,2)
+            self.size = fds[0].tell() * self.physical_period
 
     def seek(self, offset, whence=0):
         """ fake seeking routine """
@@ -35,20 +41,20 @@ class RAIDFD(Images.OffsettedFDFile):
 
     def parse_map(self, map):
         elements = map.split(".")
-        ## The physical period is the number of blocks before the map
-        ## repeats in each disk
-        self.physical_period = len(elements)/len(self.fds)
-
         self.map = []
-        while len(elements)>0:
+        for j in range(self.physical_period):
             self.map.append([])
             for i in range(self.disks):
+                if not elements:
+                    raise RuntimeError("Map does not have enough elements")
+                
                 try:
                     disk_number = int(elements.pop(0))
                 except: disk_number=None
                 
                 self.map[-1].append(disk_number)
 
+        ## Now derive the period map
         self.period_map = []
         for i in range((self.physical_period -1) * self.disks):
             found = False
@@ -62,7 +68,7 @@ class RAIDFD(Images.OffsettedFDFile):
                 except: pass
 
             if not found:
-                print "position %s not found" % i
+                raise RuntimeError("Invalid map position %s not found" % i)
             
         self.logical_period_size = len(self.period_map)
         
@@ -142,8 +148,17 @@ class RAID(Images.Standard):
                     map.append(query['position_%s' % x])
                     query.clear('position_%s' % x)
                     
-                query['map'] = '.'.join(map)
-                result.refresh(0,query,pane='parent')
+                query.set('map', '.'.join(map))
+                
+                ## Now check that this map is valid by instantiating a
+                ## RAIDFD (we will raise if anything is wrong:
+                try:
+                    RAIDFD(fds, blocksize, query['map'], 0, period)
+                    result.refresh(0,query,pane='parent')
+                except Exception,e:
+                    result.heading("Error with map")
+                    result.para("%s" % e)
+
                 return result
             
             ## Possible positions the block can be
@@ -271,4 +286,5 @@ class RAID(Images.Standard):
         ## FIXME - allow arbitrary IO Source URLs here
         fds = [ open(f) for f in filenames ]
         blocksize = FlagFramework.calculate_offset_suffix(query.get('blocksize','32k'))
-        return RAIDFD(fds, blocksize, query['map'], offset)
+        period = int(query.get('period',3))
+        return RAIDFD(fds, blocksize, query['map'], offset, period)
