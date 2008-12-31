@@ -273,6 +273,10 @@ class GenericUI:
         from pyflag.ColumnTypes import IntegerType, TimestampType, \
              StringType, InodeIDType, FilenameType
 
+        if self.defaults.has_key('select_all'):
+            del self.defaults['select_all']
+            self.refresh(0,self.defaults, pane='parent')
+
         def vfs_popup(query, result):
             if not query.has_key('case'):
                 result.heading("No case selected")
@@ -357,10 +361,6 @@ class GenericUI:
                     yield ('.', e,'leaf')
                 
             def right(path, result):
-                if result.defaults.has_key('select_all'):
-                    del result.defaults['select_all']
-                    result.refresh(0,result.defaults, pane='parent')
-
                 case = self.defaults.get('case',None)
                 dbh = DB.DBO(case)
                 tablename = dbh.get_temp()
@@ -414,10 +414,10 @@ class GenericUI:
                 def submit_all(query,new_result):
                     sql = result.renderer._make_sql(query)
                     dbh.execute(sql)
-                    new_query = query.clone()
+                    new_query = result.defaults.clone()
 #                    new_query.remove('callback_stored',self.callback)
                     del new_query[name]
-                    new_query['select_all']=1
+                    new_query['select_all']='1'
                     for row in dbh:
                         new_query[name] = row['Filename']
 

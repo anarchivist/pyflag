@@ -392,10 +392,10 @@ class HTMLUI(UI.GenericUI):
 
         if pane=='new':
             width=1024
-            height=768
+            height=700
 
         if icon:
-            base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, self.defaults,cb, width, height))
+            base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, '',cb, width, height))
         else:
             base = expand("<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />",
                           (quote_quotes(label),self.defaults,cb,width,height))

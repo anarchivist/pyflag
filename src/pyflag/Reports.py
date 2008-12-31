@@ -263,6 +263,7 @@ class CaseTableReports(report):
     
     def display(self, query, result, **opts):
         elements = []
+        
         ## Search case tables for the elements:
         for t in self.columns:
             try:
