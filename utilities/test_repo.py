@@ -136,9 +136,9 @@ def process_file(file_record):
         path = arg or file_record['file']
         pyflaglog.log(pyflaglog.DEBUG, "Unzipping %s" % path)
         copy(resolve_path(path),
-             create(file_record['file']))
-
-        fd = zipfile.ZipFile("%s/%s" % (config.TARGET, file_record['file']))
+             create(path))
+        
+        fd = zipfile.ZipFile("%s/%s" % (config.TARGET, path))
         for info in fd.infolist():
             if info.filename.endswith("/"): continue
             
