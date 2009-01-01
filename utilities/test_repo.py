@@ -42,6 +42,10 @@ config.add_option("target", short_option='t', default=os.getcwd(),
 
 config.parse_options(True)
 
+## Make sure that we use targetdir as our upload dir so we can open
+## the files in it.
+config.update('uploaddir', config.TARGET)
+
 def parse_inventory():
     """ A function to obtain and parse the inventory """
     try:
@@ -94,7 +98,7 @@ def create(path):
     try:
         os.makedirs(dirname)
     except: pass
-    
+
     return open(path, 'w')
 
 def resolve_path(url):
@@ -146,7 +150,9 @@ def process_file(file_record):
     elif action=='ewfextract':
         ## We just grab the local file:
         if arg.startswith("local://"):
-            path = "%s/%s" % (config.TARGET, arg[len("local://"):])
+            path = "%s/%s" % (config.TARGET,
+                              arg[len("local://"):])
+
             pyflaglog.log(pyflaglog.DEBUG, "EWF Decompressing %s" % path)
             iosource = Images.EWF()
             infd = iosource.open(None, None,

@@ -311,6 +311,10 @@ class ConfObject(object):
         except AttributeError:
             pass
         
+    def update(self, key,value):
+        """ This can be used by scripts to force a value of an option """
+        self.readonly[key.lower()] = value
+        
     def __getattr__(self, attr):
         ## If someone is looking for a configuration parameter but
         ## we have not parsed anything yet - do so now.
