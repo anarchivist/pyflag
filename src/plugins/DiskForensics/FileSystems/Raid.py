@@ -100,16 +100,29 @@ class RAIDFD(Images.OffsettedFDFile):
         
         return data
 
+def swap(a,x):
+    """ Create a permutation to swap column x in list a """
+    a = list(a)
+    if x>=len(a)-1:
+        return [a[x]] + a[:-1]
+    else:
+        return a[:x] + [ a[x+1] ] + [a[x]] + a[x+2:]
 
 class RAID(Images.Standard):
     """ RAID image sets """
     name = 'RAID5 (1 Parity)'
+
+    presets = [ [ "3 Disk Rotating parity (Adaptec)", "0.1.P.2.P.3.P.4.5", "3" ],
+                [ "4 Disk Continuing parity (Linux)", "0.1.2.P.4.5.P.3.8.P.6.7.P.9.10.11", "4" ],
+                [ "3 Disk double parity (4 permutations)",
+                  "0.1.P.2.3.P.4.5.P.6.7.P.8.P.9.10.P.11."\
+                  "12.P.13.14.P.15.P.16.17.P.18.19.P.20.21.P.22.23", "12"]]
     
     def form(self, query, result):
         ## Some reasonable defaults to get you started
         query.default('blocksize','4k')
-        query.default('period','3')
-        query.default('map','1.0.P.2.P.3.P.5.4')
+        query.default('period',self.presets[0][2])
+        query.default('map',self.presets[0][1])
         keys = []
         values = []
         result.fileselector("Disks", name='filename')
@@ -117,6 +130,28 @@ class RAID(Images.Standard):
         result.textfield("Period",'period')
         self.calculate_map(query, result)
         self.calculate_partition_offset(query, result)
+
+        def preset(query, result):
+            result.heading("Select a present map")
+
+            if query.has_key("__submit__"):
+                preset = self.presets[int(query['preset'])]
+                query.clear('preset')
+                query.set('period', preset[2])
+                query.set('map', preset[1])
+                return result.refresh(0, query, 'parent')
+            
+            result.start_form(query)
+            presets = []
+            presets_numbers = []
+            for row in self.presets:
+                presets.append(row[0])
+                presets_numbers.append(len(presets)-1)
+                
+            result.const_selector("Preset:", "preset", presets_numbers, presets)
+            result.end_form()
+
+        result.toolbar(cb = preset, text="Select a preset map", icon='spanner.png')
 
     def calculate_map(self, query,result):
         """ Present the GUI for calculating the map """
@@ -149,7 +184,6 @@ class RAID(Images.Standard):
                     query.clear('position_%s' % x)
                     
                 query.set('map', '.'.join(map))
-                
                 ## Now check that this map is valid by instantiating a
                 ## RAIDFD (we will raise if anything is wrong:
                 try:
@@ -165,7 +199,18 @@ class RAID(Images.Standard):
             positions = ['P', ] + [ str(x) for x in range(logical_period_size) ]
 
             for i in range(len(fds)):
-                uis[i].heading(os.path.basename(filenames[i]))
+                ## Provide links to allow swapping of filenames:
+                new_query = query.clone()
+                new_query.clear('filename')
+                new_filenames = swap(filenames, i)
+                for f in new_filenames:
+                    new_query['filename'] = f
+
+                tmp = result.__class__(result)
+                tmp.text(os.path.basename(filenames[i]))
+                tmp.link("Swap", new_query, icon='stock_right.png', pane='self')
+                uis[i].heading(tmp)
+                
                 ## Display the start and end of each physical block in
                 ## the period:
                 ## Count is the position of each block in the map
@@ -197,7 +242,7 @@ class RAID(Images.Standard):
                         data = re.sub(r'[\r\n\t]','.',data)
                         ui.text(data + "    \n", sanitise='full', font='typewriter')
                     ui.ruler()
-                    count += period
+                    count += len(filenames)
             
             result.row(*uis)
             result.end_form()
@@ -283,8 +328,9 @@ class RAID(Images.Standard):
     def create(self, name,case, query):
         offset = FlagFramework.calculate_offset_suffix(query.get('offset','0'))
         filenames = self.glob_filenames(query.getarray('filename'))
-        ## FIXME - allow arbitrary IO Source URLs here
-        fds = [ open(f) for f in filenames ]
+
+        ## Open the io sources here
+        fds = [ IO.open_URL(f) for f in filenames ]
         blocksize = FlagFramework.calculate_offset_suffix(query.get('blocksize','32k'))
         period = int(query.get('period',3))
         return RAIDFD(fds, blocksize, query['map'], offset, period)
