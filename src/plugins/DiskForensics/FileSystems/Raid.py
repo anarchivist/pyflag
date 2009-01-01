@@ -1,4 +1,32 @@
-""" This is a raid IO Source implementation. """
+# ******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+
+""" This is a RAID IO Source implementation.
+
+Currently supported RAID5 with one Parity disk (any number of data
+disks).
+"""
 import plugins.Images as Images
 import pyflag.FlagFramework as FlagFramework
 import pyflag.IO as IO
@@ -71,7 +99,7 @@ class RAIDFD(Images.OffsettedFDFile):
                 raise RuntimeError("Invalid map position %s not found" % i)
             
         self.logical_period_size = len(self.period_map)
-        
+
     def partial_read(self, length):
         ## calculate the current position within the logical
         ## image. Logical blocks refer to the reconstituted image,
@@ -92,12 +120,14 @@ class RAIDFD(Images.OffsettedFDFile):
 
         ## Now fetch the data
         to_read = min(self.blocksize - logical_block_offset, length)
-
-        self.fds[disk_number].seek(self.blocksize * physical_block_number \
-                                   + logical_block_offset)
-        data = self.fds[disk_number].read(to_read)
-        self.readptr += to_read
+        offset = self.blocksize * physical_block_number \
+                 + logical_block_offset
+        self.fds[disk_number].seek(offset)
         
+        data = self.fds[disk_number].read(to_read)
+
+        self.readptr += to_read
+
         return data
 
 def swap(a,x):
@@ -114,7 +144,7 @@ class RAID(Images.Standard):
 
     presets = [ [ "3 Disk Rotating parity (Adaptec)", "0.1.P.2.P.3.P.4.5", "3" ],
                 [ "4 Disk Continuing parity (Linux)", "0.1.2.P.4.5.P.3.8.P.6.7.P.9.10.11", "4" ],
-                [ "3 Disk double parity (4 permutations)",
+                [ "3 Disk double parity (4x3 permutations)",
                   "0.1.P.2.3.P.4.5.P.6.7.P.8.P.9.10.P.11."\
                   "12.P.13.14.P.15.P.16.17.P.18.19.P.20.21.P.22.23", "12"]]
     
@@ -334,3 +364,48 @@ class RAID(Images.Standard):
         blocksize = FlagFramework.calculate_offset_suffix(query.get('blocksize','32k'))
         period = int(query.get('period',3))
         return RAIDFD(fds, blocksize, query['map'], offset, period)
+
+
+import pyflag.tests
+import pyflag.pyflagsh as pyflagsh
+
+class RaidTest(pyflag.tests.ScannerTest):
+    """ Test the RAID IOSource loader """
+    test_case = "PyFlagTestCase"
+
+    def test01LoadRaid(self):
+        """ Test the RAID IO Source loader """
+        ## This image was made by the linux raid5 implementation.
+        ## Just to make things a bit more complicated, each image of
+        ## each individual disk was acquired using ewfacquire into an
+        ## EWF file. We use the io://EWF/filename=/raid/linux/d1.E01
+        ## URL notation as the image filename in order to use the EWF
+        ## IO Source driver to read the file.
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "subsys=RAID5 (1 Parity)",
+                                   "filename=io://EWF/filename=/raid/linux/d1.E01",
+                                   "filename=io://EWF/filename=/raid/linux/d2.E01",
+                                   "filename=io://EWF/filename=/raid/linux/d3.E01",
+                                   "offset=0",
+                                   "map=1.0.P.P.3.2.4.P.5",
+                                   "period=3",
+                                   "blocksize=64k",
+                                   "TZ=%s" % self.TZ
+                                   ])
+        
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "fstype=Sleuthkit",
+                                   "mount_point=/"])
+
+    def test02Hash(self):
+        """ Test the hashes of loaded files """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'MD5Scan'])
+            
+            
+        

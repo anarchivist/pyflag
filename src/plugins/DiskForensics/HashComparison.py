@@ -126,7 +126,7 @@ class MD5Scan(GenScanFactory):
         dbh_flag.check_index("NSRL_hashes","md5",4)
         dbh_flag.check_index("NSRL_products","Code")
 
-    class Scan(ScanIfType):
+    class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
             self.m = md5.new()
@@ -134,14 +134,13 @@ class MD5Scan(GenScanFactory):
             self.length = 0
 
         def process(self, data,metadata=None):
-            self.boring(metadata,data)
             self.m.update(data)
             self.length+=len(data)
 
         def finish(self):
             ## Dont do short files
             if self.length<16: return
-            
+
             dbh_flag=DB.DBO(config.HASHDB)
             digest = self.m.digest()
             dbh_flag.execute("select filename,Name from NSRL_hashes join NSRL_products on productcode=Code where md5=%b limit 1", digest)

@@ -61,7 +61,10 @@ class OffsettedFDFile:
     def partial_read(self, length):
         """ Read from current fd as much as possible.
         """
-        available_to_read = self.offsets[self.fd_index + 1] - self.readptr
+        try:
+            available_to_read = self.offsets[self.fd_index + 1] - self.readptr
+        except IndexError: return ''
+        
         data = self.fds[self.fd_index].read(min(length, available_to_read))
         self.readptr += len(data)
         return data
@@ -69,12 +72,13 @@ class OffsettedFDFile:
     def read(self, length=0):
         """ read length bytes from subsystem starting at readptr """
         result = ''
+        to_read = length
         while len(result)<length:
-            data = self.partial_read(length)
+            data = self.partial_read(to_read)
             if len(data)==0: break
             
             result += data
-            length -= len(data)
+            to_read -= len(data)
             
         return result
 
