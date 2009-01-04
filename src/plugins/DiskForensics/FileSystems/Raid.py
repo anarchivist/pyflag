@@ -31,6 +31,7 @@ import plugins.Images as Images
 import pyflag.FlagFramework as FlagFramework
 import pyflag.IO as IO
 import re, os.path
+import pyflag.DB as DB
 
 class RAIDFD(Images.OffsettedFDFile):
     """ A RAID file like object - must be initialised with the correct parameters """
@@ -407,5 +408,8 @@ class RaidTest(pyflag.tests.ScannerTest):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'MD5Scan'])
             
-            
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select binary_md5 from hash where binary_md5=%b",
+                    "04D68B7C8993A3A485A5780EC1A8D62D".decode("hex"))
+        self.assert_(dbh.fetch(), "Expected hash not found")
         

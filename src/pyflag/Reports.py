@@ -327,7 +327,12 @@ class PreCannedCaseTableReports(CaseTableReports, Registry.PreCanned):
     def display(self, query,result):
         import pyflag.FlagFramework as FlagFramework
         for k,v in self.args.items():
-            result.defaults.default(k, v)
+            if type(v)==list:
+                result.defaults.clear(k)
+                for x in v:
+                    result.defaults[k]=x
+            else:
+                result.defaults.default(k, v)
 
         CaseTableReports.display(self, query, result, **self.options)
 

@@ -233,13 +233,48 @@ function refresh(query, pane) {
   };
 };
 
+function parse_url(query) {
+  try{
+    var url = query.split("?")[1];
+    //returns an array of key,values
+    var vars = url.split("&");
+  } catch(err) {
+    return [];
+  };
+
+  for (var i=0;i<vars.length;i++) {
+    // Ignore vars that start with _
+    if(vars[i].substring(0,1)=='_') continue;
+
+    var pair = vars[i].split("=");
+    
+    vars[i] = (vars[i], pair);
+  }
+
+  return vars;
+};
+
+function del_var(key, vars) {
+  var result = vars;
+  for(var i=0; i<result.length; i++) {
+    if(key == result[i][0]) {
+      result = result.splice(i,1);
+    };
+  };
+   
+  return result;
+};
+
 function popup(query, callback, width, height) {
   // Derive the query string from the contents of all the form
-  // elements if available:
+  // elements if available and merge with the current URL. If a form
+  // element has the same name as a URL element, we remove the URL
+  // element and replace it with the form element. This allows popups
+  // to accurately represent form elements when launched from forms.
   var f = document.forms['pyflag_form_1'];
-  if(f) {
-    query = query+"&";
+  var vars = parse_url(document.location.href);
 
+  if(f) {
     for(var i=0; i<f.elements.length; i++) {
       var e = f.elements[i];
       //Checkboxes should only be added if they are checked
@@ -250,6 +285,7 @@ function popup(query, callback, width, height) {
       //window refreshes to its parent we know it wasnt actually
       //submitted.
       if(e.type!='submit' && e.name.length>0 ) {
+	vars = del_var(e.name, vars);
 	try {
 	  query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
 	} catch(err) {
@@ -265,7 +301,12 @@ function popup(query, callback, width, height) {
   };
 
   //Now open the window:
-  var w=window.open(query+"&callback_stored="+callback + "&__pyflag_parent=" + window.__pyflag_name+"&__pyflag_name=popup" + callback,'popup'+callback, 'width='+width+', height='+height+', scrollbars=yes,resizable=yes');
+  var location='';
+  for(var i=0; i<vars.length; i++) {
+    location += "&" + vars[i][0] + "=" + vars[i][1];
+  };
+
+  var w=window.open(query+ location + "&callback_stored="+callback + "&__pyflag_parent=" + window.__pyflag_name+"&__pyflag_name=popup" + callback,'popup'+callback, 'width='+width+', height='+height+', scrollbars=yes,resizable=yes');
   w.parent = window.name;
 };
 

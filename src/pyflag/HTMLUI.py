@@ -131,6 +131,9 @@ class HTMLUI(UI.GenericUI):
 ## when a pyflag link, refresh or submit need to go back to their
 ## parent they will know the correct js window to go to.        
     def display(self):
+        """ Render the current UI with the respective theme - returns
+        HTML for the complete page.
+        """
         ## Get the right theme
         theme=Theme.get_theme(self.defaults)
         if self.decoration=='raw':
@@ -158,9 +161,11 @@ class HTMLUI(UI.GenericUI):
         return self.__str__()
 
     def heading(self,string):
+        """ Place string as a heading """
         self.result += "<h1>%s</h1>"%string
 
     def para(self,string,**options):
+        """ Creates a new paragraph of text """
         string = cgi.escape(string)
         if options.has_key('font'):
             if options['font'].lower() == "pre":
@@ -256,11 +261,15 @@ class HTMLUI(UI.GenericUI):
         return key
     
     def start_table(self,**options):
+        """ Starts a new table """
         self.table_depth += 1
         #if not options.has_key("class"): options['class'] = "Row"
         self.result += "<table %s>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
+        """ Place the columns in a row.
+
+        Automatically creates a table if needed """
         #Sort through all the options for the ones that should go to the td html element
         td_opts = {}
         type = "td"
@@ -406,6 +415,7 @@ class HTMLUI(UI.GenericUI):
             self.result += base
 
     def radio(self,description,name,labels,**options):
+        """ Allows one of several choices to be chosen in a radio button """
         opts = self.opt_to_str(options)
         tmp ='' 
         for i in labels:
@@ -448,6 +458,7 @@ class HTMLUI(UI.GenericUI):
             del self.form_parms[name]
             
     def const_selector(self,description,name,keys,values,**options):
+        """ Builds a pull down selector from a constant set of choices """
         if options:
             opt_str = self.opt_to_str(options)
         else: opt_str = ''
@@ -819,6 +830,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
 
+    ## FIXME - This needs to move to the TableRenderer
     def add_filter(self, query, case, parser, elements,
                    filter_context="filter",
                    search_text="Search Query"):
@@ -1232,6 +1244,7 @@ class HTMLUI(UI.GenericUI):
             del self.form_parms[target]
                 
     def ruler(self):
+        """ Draws a ruller to seperate previous entries """
         if self.table_depth:
             self.result += "<tr><td colspan=10><hr /></td></tr>\n"
         else:

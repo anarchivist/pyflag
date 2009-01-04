@@ -71,7 +71,8 @@ class Images(Reports.PreCannedCaseTableReports):
     family = "Disk Forensics"
     description = "View all images bigger than 20kb "
     name = "/Disk Forensics/Multimedia/Graphics"
-    columns = ['TypeCaseTable.Thumbnail', 'InodeTable.Size','FileTable.Filename']
+    default_table = "TypeCaseTable"
+    columns = ['Thumbnail', 'InodeTable.Size','FileTable.Filename']
 
 class HTMLPages(Registry.PreCanned):
     args = {'filter':' "Thumbnail"  has_magic HTML ',
@@ -81,13 +82,15 @@ class HTMLPages(Registry.PreCanned):
     description = "View all HTML Pages "
     name = "/Disk Forensics/Multimedia/HTML Pages"
 
-class HTMLURLs(Registry.PreCanned):
+class HTMLURLs(Reports.PreCannedCaseTableReports):
     args = {'filter': '"Content Type" contains html',
-            '_hidden':[1,3,5] }
+            '_hidden': [ 4,] }
     report='Browse HTTP Requests'
     family='Network Forensics'
     description = 'View all HTML URLs'
     name = [ "/Network Forensics/Web Applications/HTML URLs" ]
+    default_table = 'HTTPCaseTable'
+    columns = ['Timestamp', 'Inode', 'Method', 'URL', 'Content Type']
 
 class GoogleSearches(Reports.PreCannedCaseTableReports):
     description = "Shows possible Google searches."
