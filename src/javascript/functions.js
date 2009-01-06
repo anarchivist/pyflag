@@ -233,11 +233,11 @@ function refresh(query, pane) {
   };
 };
 
-function parse_url(query) {
+
+function parse_query(query) {
   try{
-    var url = query.split("?")[1];
     //returns an array of key,values
-    var vars = url.split("&");
+    var vars = query.split("&");
   } catch(err) {
     return [];
   };
@@ -254,6 +254,15 @@ function parse_url(query) {
   return vars;
 };
 
+function parse_url(query) {
+  try {
+    var url = query.split("?")[1];
+    return parse_query(url);
+  } catch(err) {
+    return [];
+  };
+};
+
 function del_var(key, vars) {
   var result = vars;
   for(var i=0; i<result.length; i++) {
@@ -265,14 +274,15 @@ function del_var(key, vars) {
   return result;
 };
 
-function popup(query, callback, width, height) {
+function popup(original_query, callback, width, height) {
   // Derive the query string from the contents of all the form
   // elements if available and merge with the current URL. If a form
   // element has the same name as a URL element, we remove the URL
   // element and replace it with the form element. This allows popups
   // to accurately represent form elements when launched from forms.
   var f = document.forms['pyflag_form_1'];
-  var vars = parse_url(document.location.href);
+  var vars = parse_query(original_query);
+  var query = "f?";
 
   if(f) {
     for(var i=0; i<f.elements.length; i++) {

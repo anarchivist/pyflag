@@ -141,10 +141,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 qsl=qsl[qsl.find('?')+1:]
                 
             query = FlagFramework.query_type(cgi.parse_qsl(qsl),user=user, passwd=passwd)
-            query.pseudo_post_query = query
             pyflaglog.log(pyflaglog.DEBUG, "pseudo posted query is %s", query)
         except KeyError:
-            query.pseudo_post_query = ''
             if self.command=='POST':
                 pyflaglog.log(pyflaglog.DEBUG, "posted query is %s", query)
 

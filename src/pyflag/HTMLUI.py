@@ -404,10 +404,10 @@ class HTMLUI(UI.GenericUI):
             height=700
 
         if icon:
-            base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, self.defaults.pseudo_post_query ,cb, width, height))
+            base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, self.defaults ,cb, width, height))
         else:
-            base = expand("<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />",
-                          (quote_quotes(label),self.defaults.pseudo_post_query,cb,width,height))
+            base = expand("<input type=button value=%r onclick=\"popup('%s','%s',%r,%r); return false;\" />",
+                          (quote_quotes(label),self.defaults ,cb,width,height))
         if tooltip:
             self.result += expand("<abbr title=%r>%s</abbr>",
                                   (quote_quotes(tooltip),base))
