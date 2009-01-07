@@ -32,6 +32,11 @@ config.add_option("CACHE_FILENAME", default="__cache__.bin",
                   help = 'Name of consolidated cache file')
 
 def make_cache_filename(case, name):
+    ## Sometimes we get given a filename in the cache folder already -
+    ## this is probably a bug but we handle it anyway.
+    if name.startswith(config.RESULTDIR):
+        return name
+    
     cache_path = os.path.join(config.RESULTDIR,"case_%s" % case,
                               name)
     return cache_path
@@ -112,13 +117,14 @@ class CacheFile:
 
 class TemporaryCacheFile:
     def __init__(self, case, filename, inode_id=None, mode='wb'):
+        self.closed = True
         cache_filename = make_cache_filename(case, filename)
         self.fd = open(cache_filename, mode)
         self.filename = filename
         self.name = cache_filename
         self.inode_id = inode_id
-        self.closed = False
         self.case = case
+        self.closed = False
         
     def write(self, data):
         return self.fd.write(data)
@@ -205,6 +211,7 @@ class CachedWriter:
     """
     def __init__(self, case, filename, inode_id=None):
         self.filename = make_cache_filename(case, filename)
+        self.barename = filename
         self.fd = cStringIO.StringIO()
         self.offset = 0
         self.case = case
@@ -232,7 +239,7 @@ class CachedWriter:
 
         ## Make sure that we copy the file to the main cache file:
         fd = TemporaryCacheFile(self.case,
-                                self.filename, inode_id = self.inode_id,
+                                self.barename, inode_id = self.inode_id,
                                 mode="ab")
         fd.close()
             

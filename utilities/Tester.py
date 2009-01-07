@@ -27,6 +27,10 @@ harness.
 
 Eventually all plugins will have complete unit tests.
 """
+import sys
+sys.path.append('.')
+sys.path.append("pyflag")
+
 import pyflag.Registry as Registry
 import unittest,re
 import pyflag.conf

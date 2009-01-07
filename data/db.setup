@@ -1,4 +1,0 @@
-## This file used to contain sql to initialise the database but this
-## is now done by use of event handlers within the plugin files
-## themselves. This makes it easy to create specific tables for each
-## plugin and maintain them.

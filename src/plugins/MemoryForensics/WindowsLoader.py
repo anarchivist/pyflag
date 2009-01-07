@@ -10,7 +10,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.pyflaglog as pyflaglog
 import pyflag.IO as IO
 import pyflag.Registry as Registry
-import os, posix
+import os, posixpath
 
 class WindowsMemory(FileSystem.DBFS):
     """ Class to load a memory image into the VFS """

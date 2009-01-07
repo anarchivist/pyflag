@@ -348,7 +348,12 @@ def start_workers():
            length = ctypes.windll.kernel32.GetModuleFileNameA(None, name, 255)
            interpreter = name.raw[:length]
 
-           os.spawnv(os.P_NOWAIT, interpreter, [interpreter, __file__] + sys.argv[1:])
+           ## This encloses at least the file path in quotes just in
+           ## case we are installed to somewhere with spaces - It
+           ## seems that on windows argvs are not processed correctly
+           ## because the below array ends up as a single command line
+           ## string WTF? This is very dodgy...
+           os.spawnv(os.P_NOWAIT, interpreter, [interpreter, '"%s"' % __file__] + sys.argv[1:])
            pid = 1
        
        ## Parents:
