@@ -303,6 +303,9 @@ class HTMLUI(UI.GenericUI):
         self.table_depth -= 1
         self.result += "</table>\n"
 
+    def newline(self):
+        self.result += "<br>"
+
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 

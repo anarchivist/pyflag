@@ -385,8 +385,66 @@ class LookupIP(Reports.report):
             #global gi_resolver
             #record = gi_resolver.record_by_addr(ip)
             result.heading("GeoIP Resolving - by maxmind.com")
-            self.render_dict(record, result)
-        except Exception,e:
+
+            result.start_table()
+
+            lookupCountry = 0
+            if record['country_name'] != None:
+                result.row('country_name', record['country_name'])
+                result.row('country_code', record['country_code'])
+                result.row('country_code3', record['country_code3'])
+                lookupCountry = 1
+
+            if record['area_code'] != 0 and record['area_code'] != None:
+                result.row('area_code', record['area_code'])
+
+            if record['region'] != 0 and record['region'] != None:
+                result.row('region', record['region'])
+
+            lookupCity = 0
+            if record['city'] != 0 and record['city'] != None:
+                result.row('city', record['city'])
+                lookupCity = 1
+
+            if record['postal_code'] != 0 and record['postal_code'] != None:
+                result.row('postal_code', record['postal_code'])
+            if record['dma_code'] != 0 and record['dma_code'] != None:
+                result.row('dma_code', record['dma_code'])
+
+            lookupLatLon = -1
+            if record['latitude'] != 0 and record['latitude'] != None:
+                result.row('latitude', record['latitude'].__str__().strip())
+                lookupLatLon += 1
+            if record['longitude'] != 0 and record['longitude'] != None:
+                result.row('longitude', record['longitude'].__str__().strip())
+                lookupLatLon += 1
+
+            result.end_table()
+
+            result.newline()
+            ##self.xxrender_dict(record, result)
+            ##result.raw(record)
+
+            if lookupLatLon == 1:
+                zoom = 7
+                if float(record['latitude']) == float(int(record['latitude'])):
+                    zoom = 5
+                result.link("Lookup coordinates in Google Maps", url = 'http://maps.google.com/?q=%f,%f&z=%i' % (record['latitude'], record['longitude'], zoom))
+                result.newline()
+
+            if lookupCity == 1:
+                result.link("Lookup City in Google Maps", url = 'http://maps.google.com/?q=%s,%s' % (record['city'], record['country_name']))
+                result.newline()
+                result.link("Lookup City in Wikipedia", url = 'http://en.wikipedia.org/wiki/' + str(record['city']))
+                result.newline()
+
+            if lookupCountry == 1:
+                result.link("Lookup Country in Google Maps", url = 'http://maps.google.com/?q=%s' % record['country_name'])
+                result.newline()
+                result.link("Lookup Country in Wikipedia", url = 'http://en.wikipedia.org/wiki/' + str(record['country_name']))
+                result.newline()
+
+        except Exception, e:
             pass
         
     def display_whois(self,query,result, address):

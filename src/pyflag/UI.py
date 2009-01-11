@@ -85,6 +85,10 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "row not implemented")
     
+    def newline(self):
+        """ Add a new line"""
+        pyflaglog.log(pyflaglog.DEBUG, "newline not implemented")
+    
     def start_form(self,target, **hiddens):
         """ Creates a form. Target is a query_type object and is implemented as hidden fields. hiddens are name/value pairs of hidden parameter than should be passed. """
         pyflaglog.log(pyflaglog.DEBUG, "start_form not implemented")
