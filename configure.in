@@ -176,6 +176,7 @@ AC_OUTPUT([
 	src/mmedia/Makefile
 	src/mailtools/Makefile 
 	src/indextools_ng/Makefile
+	src/regtools/Makefile
 	src/network/Makefile
 	src/filesystems/Makefile
 	src/filesystems/sleuthkit/Makefile

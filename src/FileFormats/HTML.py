@@ -252,6 +252,13 @@ class SanitizingTag(Tag):
                             "nowrap"
                             ]
 
+    ## This header is automatically appended to each HTML <head/>
+    header = '''<link rel="stylesheet" type="text/css" href="images/html_render.css" ></link>
+
+    '''
+
+    body_extra = '''<div class="overlaymenu"><a href="#" onclick="javascript:show_links();"  id="pf_link_menu">Show all links</a></div>
+    <script src="javascript/html_render.js" type="text/javascript" language="javascript" ></script>'''     
     def css_filter(self, data):
         def resolve_css_references(m):
             action = m.group(1)
@@ -274,12 +281,18 @@ class SanitizingTag(Tag):
         return data
 
     def __str__(self):
+        postfix = ''
         ## Some tags are never allowed to be outputted
         if self.name not in self.allowable_tags:
             if self.name in self.forbidden_tag:
                 return ''
             #print "Rejected tag %s" % self.name
             return self.innerHTML()
+
+        if self.name == 'head':
+            self.children = [self.header,] + self.children
+        elif self.name =='body':
+            self.children = [self.body_extra, ] + self.children
 
         ## Frames without src are filtered because IE Whinges:
         if self.name == 'iframe' and 'src' not in self.attributes:
@@ -306,6 +319,7 @@ class SanitizingTag(Tag):
             else:
                 attributes += DB.expand(' href="javascript: alert(%r)"',
                                         iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
+                postfix = self.mark_link(self.attributes['href'])
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
@@ -313,16 +327,56 @@ class SanitizingTag(Tag):
                                              self.css_filter(self.innerHTML())))
         
         if self.type == 'selfclose':
-            return expand("<%s%s/>" , (self.name, attributes))
+            return expand("<%s%s/>%s" , (self.name, attributes, postfix))
         else:
-            return expand("<%s%s>%s</%s>", (self.name, attributes,
+            return expand("<%s%s>%s</%s>%s", (self.name, attributes,
                                             self.innerHTML(),
-                                            self.name))
+                                            self.name,postfix))
 
 
     def resolve_reference(self, reference, hint=''):
         return '"images/spacer.png"  '
 
+    def mark_link(self, reference):
+        """ Create markup to indicate the link.
+
+        We just add an overlay to represent the link.
+        """
+        postfix = ''
+        ## Absolute reference
+        if reference.startswith('http'):
+            pass
+        elif reference.startswith("/"):
+            path = normpath("%s" % (reference))
+            reference="%s://%s%s" % (self.method, self.host, path)
+        elif self.method:
+            ## FIXME: This leads to references without methods:
+            reference="%s/%s" % (self.base_url, reference)
+            if reference.startswith("http://"):
+                reference='http:/'+FlagFramework.normpath(reference[6:])
+
+        reference = url_unquote(decode_entity(unquote(reference)))
+        dbh = DB.DBO(self.case)
+        dbh.execute("select mtime from inode where inode_id=%r", self.inode_id)
+        row = dbh.fetch()
+
+        dbh.execute("select inode.inode_id, inode.mtime, datediff(inode.mtime, %r) as diff, url "\
+                    "from http join inode on "\
+                    "inode.inode_id=http.inode_id where url=%r and not "\
+#                    "isnull(http.inode_id) and size > 0 and inode.mtime >= %r "\
+                    "isnull(http.inode_id) "\
+                    "order by inode.mtime asc limit 1", (row['mtime'],
+                                                         reference, ))
+        row = dbh.fetch()
+        if row:
+            print "Fetched %s %s ago" % (row['url'], row['diff'])
+            postfix = "<div class='overlay'>Linked <a href=%s>%s</a><br>After %s</div>" % (
+                self.make_reference_to_inode(row['inode_id'],None),
+                row['url'][:50],
+                row['diff'])
+
+        return postfix
+    
 class SanitizingTag2(SanitizingTag):
     """ A more restrictive sanitiser which removes e.g. body tags etc """
     allowable_tags = [ 'b','i','a','img','em','br','strong',
