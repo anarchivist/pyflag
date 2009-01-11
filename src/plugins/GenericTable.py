@@ -36,9 +36,11 @@ class GenericReport(Reports.report):
             i = int(i)
             
             columns = t.columns + t.extras
-            columns_cls, args = columns[i]
+            columns_cls, args = columns[i][:2]
             args = args.copy()
-            elements.append( columns_cls(table=t.name, case=query['case'], **args))
+            args['case'] = query['case']
+            args['table'] = t.name
+            elements.append( columns_cls(**args))
             
         result.table(
             elements = elements,

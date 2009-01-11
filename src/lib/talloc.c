@@ -209,6 +209,9 @@ static inline void *__talloc(const void *context, size_t size)
 	tc = (struct talloc_chunk *)malloc(TC_HDR_SIZE+size);
 	if (unlikely(tc == NULL)) return NULL;
 
+	// Ensure memory is properly initialised
+	memset(tc, 0, TC_HDR_SIZE+size);
+
 	tc->size = size;
 	tc->flags = TALLOC_MAGIC;
 	tc->destructor = NULL;

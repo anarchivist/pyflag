@@ -98,9 +98,13 @@ class GoogleImageScanner(Gmail.GmailScanner):
                     result = "<table>%s</table>" % result
                     tag.add_child(result)
 
+                page = self.parser.root.innerHTML()
+                page = page.encode("utf8","ignore")
+
                 inode_id = self.ddfs.VFSCreate(self.inode,
                                                "xGimage",
-                                               "Gimage")
+                                               "Gimage",
+                                               size=len(page))
 
                 ## Update the http and http_parameters table to point
                 ## to this new Inode instead:
@@ -113,8 +117,6 @@ class GoogleImageScanner(Gmail.GmailScanner):
                            where = DB.expand("inode_id=%r",self.inode_id),
                            inode_id = inode_id)
 
-                page = self.parser.root.innerHTML()
-                page = page.encode("utf","ignore")
                 CacheManager.MANAGER.create_cache_from_data(self.case,
                                                             "%s|xGimage" % self.inode,
                                                             page,

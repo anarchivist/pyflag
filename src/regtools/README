@@ -1,0 +1,4 @@
+This is a fork on reglookup 0.9.0 with heavy code modifications. The latest version can be found here http://projects.sentinelchicken.org/reglookup/.
+
+Original Copyright Tim Morgan.
+Modified to add talloc support: Michael Cohen (scudette@users.sf.net)

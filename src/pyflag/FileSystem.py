@@ -319,6 +319,10 @@ class DBFS(FileSystem):
 
         inode_properties = dict(status="alloc", mode=40755, links=4, _fast=_fast,
                                 size=0)
+        try:
+            inode_properties['mtime'] = self.mtime
+        except: pass
+        
         if inode:
             inode_properties['inode'] = inode
 
@@ -333,6 +337,9 @@ class DBFS(FileSystem):
         for t in ['ctime','atime','mtime']:
             if properties.get("_"+t):
                 inode_properties["_"+t] = "from_unixtime(%r)" % int(properties["_"+t])
+                try:
+                    del inode_properties[t]
+                except KeyError: pass
             elif properties.get(t):
                     inode_properties[t] = properties[t]
 
@@ -430,10 +437,10 @@ class DBFS(FileSystem):
         
         elif inode_id:
             dbh.check_index('inode','inode_id')
-            dbh.execute("select inode.inode, concat(path,name) as path from inode left join file on inode.inode_id=file.inode_id where inode.inode_id=%r order by file.status limit 1", inode_id)
+            dbh.execute("select mtime, inode.inode, concat(path,name) as path from inode left join file on inode.inode_id=file.inode_id where inode.inode_id=%r order by file.status limit 1", inode_id)
             res = dbh.fetch()
             if not res: raise IOError("Inode ID %s not found" % inode_id)
-            
+            self.mtime = res['mtime']
             return res['path'],res['inode'], inode_id
 
         else:

@@ -480,8 +480,17 @@ def Server(HandlerClass = FlagServerHandler,
     HandlerClass.protocol_version = protocol
     httpd = ServerClass(server_address, HandlerClass)
     #httpd.socket.settimeout(1.0)
-    sa = httpd.socket.getsockname()
-    pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s", sa)
+    sa = list(httpd.socket.getsockname())
+    pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on http://%s:%s" % (sa[0],sa[1]))
+
+    if sa[0]=='0.0.0.0':
+        sa[0]='127.0.0.1'
+
+    try:
+        os.startfile("http://%s:%s/" % (sa[0],sa[1]))
+    except Exception,e:
+        pass
+    
     httpd.serve_forever()
 
 config.add_option("HTTPSERVER_BINDIF", default='127.0.0.1',
