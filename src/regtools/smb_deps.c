@@ -23,7 +23,7 @@
  * $Id: smb_deps.c 111 2008-05-01 04:06:22Z tim $
  */
 
-#include "../include/smb_deps.h"
+#include "smb_deps.h"
 #include "talloc.h"
 
 /* From lib/time.c */

@@ -18,7 +18,7 @@
  */
 
 #include <math.h>
-#include "../include/range_list.h"
+#include "range_list.h"
 #include "talloc.h"
 
 /*******************/

@@ -24,7 +24,7 @@
  * $Id: regfi.c 116 2008-08-03 19:34:27Z tim $
  */
 
-#include "../include/regfi.h"
+#include "regfi.h"
 #include "talloc.h"
 
 /* Registry types mapping */

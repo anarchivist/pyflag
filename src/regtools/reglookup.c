@@ -28,9 +28,9 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
-#include "../include/regfi.h"
-#include "../include/void_stack.h"
-#include "../include/talloc.h"
+#include "regfi.h"
+#include "void_stack.h"
+#include "talloc.h"
 
 /* Globals, influenced by command line parameters */
 bool print_verbose = false;

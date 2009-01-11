@@ -17,7 +17,7 @@
  * $Id: lru_cache.c 122 2008-08-09 20:24:01Z tim $
  */
 
-#include "../include/lru_cache.h"
+#include "lru_cache.h"
 #include "talloc.h"
 
 #define LRU_CACHE_DEBUG 0

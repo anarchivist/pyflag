@@ -21,7 +21,7 @@
  * $Id: void_stack.c 111 2008-05-01 04:06:22Z tim $
  */
 
-#include "../include/void_stack.h"
+#include "void_stack.h"
 #include "talloc.h"
 
 void_stack* void_stack_new(void *ctx, unsigned short max_size)
