@@ -186,7 +186,7 @@ import pyflag.Store as Store
 ## main thread exits
 children = []
 def child_exist():
-    print "Child Existed"
+    pyflaglog.log(pyflaglog.INFO, "Child Existed")
 
 ## Windows uses events for IPCs
 try:
@@ -199,7 +199,6 @@ except ImportError:
     
 def terminate_children():
     try:
-        print "Terminating children"
         for pid in children:
             win32event.PulseEvent(TerminateEvent)
 
@@ -211,6 +210,9 @@ def terminate_children():
         try:
             os.kill(pid, signal.SIGABRT)
         except: pass
+
+        ## Stop our logging thread
+        pyflaglog.kill_logging_thread()
 
 class Task:
     """ All distributed tasks need to extend this subclass """
@@ -233,6 +235,43 @@ config.add_option("WORKERS", default=2, type='int',
 
 config.add_option("JOB_QUEUE", default=10, type='int',
                   help='Number of jobs to take on at once')
+
+def nanny(cb, *args, **kwargs):
+    """ Runs cb in another process persistently. If the child process
+    quits we restart it.
+    """
+    atexit.register(terminate_children)
+    signal.signal(signal.SIGABRT, handler)
+    signal.signal(signal.SIGINT, handler)
+    global children
+    
+    children = []
+    while 1:
+        try:
+            pid = os.fork()
+        except AttributeError:
+            ## For windows we just call directly
+            cb(*args, **kwargs)
+
+        ## Parent
+        if pid:
+            ## Add the child to the list of our children so we
+            ## remember to kill it when we terminate ourselves.
+            try:
+                children = [pid]
+                ret = os.waitpid(pid,0)
+                pyflaglog.log(pyflaglog.WARNING, "Child %s died... restaring" % ret[0])
+            finally:
+                terminate_children()
+            
+        ## Child
+        else:
+            cb(*args, **kwargs)
+            sys.exit(0)
+
+        ## This should never return but just in case we wait a bit
+        ## so as not to spin if the child fails to start
+        time.sleep(60)
 
 
 def worker_run():
@@ -360,7 +399,7 @@ def start_workers():
        if pid:
          children.append(pid)
        else:   
-           worker_run()
+           nanny(worker_run)
            
     atexit.register(terminate_children)
 
@@ -370,17 +409,19 @@ def start_workers():
             event().startup()
         except Exception,e:
             pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
-
-    ## The parent now calls the startup method on each of the events:
-    for event in Registry.EVENT_HANDLERS.classes:
-        try:
-            event().startup()
-        except Exception,e:
-            pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
         
 def handler(sig, frame):
-    #print "Got woken up"
-    pass
+    pyflaglog.kill_logging_thread()
+    if sig==signal.SIGABRT:
+        print "This is %s handling signal %s" % (os.getpid(), sig)
+        for child in children:
+            try:
+                print "Killing %s from %s using %s" % (pid, os.getpid(), sig)
+                os.kill(pid, sig)
+            except: pass
+
+    if sig!=signal.SIGUSR1:
+        sys.exit(0)
 
 ## Is this a dangerous thing to do? If a signal comes when we dont
 ## expect it we may lose sync with the db. Seems to work for now, but
@@ -388,6 +429,8 @@ def handler(sig, frame):
 ## FIXME: Use select on unix domain sockets instead of time.sleep
 try:
     signal.signal(signal.SIGUSR1, handler)
+    signal.signal(signal.SIGABRT, handler)
+    signal.signal(signal.SIGINT, handler)
 except AttributeError:
     ## This fails on windows (no signals)
     pass
@@ -413,6 +456,8 @@ def wake_workers():
 config.add_option("FLUSH", default=False, action='store_true',
                   help='There are no workers currently processing, flush job queue.')
 
+atexit.register(terminate_children)
+
 if __name__ == "__main__":
     import pyflag.Registry as Registry
     import pyflag.conf
@@ -425,4 +470,4 @@ if __name__ == "__main__":
     config.parse_options()
     
     print "Starting PyFlag worker"
-    worker_run()
+    nanny(worker_run)

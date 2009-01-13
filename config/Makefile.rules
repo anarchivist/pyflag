@@ -2,11 +2,11 @@
 	## The static is used to ensure that we do not require any
 	## more dlls in the python modules. This solves the windows
 	## dll hell.
-	$(CC) -static $(AM_CFLAGS) $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include $(PYTHON_LDFLAGS) -o $@ $(*F).c .libs/$*.a $(PYTHON_EXTRA_LIBS) $(AM_LDFLAGS)
+	$(CC) -static $(AM_CFLAGS) $(PYTHON_CPPFLAGS) -I. -I$(top_srcdir)/src/include $(PYTHON_LDFLAGS) -o $@ $(*F).c .libs/$*.a $(PYTHON_EXTRA_LIBS) $(AM_LDFLAGS)
 	$(STRIP) $@
 
 %.so: %.c
         ## This compile line is for building shared objects under
         ## linux. The -fPIC seems to be required for 64 bit machines.
-	$(CC) -shared -fPIC $(AM_CFLAGS) $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include $(PYTHON_LDFLAGS) -o $@ $? .libs/$*.a $(PYTHON_EXTRA_LIBS) $(AM_LDFLAGS)
+	$(CC) -shared -fPIC $(AM_CFLAGS) $(PYTHON_CPPFLAGS) -I. -I$(top_srcdir)/src/include $(PYTHON_LDFLAGS) -o $@ $? .libs/$*.a $(PYTHON_EXTRA_LIBS) $(AM_LDFLAGS)
 	## $(STRIP) $@

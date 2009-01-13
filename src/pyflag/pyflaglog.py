@@ -81,7 +81,13 @@ class LoggingThread(threading.Thread):
             
         while 1:
             try:
-                level, message = LOG_QUEUE.get(block=True)
+                ## This is done so we can receive signals while
+                ## blocked on the logging thread.
+                try:
+                    level, message = LOG_QUEUE.get(block=True, timeout=1)
+                except Empty:
+                    continue
+                
                 ## Terminate the thread
                 if level==0:
                     break
@@ -96,6 +102,9 @@ class LoggingThread(threading.Thread):
                 sys.stdout.flush()
                 time.sleep(10)
 
+def kill_logging_thread():
+    LOG_QUEUE.put((0,None))
+
 def start_log_thread():
     """ This needs to be called to start the log thread.
 
@@ -103,9 +112,6 @@ def start_log_thread():
     will be done in the main process. We do not want the db handled
     here to be shared between processes or we will get dead locks.
     """
-    def kill_logging_thread():
-        LOG_QUEUE.put((0,None))
-
     t = LoggingThread()
     t.start()
 
