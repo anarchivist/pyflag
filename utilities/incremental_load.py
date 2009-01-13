@@ -123,7 +123,9 @@ if output_file != '-':
         output_fd.flush()
 else:
     output_fd = None
+    offset =0
 
+    
 ## Make a new IO source for the output:
 try:
     pyflagsh.shell_execv(command="execute",
@@ -190,6 +192,8 @@ def load_file(filename):
             packet_data = packet.serialise("little")
             offset += len(packet_data)
             output_fd.write(packet_data)
+        else:
+            offset += packet.caplen
 
     if output_fd:
         output_fd.flush()
@@ -217,18 +221,25 @@ last_mtime = os.stat(directory).st_mtime
 Farm.start_workers()
 
 def run():
+    global last_mtime, offset
+    
     t = os.stat(directory).st_mtime
     if t>=last_mtime:
         last_mtime = t
         files = os.listdir(directory)
         files.sort()
-
+        count = 0
+        
         if not os.access(config.lock, os.F_OK):
             for f in files:
+               count +=1
                if f in files_we_have: continue
-
+               
                ## Detect if the lock file appeared:
                if os.access(config.lock, os.F_OK): break
+
+               if (count % 10) ==0 and config.MAXIMUM_WORKER_MEMORY > 0:
+                   Farm.check_mem(finish)
 
                filename = "%s/%s" % (directory,f)
                load_file(filename)
@@ -269,9 +280,6 @@ def finish():
 def main():
     while 1:
         run()
-        if config.MAXIMUM_WORKER_MEMORY > 0:
-            Farm.check_mem(finish)
-
         print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
         time.sleep(config.sleep)
 

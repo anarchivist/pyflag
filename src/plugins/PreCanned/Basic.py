@@ -84,13 +84,22 @@ class HTMLPages(Registry.PreCanned):
 
 class HTMLURLs(Reports.PreCannedCaseTableReports):
     args = {'filter': '"Content Type" contains html',
-            '_hidden': [ 4,] }
+            '_hidden': [ 4, 5] }
     report='Browse HTTP Requests'
     family='Network Forensics'
     description = 'View all HTML URLs'
     name = [ "/Network Forensics/Web Applications/HTML URLs" ]
     default_table = 'HTTPCaseTable'
-    columns = ['Timestamp', 'Inode', 'Method', 'URL', 'Content Type']
+    columns = ['Timestamp', 'Inode', 'Method', 'URL', 'Content Type', 'InodeTable.Size']
+
+class ImageURLs(Reports.PreCannedCaseTableReports):
+    description = "Show larger images transferred over HTTP"
+    name = [ "/Network Forensics/Communications/Web/Images"]
+    family = 'Network Forensics'
+    args = {'filter':'Thumbnail has_magic image and Size > 20000',
+            'order': 0, 'direction': 1 }
+    default_table = 'HTTPCaseTable'
+    columns = ['Timestamp','TypeCaseTable.Thumbnail','InodeTable.Size', 'URL']
 
 class GoogleSearches(Reports.PreCannedCaseTableReports):
     description = "Shows possible Google searches."
