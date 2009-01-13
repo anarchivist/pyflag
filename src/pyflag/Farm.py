@@ -214,6 +214,19 @@ def terminate_children():
         ## Stop our logging thread
         pyflaglog.kill_logging_thread()
 
+config.add_option("MAXIMUM_WORKER_MEMORY", default=0, type='int',
+                  help='Maximum amount of memory (Mb) the worker is allowed to consume (0=unlimited,default)')
+
+def check_mem(cb, *args, **kwargs):
+    """ Checks for our current memory usage - if it exceeds the limit
+    we exit and let the nanny restart us.
+    """
+    if config.MAXIMUM_WORKER_MEMORY > 0:
+        mem = open("/proc/%s/statm" % os.getpid()).read().split()
+        if int(mem[1])*4096/1024/1024 > config.MAXIMUM_WORKER_MEMORY:
+            pyflaglog.log(pyflaglog.WARNING, "Process resident memory exceeds threshold. Exiting")
+            cb(*args, **kwargs)
+
 class Task:
     """ All distributed tasks need to extend this subclass """
 
@@ -271,13 +284,11 @@ def nanny(cb, *args, **kwargs):
 
         ## This should never return but just in case we wait a bit
         ## so as not to spin if the child fails to start
-        time.sleep(60)
+        time.sleep(10)
 
 
 def worker_run():
      """ The main loop of the worker """
-     atexit.register(child_exist)
-
      ## It is an error to fork with db connections
      ## established... they can not be shared:
      if DB.db_connections > 0:
@@ -306,6 +317,9 @@ def worker_run():
      except: pass
 
      while 1:
+         ## Check for memory usage
+         check_mem(sys.exit,0)
+
          ## Check for new tasks:
          if not jobs:
              try:
@@ -413,10 +427,8 @@ def start_workers():
 def handler(sig, frame):
     pyflaglog.kill_logging_thread()
     if sig==signal.SIGABRT:
-        print "This is %s handling signal %s" % (os.getpid(), sig)
         for child in children:
             try:
-                print "Killing %s from %s using %s" % (pid, os.getpid(), sig)
                 os.kill(pid, sig)
             except: pass
 

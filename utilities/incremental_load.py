@@ -43,6 +43,10 @@ output file. The pcap file will be unlinked (removed) afterwards.
 
 NOTE: This loader does not start any workers, if you want to scan the
 data as well you will need to start seperate workers.
+
+if output_file is '-' we skip writing altogether. This is useful if
+you never want to examine packets and only want to see reassembled
+streams.
 """, version = "Version: %%prog PyFlag %s" % config.VERSION)
 
 config.add_option("case", default=None,
@@ -92,30 +96,33 @@ print "Will read from %s and write to %s. Will use these scanners: %s" % (direct
 
 ## Check if the file is already there:
 filename = config.UPLOADDIR + '/' + output_file
-try:
-    os.stat(filename)
-    ## Yep its there:
-    output_fd = open(filename, 'a')
-    output_fd.seek(0,os.SEEK_END)
-    offset = output_fd.tell()
-
-    ## There can be only one:
+if output_file != '-':
     try:
-        fcntl.flock(output_fd,fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError,e:
-        print "Highlander Error: %s" % e
-        sys.exit(1)
-    
-except OSError:
-    output_fd = open(filename, 'w')
+        os.stat(filename)
+        ## Yep its there:
+        output_fd = open(filename, 'a')
+        output_fd.seek(0,os.SEEK_END)
+        offset = output_fd.tell()
 
-    ## This is a hardcoded header for the output file:
-    header = '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x01\x00\x00\x00'
-    offset = len(header)
+        ## There can be only one:
+        try:
+            fcntl.flock(output_fd,fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError,e:
+            print "Highlander Error: %s" % e
+            sys.exit(1)
 
-    ## Write the file header on
-    output_fd.write(header)
-    output_fd.flush()
+    except OSError:
+        output_fd = open(filename, 'w')
+
+        ## This is a hardcoded header for the output file:
+        header = '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x01\x00\x00\x00'
+        offset = len(header)
+
+        ## Write the file header on
+        output_fd.write(header)
+        output_fd.flush()
+else:
+    output_fd = None
 
 ## Make a new IO source for the output:
 try:
@@ -178,12 +185,15 @@ def load_file(filename):
 
         processor.process(packet)
 
-        ## Write the packet on the output file:
-        packet_data = packet.serialise("little")
-        offset += len(packet_data)
-        output_fd.write(packet_data)
+        if output_fd:
+            ## Write the packet on the output file:
+            packet_data = packet.serialise("little")
+            offset += len(packet_data)
+            output_fd.write(packet_data)
 
-    output_fd.flush()
+    if output_fd:
+        output_fd.flush()
+        
     pcap_dbh.delete("connection_details",
                     where = "inode_id is null")
     pcap_dbh.mass_insert_commit() 
@@ -206,7 +216,7 @@ last_mtime = os.stat(directory).st_mtime
 ## Start up some workers if needed:
 Farm.start_workers()
 
-while 1:
+def run():
     t = os.stat(directory).st_mtime
     if t>=last_mtime:
         last_mtime = t
@@ -242,7 +252,7 @@ while 1:
                     continue
                 else:
                     break
-                
+
             sys.exit(0)
 
         ## We need to flush the decoder:
@@ -251,5 +261,19 @@ while 1:
             processor.flush()
             last_time = time.time()
 
-    print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
-    time.sleep(config.sleep)
+def finish():
+    print "Loader Process size increased above threashold. Exiting and restarting."
+    processor.flush()
+    sys.exit(0)
+
+def main():
+    while 1:
+        run()
+        if config.MAXIMUM_WORKER_MEMORY > 0:
+            Farm.check_mem(finish)
+
+        print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
+        time.sleep(config.sleep)
+
+## Run the main loader under the nanny
+Farm.nanny(main)
