@@ -1,0 +1,50 @@
+
+/* These are various overlays which may be shown in html rendering */
+div.overlay {
+  border: 1px ; 
+  moz-border-radius: 15px;
+  background: #A9CCFE; 
+  padding: 5px;
+  margin-top: -1ex;
+  
+  moz-background-clip: -moz-initial;
+  moz-background-origin: -moz-initial; 
+  moz-background-inline-policy: -moz-initial;
+  opacity: 0.2; 
+  position: absolute;
+  top: auto;
+  width: 50ex; left: 1ex;
+}
+
+div.overlay:hover {
+  opacity: 1;
+  background: pink;
+};
+
+div.overlaymenu, div.overlaymenu a  { 
+  border: 1px ; 
+  moz-border-radius: 15px;
+  background: #A9CCFE; 
+  padding: 5px;
+  margin-top: -1ex;
+  
+  moz-background-clip: -moz-initial;
+  moz-background-origin: -moz-initial; 
+  moz-background-inline-policy: -moz-initial;
+  opacity: 0.2; 
+  position: absolute;
+  top: 0;
+  width: 50ex; left: 1ex;
+}
+
+div.overlaymenu a { 
+  opacity: 0.2;
+  width: 50ex;
+  position: absolute;
+  top: 0;
+}
+
+div.overlaymenu:hover, div.overlaymenu:hover a {
+  opacity: 1;
+  background: pink;
+};
