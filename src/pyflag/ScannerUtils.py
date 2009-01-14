@@ -43,26 +43,36 @@ def fill_in_dependancies(scanners):
     Will also sort scanners in dependancy order - so that scanners
     which depend on other scanners follow them in the list.
     """
-    while 1:
-        modified = False
+    result = []
+    dependancies = []
 
-        for i in range(len(scanners)):
-            cls = Registry.SCANNERS.dispatch(scanners[i])
-            if type(cls.depends)==type(''):
-                d = [cls.depends]
-            else:
-                d = cls.depends
+    def find_dependencies(scanner, dependancies):
+        """ Fills in scanner's dependancies in dependancies """
+        cls = Registry.SCANNERS.dispatch(scanner)
+        if type(cls.depends)==type(''):
+            depends = [cls.depends]
+        else:
+            depends = cls.depends
 
-            for dependancy in d:
-                if dependancy in scanners[i+1:]:
-                    scanners.pop(scanners.index(dependancy))
-                    modified = True
+        for d in depends:
+            dependancies.append(d)
+            find_dependencies(d, dependancies)
 
-                if dependancy not in scanners[:i]:
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (scanners[i],dependancy))
-                    scanners.insert(i,dependancy)
-                    modified = True
+    groups = Registry.SCANNERS.get_groups()
+    for s in scanners:
+        ## Is it a scanner that was specified?
+        if s in Registry.SCANNERS.class_names:
+            dependancies.append(s)
+            find_dependencies(s, dependancies)
+        elif s in groups:
+            for g in groups[s]:
+                dependancies.append(g.name)
+                find_dependencies(g.name, dependancies)
 
-            if modified: break
-                
-        if not modified: break
+    for i in range(len(dependancies)):
+        if dependancies[i] not in dependancies[i+1:]:
+            result.append(dependancies[i])
+
+    result.reverse()
+
+    return result

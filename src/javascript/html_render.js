@@ -21,6 +21,7 @@ function hide_links() {
 
   for(var i=0; i<elements.length; i++) {
     elements[i].style.opacity = "20%";
+    elements[i].style.display = "None";    
   };
 
   var menu = document.getElementById("pf_link_menu");
@@ -33,6 +34,7 @@ function show_links() {
 
   for(var i=0; i<elements.length; i++) {
     elements[i].style.opacity = '1';
+    elements[i].style.display = "block";
   };
 
   var menu = document.getElementById("pf_link_menu");

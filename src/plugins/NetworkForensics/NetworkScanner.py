@@ -118,7 +118,7 @@ class StreamScannerFactory(GenScanFactory):
     """
     order = 2
     depends = ['TypeScan']
-    group = 'NetworkScanner'
+    group = 'NetworkScanners'
 
     def stream_to_server(self, stream, protocol):
         if stream.dest_port in dissect.fix_ports(protocol):

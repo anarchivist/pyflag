@@ -219,10 +219,12 @@ class Registry:
         raise ImportError("No module by name %s" % name)
 
     def get_name(self, cls):
-        try:
-            return cls.name
-        except AttributeError:
-            return ("%s" % cls).split(".")[-1]
+        #try:
+        #    return cls.name
+        #except AttributeError:
+            name = ("%s" % cls).split(".")[-1]
+            cls.name = name
+            return name
 
     def filename(self, cls_name):
         return self.filenames.get(cls_name, "Unknown")
@@ -307,6 +309,19 @@ class ScannerRegistry(Registry):
         self.classes.sort(sort_function)
         self.class_names = [ self.get_name(i) for i in self.classes ]
         self.scanners = self.class_names
+
+    def get_groups(self):
+        ## Get the scanner groups
+        groups = {}
+        for s in self.classes:
+            try:
+                groups[s.group].append(s)
+            except KeyError:
+                groups[s.group]=[s,]
+            except AttributeError:
+                print "Scanner Class %s has no group" % s
+
+        return groups
 
     def dispatch(self,scanner_name):
         if scanner_name in self.class_names:
