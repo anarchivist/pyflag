@@ -212,6 +212,9 @@ def terminate_children():
             os.kill(pid, signal.SIGINT)
         except: pass
 
+        ## Stop our logging thread
+        pyflaglog.kill_logging_thread()
+
 config.add_option("MAXIMUM_WORKER_MEMORY", default=0, type='int',
                   help='Maximum amount of memory (Mb) the worker is allowed to consume (0=unlimited,default)')
 
@@ -304,7 +307,7 @@ def nanny(cb, keepalive=None, *args, **kwargs):
         else:
             os.close(r)
             cb(keepalive=w, *args, **kwargs)
-            sys.exit(0)
+            os._exit(0)
 
 def worker_run(keepalive=None):
      """ The main loop of the worker """
@@ -318,6 +321,9 @@ def worker_run(keepalive=None):
          DB.DBO.DBH_old = DB.DBO.DBH
          DB.DBO.DBH = Store.Store(max_size=10)
          DB.db_connections = 0
+
+     ## Start the logging thread for each worker:
+     pyflaglog.start_log_thread()
 
      ## These are all the methods we support
      jobs = []
@@ -341,8 +347,7 @@ def worker_run(keepalive=None):
              os._exit(1)
 
          ## Check for memory usage
-         check_mem(sys.exit,0)
-
+         check_mem(os._exit,0)
          ## Check for new tasks:
          if not jobs:
              try:
@@ -469,16 +474,16 @@ def start_workers():
             pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
         
 def handler(sig, frame):
-    if sig==signal.SIGABRT or sig==signal.SIGUSR1:
-        ## Pass these signals directly to our children
-        for pid in children:
+    pyflaglog.kill_logging_thread()
+    if sig==signal.SIGABRT:
+        for child in children:
             try:
                 os.kill(pid, sig)
             except Exception,e:
                 pass
 
     if sig!=signal.SIGUSR1:
-        sys.exit(0)
+        os._exit(0)
 
 ## Is this a dangerous thing to do? If a signal comes when we dont
 ## expect it we may lose sync with the db. Seems to work for now, but

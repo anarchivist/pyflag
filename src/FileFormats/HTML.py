@@ -319,7 +319,7 @@ class SanitizingTag(Tag):
             else:
                 attributes += DB.expand(' href="javascript: alert(%r)"',
                                         iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
-                postfix = self.mark_link(self.attributes['href'] or '')
+                postfix = self.mark_link(self.attributes['href'])
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
@@ -342,6 +342,7 @@ class SanitizingTag(Tag):
 
         We just add an overlay to represent the link.
         """
+        if not reference: return ''
         postfix = ''
         ## Absolute reference
         if reference.startswith('http'):
@@ -434,7 +435,7 @@ class ResolvingHTMLTag(SanitizingTag):
     to the parser because we need to know the inode and case (our
     constructor takes more parameters.
     """
-    url_re = re.compile("(http|ftp)://([^/]+)/([^?]*)")
+    url_re = re.compile("(http|ftp|HTTP|FTP)://([^/]+)(/[^?]*)")
     def __init__(self, case, inode_id, name=None, attributes=None, charset=None):
         self.case = case
         self.inode_id = inode_id
@@ -442,23 +443,24 @@ class ResolvingHTMLTag(SanitizingTag):
 
         ## Collect some information about this inode:
         url = get_url(inode_id, case)
+        self.url=url
         m=self.url_re.search(url)
         if m:
-            self.method = m.group(1)
-            self.host = m.group(2)
+            self.method = m.group(1).lower()
+            self.host = m.group(2).lower()
             self.base_url = posixpath.dirname(m.group(3))
         else:
             self.method = ''
             self.host = ''
             self.base_url = url
 
-        if not self.base_url.startswith("/"):
-            self.base_url = "/"+self.base_url
+        ##if not self.base_url.startswith("/"):
+##            self.base_url = "/"+self.base_url
             
-        if self.base_url.endswith("/"):
-            self.base_url = self.base_url[:-1]
-        else:
-            self.base_url = posixpath.dirname(url)
+##        if self.base_url.endswith("/"):
+##            self.base_url = self.base_url[:-1]
+##        else:
+##            self.base_url = posixpath.dirname(url)
             
         self.comment = False
 
@@ -486,14 +488,15 @@ class ResolvingHTMLTag(SanitizingTag):
         original_reference = reference
 
         ## Absolute reference
-        if reference.startswith('http'):
+        if re.match("(http|ftp)", reference, re.I):
             pass
         elif reference.startswith("/"):
             path = normpath("%s" % (reference))
             reference="%s://%s%s" % (self.method, self.host, path)
         elif self.method:
             ## FIXME: This leads to references without methods:
-            reference="%s/%s" % (self.base_url, reference)
+            reference="%s://%s%s" % (self.method, self.host,
+                                     FlagFramework.normpath("%s/%s" % (self.base_url, reference)))
             if reference.startswith("http://"):
                 reference='http:/'+FlagFramework.normpath(reference[6:])
 
@@ -510,8 +513,10 @@ class ResolvingHTMLTag(SanitizingTag):
             except RuntimeError: pass
 
         ## Try to make reference more url friendly:
-#        reference = reference.replace(" ","%20")
+        reference = reference.strip(" \"'\t")
         reference = url_unquote(decode_entity(unquote(reference)))
+##        print reference, self.method, self.host, self.base_url, original_reference
+
 
         dbh = DB.DBO(self.case)
         dbh.execute("select http.status,http.inode_id from http join inode on "\
@@ -572,7 +577,7 @@ class ResolvingHTMLTag(SanitizingTag):
         if build_reference:
             result += " reference=\"%s\" " % reference
 
-        print "Not found '%s'" % reference
+        print "Not found '%s' (%s + %s)" % (reference,original_reference, self.url)
         return result
 
 class HTMLParser(lexer.Lexer):

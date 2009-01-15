@@ -26,7 +26,8 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
-import PIL, cStringIO
+import PIL, cStringIO, PIL.ImageFile
+import PIL.Image as Image
 import os.path
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
@@ -98,7 +99,6 @@ class ThumbnailType(InodeIDType):
             print e
             return "<a href=%r ><img src='images/broken.png' /></a>" % inode_filename
 
-        table_renderer.add_file_to_archive(inode_id)
         return "<a href=%r ><img src=%r /></a>" % (inode_filename, filename)
 
     def render_thumbnail_hook(self, inode_id, row, result):

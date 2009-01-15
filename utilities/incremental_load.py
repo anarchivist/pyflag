@@ -90,7 +90,8 @@ if not config.case:
     sys.exit(-1)
 
 scanners = config.scanners.split(',')
-ScannerUtils.fill_in_dependancies(scanners)
+scanners = ScannerUtils.fill_in_dependancies(scanners)
+print scanners
 
 print "Will read from %s and write to %s. Will use these scanners: %s" % (directory, output_file, scanners)
 
@@ -275,7 +276,7 @@ def run():
 def finish():
     print "Loader Process size increased above threashold. Exiting and restarting."
     processor.flush()
-    sys.exit(0)
+    os._exit(0)
 
 def main():
     while 1:

@@ -222,7 +222,7 @@ class Registry:
             return name
         except AttributeError:
             name = ("%s" % cls).split(".")[-1]
-            cls.name = name
+            cls.clsname = name
             return name
 
     def filename(self, cls_name):
@@ -307,7 +307,6 @@ class OrderedRegistry(Registry):
 
         self.classes.sort(sort_function)
         self.class_names = [ self.get_name(i) for i in self.classes ]
-        self.class_names_ex = [ self.get_class_name(i) for i in self.classes ]
         self.scanners = self.class_names
 
     def get_class_name(self, cls):
@@ -331,6 +330,8 @@ class OrderedRegistry(Registry):
             return self.classes[self.class_names_ex.index(scanner_name)]
         elif scanner_name in self.class_names:
             return self.classes[self.class_names.index(scanner_name)]
+        elif scanner_name in self.object_names:
+            return self.classes[self.object_names.index(scanner_name)]
         else:
             raise ValueError("Object %s does not exist in the registry. Is the relevant plugin loaded?" % scanner_name)
 

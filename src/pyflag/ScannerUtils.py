@@ -66,8 +66,10 @@ def fill_in_dependancies(scanners):
             find_dependencies(s, dependancies)
         elif s in groups:
             for g in groups[s]:
-                dependancies.append(g.name)
-                find_dependencies(g.name, dependancies)
+                #name = ("%s" % g).split(".")[-1]
+                name = g.clsname
+                dependancies.append(name)
+                find_dependencies(name, dependancies)
 
     for i in range(len(dependancies)):
         if dependancies[i] not in dependancies[i+1:]:

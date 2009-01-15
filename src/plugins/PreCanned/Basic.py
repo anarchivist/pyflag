@@ -83,14 +83,14 @@ class HTMLPages(Registry.PreCanned):
     name = "/Disk Forensics/Multimedia/HTML Pages"
 
 class HTMLURLs(Reports.PreCannedCaseTableReports):
-    args = {'filter': '"Content Type" contains html',
-            '_hidden': [ 4, 5] }
+    args = {'filter': '"Content Type" contains html and Status = 200 ',
+            '_hidden': [ 4, 5, 6] }
     report='Browse HTTP Requests'
     family='Network Forensics'
     description = 'View all HTML URLs'
     name = [ "/Network Forensics/Web Applications/HTML URLs" ]
     default_table = 'HTTPCaseTable'
-    columns = ['Timestamp', 'Inode', 'Method', 'URL', 'Content Type', 'InodeTable.Size']
+    columns = ['Timestamp', 'Inode', 'Method', 'URL', 'Content Type', 'InodeTable.Size', 'Status']
 
 class ImageURLs(Reports.PreCannedCaseTableReports):
     description = "Show larger images transferred over HTTP"

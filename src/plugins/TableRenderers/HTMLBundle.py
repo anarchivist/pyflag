@@ -89,7 +89,11 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             while 1:
                 data = infd.read(1024*1024)
                 if not data: break
-                outfd.write(data)
+                try:
+                    outfd.write(data.encode("latin1","ignore"))
+                except Exception,e:
+                    outfd.write(data)
+
         except IOError:
             pass
 
@@ -248,6 +252,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         for filename, dest in [ ("images/spacer.png", "inodes/images/spacer.png"),
                                 ("images/spacer.png", None),
                                 ('images/pyflag.css',None,),
+                                ('images/html_render.css',"inodes/images/html_render.css",),
                                 ('images/pyflag.css', "inodes/images/pyflag.css",),
                                 ('images/next_line.png', None),
                                 ('images/decrement.png',None,),
@@ -260,6 +265,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                 ('images/question.png',None),
                                 ('images/browse.png',None),
                                 ('javascript/functions.js', None),
+                                ('javascript/html_render.js', "inodes/javascript/html_render.js"),
                                 ]:
             if not dest: dest = filename
             self.add_file(dest, open("%s/%s" % (config.DATADIR, filename),'rb'))
