@@ -17,19 +17,18 @@ def list_entry(vm, types, profile, head, objname,
             print ("WARN: given field is not a LIST_ENTRY, attempting to "
                    "continue anyway.")
 
-    lst = Object("_LIST_ENTRY", head, vm, profile=profile)
+    lst = NewObject("_LIST_ENTRY", head, vm, profile=profile)
     seen.add(lst)
     if not lst.is_valid(): return
     while True:
         if forward:
-            lst = lst.Flink
+            lst = lst.Flink.dereference()
         else:
-            lst = lst.Blink
+            lst = lst.Blink.dereference()
         
         if not lst.is_valid(): return
         
         if lst in seen: break
         else: seen.add(lst)
-
-        obj = Object(objname, lst.offset - offset, vm, profile=profile)
+        obj = NewObject(objname, lst.offset - offset, vm, profile=profile)
         yield obj

@@ -23,11 +23,11 @@
 @contact:      bdolangavitt@wesleyan.edu
 """
 
-from forensics.object2 import Object
+from forensics.object2 import CType, NewObject
 from forensics.object import *
 from vtypes import xpsp2types as types
 
-class _UNICODE_STRING(Object):
+class _UNICODE_STRING(CType):
     """Class representing a _UNICODE_STRING
 
     Adds the following behavior:
@@ -36,14 +36,74 @@ class _UNICODE_STRING(Object):
       * The __str__ method returns the value of the Buffer.
     """
 
-    def __new__(typ, *args, **kwargs):
-        obj = object.__new__(typ)
-        return obj
-
     def __str__(self):
         return self.Buffer
 
     # Custom Attributes
     def getBuffer(self):
         return read_unicode_string(self.vm, types, [], self.offset)
+    
     Buffer = property(fget=getBuffer)
+
+class list_iterator:
+    def __init__(self, current, member=None, type=None):
+        self.seen = set()
+        
+        ## This is the first object in the list
+        ##self.current = NewObject(type, offset = self.current.offset - 
+        ## The name of the member containing the _LIST_ENTRY
+        self.member = member
+        ## The type of the list object
+        self.type = type
+
+    def next(self):
+        lst = self.current.m(self.member)
+        
+        self.list = self.current.Flink.dereference()
+        if not self.current.is_valid() or self.current in self.seen:
+            raise StopIteration()
+
+        self.seen.add(self.current)
+
+        print "Instantiate %s" % self.type
+        return NewObject(self.type,
+                         offset = self.current.v() - self.offset,
+                         vm=self.current.vm,
+                         profile = self.current.profile, parent = self.parent,
+                         members = self.parent.members,
+                         name=self.name)
+
+    def __iter__(self):
+        return self
+    
+class _LIST_ENTRY(CType):
+    """ Adds iterators for _LIST_ENTRY types """
+    def list_of_type(self, type, member, forward=True):
+        print type, member
+        ## Get the first element
+        if forward:
+            lst = self.Flink.dereference()
+        else:
+            lst = self.Blink.dereference()
+
+        offset = self.profile.get_obj_offset(type ,member)
+
+        seen = set()
+        while 1:
+            if not lst.is_valid() or lst in seen: return
+            print lst
+            ## Instantiate the object
+            obj = NewObject(type, offset = lst.offset - offset,
+                            vm=self.vm,
+                            parent=self.parent,
+                            profile=self.profile, name=type)
+            yield obj
+            
+            seen.add(lst)
+            if forward:
+                lst = obj.m(member).Flink.dereference()
+            else:
+                lst = obj.m(member).Blink.dereference()
+
+    def __iter__(self):
+        return list_iterator(self.parent, self.name, self.parent.__class__)

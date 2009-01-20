@@ -105,7 +105,7 @@ class pslist_ex_3(forensics.commands.command):
                                                    handle_count,
                                                    create_time),defaults)
 
-class _EPROCESS(Object):
+class _EPROCESS(CType):
     """Class representing an _EPROCESS.
 
     Adds the following special behavior:
@@ -117,12 +117,8 @@ class _EPROCESS(Object):
     hasMembers = True
     name = "EPROCESS"
 
-    def __new__(typ, *args, **kwargs):
-        obj = object.__new__(typ)
-        return obj
-    
-    def __init__(self, name, address, space, parent=None,profile=None):
-        super(_EPROCESS,self).__init__(name, address, space,parent,profile)
+    def __init__(self, *args, **kwargs):
+        CType.__init__(self, *args, **kwargs)
         new_dtb = self.Pcb.DirectoryTableBase[0]
         self.vm = create_addr_space(self.vm, new_dtb)
     

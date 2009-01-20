@@ -38,6 +38,7 @@ builtin_types = { \
     'char' : (1, 'c'), \
     'unsigned char' : (1, 'B'), \
     'unsigned short' : (2, 'H'), \
+    'unsigned short int' : (2, 'H'), \
     'short' : (2, 'h'), \
     'long long' : (8, 'q'), \
     'unsigned long long' : (8, 'Q'), \

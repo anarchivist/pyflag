@@ -1023,7 +1023,7 @@ def find_module(modlist, mod_addrs, addr):
     mod = modlist[mod_addrs[pos]]
 
     if (addr >= mod.BaseAddress.v() and 
-        addr <  mod.BaseAddress.v() + mod.SizeOfImage):
+        addr <  mod.BaseAddress.v() + mod.SizeOfImage.v()):
         return mod
     else:
         return None
@@ -1045,7 +1045,6 @@ class ssdt(forensics.commands.command):
         return  "Display SSDT entries"
     
     def execute(self):
-        print self.meta_info
         from vtypes import xpsp2types
         
         xpsp2types['_ETHREAD'][1]['ThreadListEntry'] = [ 0x22c, ['_LIST_ENTRY']]
@@ -1058,21 +1057,26 @@ class ssdt(forensics.commands.command):
             self.opts)
         
         pslist = process_list(addr_space, types, symtab)
-        procs = [ Object("_EPROCESS", p, addr_space, profile=profile)
+        procs = [ NewObject("_EPROCESS", p, addr_space, profile=profile)
                   for p in pslist ]
+
         modlist = modules_list(addr_space, types, symtab)
-        mods =  [ Object("_LDR_MODULE", m, addr_space, profile=profile)
+        mods =  [ NewObject("_LDR_MODULE", m, addr_space, profile=profile)
                   for m in modlist ]
         mods = dict( (mod.BaseAddress.v(),mod) for mod in mods )
         mod_addrs = sorted(mods.keys())
-        
+
         # Gather up all SSDTs referenced by threads
         print "Gathering all referenced SSDTs from KTHREADs..."
         ssdts = set()
         for proc in procs:
+            print proc
+            for thread in proc.ThreadListHead.list_of_type("_ETHREAD", "ThreadListEntry"):
+                print "Thread %s" % thread
+                
             for thread in get_threads(proc):
-                ssdts.add(thread.Tcb.ServiceTable)
-        
+                ssdts.add(thread.Tcb.ServiceTable.dereference())
+
         # Get a list of *unique* SSDT entries. Typically we see only two.
         tables = set()
         for ssdt in ssdts:
@@ -1098,7 +1102,7 @@ class ssdt(forensics.commands.command):
             print "SSDT[%d] at %x with %d entries" % (idx,table, n)
             if vm.is_valid_address(table):
                 for i in range(n):
-                    syscall_addr = Object('unsigned long', table+(i*4), vm, profile=profile).v()
+                    syscall_addr = NewObject('unsigned long', table+(i*4), vm, profile=profile).v()
                     try:
                         syscall_name = xpsp2_syscalls[idx][i]
                     except IndexError:

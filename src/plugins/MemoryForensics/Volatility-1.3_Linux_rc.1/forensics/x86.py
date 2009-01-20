@@ -40,6 +40,7 @@ x86_native_types = { \
     'address' : [4, 'L'], \
     'char' : [1, 'c'], \
     'unsigned char' : [1, 'B'], \
+    'unsigned short int' : [2, 'H'], \
     'unsigned short' : [2, 'H'], \
     'short' : [2, 'h'], \
     'long long' : [8, 'q'], \

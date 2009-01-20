@@ -25,12 +25,46 @@
 @contact:      awalters@volatilesystems.com
 @organization: Volatile Systems
 """
+import sys, StringIO
+sys.path.append(".")
+sys.path.append("..")
 
 from vtypes import xpsp2types as types
 from forensics.object import *
 from forensics.x86 import x86_native_types
 import forensics.registry as MemoryRegistry
 import struct
+import forensics.addrspace as addrspace
+
+class Curry:
+    """ This class makes a curried object available for simple inlined functions.
+
+    A curried object represents a function which has some of its
+    arguements pre-determined. For example imagine there is a
+    function:
+
+    def foo(a=a,b=b):
+        pass
+
+    curry=Curry(foo,a=1)   returns a function pointer.
+
+    curry(3) is the same as calling foo(a=1,b=3).
+    For more information see the Oreilly Python Cookbook.
+    """
+    def __init__(self,function,*args,**kwargs):
+        """ Initialised the curry object with the correct function."""
+        self.fun=function
+        self.pending = args[:]
+        self.kwargs = kwargs.copy()
+
+    def __call__(self,*args,**kwargs):
+        if kwargs and self.kwargs:
+            kw=self.kwargs.copy()
+            kw.update(kwargs)
+        else:
+            kw = kwargs or self.kwargs
+            
+        return self.fun(*(self.pending+args), **kw)
 
 class InvalidType(Exception):
     def __init__(self, typename=None):
@@ -47,247 +81,109 @@ class InvalidMember(Exception):
     def __str__(self):
         return str(self.typename) + ":" + str(self.membername)
 
-class Object(object):
+def NewObject(theType, offset, vm, parent=None, profile=None, name=None, **kwargs):
+    """ A function which instantiates the object named in theType (as
+    a string) from the type in profile passing optional args of
+    kwargs.
+    """
+    if theType in profile.types:
+        result = profile.types[theType](offset=offset, vm=vm, name=name,
+                                        parent=parent, profile=profile)
+        return result
 
-    def __new__(pcls, theType, offset, vm, parent=None, profile=None):
+    # Need to check for any derived object types that may be 
+    # found in the global memory registry.
+    try:
+        if theType:
+            if MemoryRegistry.OBJECT_CLASSES.objects.has_key(theType):
+                return MemoryRegistry.OBJECT_CLASSES[theType](
+                    theType=theType,
+                    offset = offset,
+                    vm = vm, parent=parent, profile=profile, name=name,
+                    **kwargs)
+    except AttributeError:
+        pass
 
-        theTypeName = None
-
-        if isinstance(theType, str): 
-	    theTypeName = theType
-        elif isinstance(theType, CType):
-            theTypeName = theType.name
-
-        # Need to check for any derived object types that may be 
-	# found in the global memory registry.
-	if theTypeName:
-            if MemoryRegistry.OBJECT_CLASSES.objects.has_key(theTypeName):
-                return MemoryRegistry.OBJECT_CLASSES[theTypeName](theTypeName, \
-	            offset,vm,parent,profile)
-
-        obj = object.__new__(pcls)
-	return obj
-        
-    def __init__(self, theType, offset, vm, parent=None, profile=None):
-
+class Object(object):        
+    def __init__(self, theType, offset, vm, parent=None, profile=None, name=None):
         self.vm = vm
 	self.members = {}
 	self.parent = parent
 	self.extra_members = {}
 	self.profile = profile
 	self.offset = offset
+        self.name = name
+        self.theType = theType
 
-        if offset == None:
-	    return None
+    def __add__(self, other):
+        return other + self.v()
 
-        if not isinstance(theType, str):
-            self.type = theType
-        elif theType in profile.cstructs:
-            self.type = profile.cstructs[theType]
-        elif theType in builtin_types and theType != 'pointer':
-            self.type = NativeType(profile, theType, \
-	        builtin_types[theType][0], builtin_types[theType][1])
-        else:
-	    raise InvalidType,theType
-                 
+    def __sub__(self, other):
+        return -other + self.v()
+
+    def __neg__(self):
+        return -self.v()
+    
     def __getattribute__(self, attr):
-
-        try:
-            return object.__getattribute__(self, attr)
-        except AttributeError:
-            pass
-
-        if attr in self.extra_members:
-            return self.extra_members[attr]
-       
-        if isinstance(self.type, Pointer):
-	    return self.type.dereference(self)
-
-        if self.type.name in builtin_types:
-            raise AttributeError("Native types have no dynamic attributes")
-
-        off = self.get_member_offset(attr, relative=True)
-        ObjectMember = self.get_member(attr)
-
-        if off == None or ObjectMember == None:
-            raise AttributeError("'%s':no offset or type for attribute '%s'" % \
-                (self.type.name, attr))
-
-        if isinstance(ObjectMember.type, Pointer):
-	    cdecl = ObjectMember.type.basetype.cdecl()
-            if cdecl == 'void':
-                return Object(ObjectMember.type.basetype, \
-                    off+self.offset, self.vm,profile=self.profile)
-
-            base_address = self.get_member(attr).v()
-	    if base_address == None:
-		return None
-
-            return Object(ObjectMember.type.basetype, base_address, \
-                self.vm,profile=self.profile)
-
-        elif isinstance(ObjectMember.type, CType): 
-            theTypeName = ObjectMember.type.name
-	    if MemoryRegistry.OBJECT_CLASSES.objects.has_key(ObjectMember.type.name):
-		offset = self.offset + off
-		return MemoryRegistry.OBJECT_CLASSES[theTypeName](theTypeName,offset,self.vm,self,self.profile)
-
-	    return ObjectMember
-	elif isinstance(ObjectMember.type,Array): 
-	    array_vals= []
-	    for index in ObjectMember.type.get_member_names():
-	        element = Object(ObjectMember.type.basetype, \
-		    ObjectMember.offset + index * \
-		    ObjectMember.type.basetype.size, \
-		    self.vm,profile=self.profile)
-                if isinstance(element.type, NativeType):
-                    array_vals.append(element.v())
-		else:
-		    array_vals.append(element)
-            return array_vals
-        else:
-            return self.get_member(attr).v()
+        """ We use this to evaluate ourselves or dereference or
+        whatever
+        """
+        return object.__getattribute__(self, attr)
        
     def __eq__(self, other):
         if isinstance(other, Object):
-	   return (self.type == other.type) and (self.offset == other.offset)
+	   return (self.__class__ == other.__class__) and (self.offset == other.offset)
 	else:
 	   return NotImplemented
 
     def __ne__(self, other):
-        result = self.__eq__(other)
-	if result is NotImplemented:
-	    return result
-	return not result
+        return not self == other
 
     def __hash__(self):
-        return hash(self.type.name) ^ hash(self.offset)
+        return hash(self.name) ^ hash(self.offset)
 
     def has_member(self, memname):
-        return self.type.hasMembers and self.type.members.has_key(memname)
+        return False
 
     def m(self, memname):
         return self.get_member(memname)
 
     def get_member(self, memname):
-        if not self.type.hasMembers:
-            return None
+        raise AttributeError("No member %s" % memname)
 
-        if memname in self.extra_members:
-            return self.extra_members[memname]
-
-        if self.members.has_key(memname):
-            return self.members[memname]
-        else:
-            thisMember = self.type.get_member(memname)
-	    if isinstance(thisMember.type, Pointer) or isinstance(thisMember.type, Array):
-                thisObject = Object(thisMember.type, \
-		    self.offset + thisMember.offset, self.vm, self,self.profile) 
-		return thisObject
-            thisObject = Object(thisMember.type.name, \
-	        self.offset + thisMember.offset, self.vm, self,self.profile)    
-            return thisObject
-
-    def get_member_type(self, memname):
-        if self.type.hasMembers:
-	    thisMemberType = self.type.get_member(memname)
-            return thisMemberType
-        else:
-            return None
-
-    def get_member_offset(self, memname, relative=False): 
-        if self.type.hasMembers:
-	    thisMemberType = self.type.get_member(memname)
-            
-	    if thisMemberType == None:
-	        return None
-
-	    if relative:
-	        return thisMemberType.offset
-	    return thisMemberType.offset + self.offset
-
-        else:
-	    return None
-
-    def get_deep_member(self, list):
-        current_object = self
-        for i in list:            
-            if isinstance(current_object, Pointer):
-                if current_object.is_null():
-                    return None
-                current_object = current_object.dereference()
-            current_object = current_object.get_member(i)
-            if current_object == None:
-                return None
-        return current_object
+    def get_member_offset(self, memname, relative=False):
+        return self.offset
 
     def is_null(self):
-        if isinstance(self.type, Pointer):
-            return self.v() == 0x00
-        else:
-            return False
+        return False
 
     def is_valid(self):
-        if isinstance(self.type, Pointer):
-            if self.v() == None:
-                return False
-            return self.vm.is_valid_address(self.v())
-        elif isinstance(self.type, CType):
-            return self.vm.is_valid_address(self.offset)
-        else:
-            return False
+        return self.vm.is_valid_address(self.offset)
 
     def dereference(self):
-        if isinstance(self.type, Pointer):
-            return self.type.dereference(self)
         return None
 
     def dereference_as(self, castType):
-        if isinstance(self.type, Pointer):
-            return self.type.dereference_as(castType, self)
-	elif isinstance(self.type, Void):
-	    return self.type.dereference_as(castType, self)
-        else:
-            return None
+        return None
 
     def cast(self, castString):
-        if castString in self.type.profile.native_types:
-	    return Object(castString, self.offset, self.vm, None, self.profile)
-	else:
-	    return Object(castString, self.offset, self.vm, None, self.profile)
-
-    def size(self):
-        return self.type.size
+        return Object(castString, self.offset, self.vm, None, self.profile)
 
     def v(self):
         return self.value()
 
     def value(self):
-        if self.type.hasValue:
-            return self.type.v(self)
-	elif isinstance(self.type, CType):
-	    return self.offset
-	elif isinstance(self.type, Array):
-	    array_vals= []
-	    for index in self.type.get_member_names():
-	        element = Object(self.type.basetype, \
-		    self.offset + index * \
-		    self.type.basetype.size, \
-		    self.vm,profile=self.profile)
-		array_vals.append(element.v())
-            return array_vals
-        else:
-            return None
+        """ Do the actual reading and decoding of this member
+        """
+        return None
 
     def get_member_names(self):
-        if self.type.hasMembers:
-            return self.type.get_member_names() + self.extra_members.keys()
-        else:
-            return False
+        return False
 
     def get_bytes(self,amount=None):
         if amount == None:
-            amount = self.type.size
+            amount = self.size()
+
         return self.vm.read(self.offset, amount)
 
     def get_values(self):
@@ -297,20 +193,15 @@ class Object(object):
         return value_dict
 
     def __str__(self):
-        if  isinstance(self.type, CType):
-            retval = "[%s] @ %s" % (self.type.cdecl(), hex(self.offset))
-	    return retval
-	elif isinstance(self.type, Void):
-	    retval = "[%s]  %s" % (self.type.cdecl(), hex(self.v()))
-	    return retval
-        return object.__str__(self)
-
-    def __repr__(self):
-	if isinstance(self.type, NativeType):
-	    return str(self.value())
-        return object.__repr__(self)
+        return "[%s %s] @ 0x%08X" % (self.__class__.__name__, self.name or '',
+                                     self.offset)
 
 class VType:
+    """ This is a proxy class for members in the struct.
+
+    We use proxy classes to fill in members in the struct so we dont
+    need to dereference them until we want to.
+    """
     def __init__(self, profile, size, hasMembers=False, hasValue=False):
         self.profile = profile
         self.hasMembers=hasMembers
@@ -320,80 +211,97 @@ class VType:
     def cdecl(self):
         return "VType"
 
-class Void(VType):
-    def __init__(self, profile):
-	VType.__init__(self, profile, 0, False, True)
+class NativeType(Object):
+    def __init__(self, theType, offset, vm, parent=None, profile=None,
+                 format_string=None, **args):
+        Object.__init__(self, theType, offset, vm, parent=parent, profile=profile)
+        self.format_string = format_string
 
-    def v(self, theObject):
-        return self.value(theObject)
+    def size(self):
+        return struct.calcsize(self.format_string)
 
-    def value(self, theObject):
-        (val, ) = struct.unpack("=L", theObject.vm.read(theObject.offset, 4))
-        return val
-
-    def cdecl(self):
-        return "void"   
-
-    def dereference_as(self, derefType, theObject):
-	if isinstance(derefType, str):
-	    return Object(derefType, self.v(theObject), \
-	        theObject.vm, None,self.profile)
-        return Object(derefType.name, self.v(theObject), theObject.vm, \
-	    None,self.profile)
-
-class NativeType(VType):
-    def __init__(self, profile, name, size, readChar):
-        VType.__init__(self, profile, size, False, True)
-        self.name = name
-        self.size = size
-        self.readChar = readChar
-
-    def v(self, theObject):
-        return self.value(theObject)
-
-    def value(self, theObject):
-        (val, ) = struct.unpack('='+self.readChar, \
-	    theObject.vm.read(theObject.offset, self.size))
+    def value(self):
+        (val, ) = struct.unpack(self.format_string, \
+	    self.vm.read(self.offset, self.size()))
         return val
 
     def cdecl(self):
         return self.name
 
-    def __getattribute__(self, attr):
+    def __int__(self):
         return self.v()
-        
-class Pointer(NativeType):
-    def __init__(self, profile, basetype):
-        NativeType.__init__(self, profile, 'pointer', profile.native_types['address'].size, \
-                            profile.native_types['address'].readChar)
-        self.basetype = basetype
 
-    def dereference(self,  theObject):
-        return self.dereference_as(self.basetype, theObject)
+    def __eq__(self, other):
+        return self.v() == other
 
-    def dereference_as(self, derefType, theObject):
-        return Object(derefType.name, self.v(theObject), \
-	    theObject.vm, None,self.profile)
+    def __hex__(self):
+        return hex(self.v())
+
+    def __str__(self):
+        return " [%s]: %s" % (self.theType, self.v())
+
+class Void(NativeType):
+    def __init__(self, theType, offset, vm, parent=None, profile=None,
+                 format_string=None, **args):
+        NativeType.__init__(self, theType, offset, vm, parent=None, profile=None)
+        self.format_string = "=L"
 
     def cdecl(self):
-        return "%s *" % self.basetype.cdecl()
+        return "0x%08X" % self.v()
+    
+    def __str__(self):
+        return "Void (0x0%08X)" % self.v()
+
+    def dereference_as(self, derefType):
+        return NewObject(derefType, self.v(), \
+                         self.vm, parent=self,profile=self.profile)
+
+class Pointer(NativeType):
+    def __init__(self, theType, offset, vm, parent=None, profile=None, target=None, name=None):
+        NativeType.__init__(self, theType, offset = offset, vm=vm, name=name,
+                            parent=parent, profile=profile)
+        
+        self.target = target
+        self.format_string = "=L"
+
+    def dereference(self):
+        offset = self.v()
+
+        return self.target(offset=offset, vm=self.vm, parent=self,
+                           profile=self.profile, name=self.name)
+
+    def dereference_as(self, derefType):
+        return NewObject(derefType, self.v(), \
+                         self.vm, parent=self ,profile=self.profile)
+
+    def cdecl(self):
+        return "Pointer %s" % self.v()
 
     def __repr__(self):
-        return "<pointer to [%s ]>" % (self.basetype.cdecl())
+        return "<pointer to [%s ]>" % (self.v())
+
+    def __str__(self):
+        return "<%s pointer to [0x%08X]>" % (self.dereference().__class__.__name__, self.v())
 
     def __getattribute__(self, attr):
         try:
             return super(Pointer,self).__getattribute__(attr)
         except AttributeError:
-            return getattr(self.value, attr)
+            ## We just dereference ourself
+            return self.dereference()
 
 class CTypeMember:
+    """ A placeholder for a type in a struct.
+
+    We use this intermediate placeholder so we dont need to
+    instantiate theType right away. This is done on demand.
+    """
     def __init__(self, name, offset, theType):
         self.name = name
         self.offset = offset
         self.type = theType
         
-class CType(VType):
+class XXCType(VType):
     def __init__(self, profile, name, size, members, isStruct):
         VType.__init__(self, profile, size, True, False)
         self.name = name
@@ -427,75 +335,365 @@ class CType(VType):
         else:
             return "union %s" % self.name
 
-class Array(VType):
-    def __init__(self, profile, count, basetype):
-        VType.__init__(self, profile, count * basetype.size, True, False)
-        self.count = count
-        self.basetype = basetype
+class Array(Object):
+    """ A array of objects of the same size """
+    def __init__(self, targetType, offset, vm, parent=None,
+                 profile=None, count=1, name=None, target=None):
+        ## Instantiate the first object on the offset:
+        Object.__init__(self, targetType, offset, vm,
+                        parent=parent, profile=profile,
+                        name=name)
+        try:
+            self.count = count(parent)
+        except TypeError:
+            self.count = int(count)
 
-    def get_member_names(self):
-        return range(0, self.count)
+        self.position = 0
+        self.original_offset = offset
+        self.target = target
+        self.current = self.target(offset=offset, vm=vm, parent=self,
+                                   profile=profile, name= name)
+        
+    def __iter__(self):
+        self.position = 0
+        return self
 
-    def get_member(self, index):
-        return CTypeMember(index, self.basetype.size * index, self.basetype)
+    def size(self):
+        return self.count * self.current.size()
 
-    def cdecl(self):
-        return "%s[%d]" % (self.basetype.cdecl(), self.count)     
+    def next(self):
+        if self.position >= self.count:
+            raise StopIteration()
 
+
+        offset = self.original_offset + self.position * self.current.size()
+        self.position += 1
+
+        ## Instantiate the target here:
+        return self.target(offset = offset, vm=self.vm,
+                           profile=self.profile, parent=self,
+                           name="%s %s" % (self.name, self.position))
+
+    def __str__(self):
+        return "Array (len=%s of %s)\n" % (self.count, self.current.name)
+
+    def __eq__(self, other):
+        if self.count != len(other):
+            return False
+        
+        for i in range(self.count):
+            if not self[i]==other[i]:
+                return False
+
+        return True
+    
+    def __getitem__(self, pos):        
+        return self.target(offset = self.original_offset + \
+                           pos * self.current.size(),
+                           vm=self.vm, parent=self,
+                           profile=self.profile)
+
+class CType(Object):
+    """ A CType is an object which represents a c struct """
+    def __init__(self, theType, offset, vm, parent=None, profile=None, members=None, name=None, size=0):
+        """ This must be instantiated with a dict of members. The keys
+        are the offsets, the values are Curried Object classes that
+        will be instanitated when accessed.
+        """
+        if not members: raise RuntimeError()
+        
+        Object.__init__(self, theType, offset, vm, parent=parent, profile=profile, name=name)
+        self.members = members
+        self.offset = offset
+        self.struct_size = size
+
+    def size(self):
+        return self.struct_size
+
+    def __str__(self):
+        return "[%s %s] @ 0x%08X" % (self.__class__.__name__, self.name or '', 
+                                     self.offset)
+    def __repr__(self):
+        result = ''
+        for k,v in self.members.items():
+            result += " %s -\n %s\n" % ( k, self.m(k))
+
+        return result
+
+    def value(self):
+        """ When a struct is evaluated we just return our offset.
+        """
+        return self.offset
+
+    def m(self, attr):
+        try:
+            offset, cls = self.members[attr]
+        except KeyError:
+            raise AttributeError("Struct %s has no member %s" % (self.name, attr))
+
+        try:
+            offset = offset(self).v()
+        except TypeError: pass
+
+        result = cls(offset = self.offset + offset, vm=self.vm,
+                     profile=self.profile, parent=self, name=attr)
+
+        return result
+
+    def __getattribute__(self,attr):
+        try:
+            return Object.__getattribute__(self, attr)
+        except AttributeError: pass
+
+        ## Special code to follow flink,blink lists
+        if attr=='next':
+            try:
+                flink = self.m("Flink")
+                offset,cls = self.parent.members[self.name]
+                offset = flink.v() - offset
+
+                return  self.__class__(self.name, offset = offset, vm=self.vm,
+                                       profile=self.profile, parent=self,
+                                       members=self.parent.members,
+                                       name=self.parent.name)
+            except (KeyError,AttributeError):
+                pass
+
+        elif attr=='prev':
+            try:
+                blink = self.m("Blink")
+
+                offset,cls = self.parent.members[self.name]
+                offset = blink.v() - offset
+
+                return  self.__class__(self.name, offset = offset, vm=self.vm,
+                                       profile=self.profile, parent=self,
+                                       members=self.parent.members,
+                                       name=self.parent.name)
+            except KeyError:
+                pass
+
+        result = self.m(attr)
+        return result
+    
 ## Profiles are the interface for creating/interpreting
 ## objects
 
 class Profile:
+    """ A profile is a collection of types relating to a certain
+    system. We parse the abstract_types and join them with
+    native_types to make everything work together.
+    """
     def __init__(self, native_types=x86_native_types, abstract_types=types):
-        self.native_types = {}
-        self.cstructs = {}
-        globs = {}
-        locs = {}
-        self.voidType = Void(self)
-	self.abstract_types = abstract_types
+        self.types = {}
 
         # Load the native types
-        for nt in native_types.keys():
-            self.native_types[nt] = NativeType(self, nt, \
-	        native_types[nt][0], native_types[nt][1])
-       
+        for nt, value in native_types.items():
+            if type(value)==list:
+                self.types[nt] = Curry(NativeType, nt, format_string=value[1])
+
         # Load the abstract data types
-        typeDict = abstract_types
-	for ctype in typeDict.keys():
-           self.import_type(ctype, typeDict)
+        
+        for name, value in abstract_types.items():
+           self.import_type(name, abstract_types)
 	
     def import_type(self, ctype, typeDict):
-        members = self.convert_members(ctype, typeDict)
-        if self.cstructs.has_key(ctype):
-            self.cstructs[ctype].set_members(members)
-            self.cstructs[ctype].size = typeDict[ctype][0]
-        else:
-            isStruct = (ctype.find('union') == -1)
-            self.cstructs[ctype] = CType(self, ctype, typeDict[ctype][0], members, isStruct)
+        """ Parses the abstract_types by converting their string
+        representations to class instances.
+        """
+        self.types[ctype] = self.convert_members(ctype, typeDict)
 
     def add_types(self, addDict):
         for ctype in addDict.keys():
 	    self.import_type(ctype, addDict)
         
-    def list_to_type(self, typeList, typeDict):
-        if typeList[0] == 'void':
-            return self.voidType        
-        if typeList[0] == 'pointer':
-            return Pointer(self, self.list_to_type(typeList[1], typeDict))
-        if typeList[0] == 'array':
-            return Array(self, typeList[1], self.list_to_type(typeList[2], typeDict))
-        if self.native_types.has_key(typeList[0]):
-            return self.native_types[typeList[0]]
-        if self.cstructs.has_key(typeList[0]):
-            return self.cstructs[typeList[0]]
+    def list_to_type(self, name, typeList, typeDict):
+        """ Parses a specification list and returns a VType object.
 
-        isStruct = (typeList[0].find('union') == -1)
-        self.cstructs[typeList[0]] = CType(self, typeList[0], 0, {}, isStruct)
-        return self.cstructs[typeList[0]]        
+        This function is a bit complex because we support lots of
+        different list types for backwards compatibility.
+        """
+        ## This supports plugin memory objects:
+        #if typeList[0] in MemoryRegistry.OBJECT_CLASSES.objects:
+        #    print "Using plugin for %s" % 
+
+        try:
+            args = typeList[1]
+
+            if type(args)==dict:
+                ## We have a list of the form [ ClassName, dict(.. args ..) ]
+                return Curry(NewObject, theType=typeList[0], name=name,
+                             **args)
+        except (TypeError,IndexError),e:
+            pass
+
+        ## This is of the form [ 'void' ]
+        if typeList[0] == 'void':
+            return Curry(Void, Void, name=name)
+
+        ## This is of the form [ 'pointer' , [ 'foobar' ]]
+        if typeList[0] == 'pointer':
+            return Curry(Pointer, Pointer,
+                         name = name,
+                         target=self.list_to_type(name, typeList[1], typeDict))
+
+        ## This is an array: [ 'array', count, ['foobar'] ]
+        if typeList[0] == 'array':
+            return Curry(Array, Array,
+                         name = name, count=typeList[1],
+                         target=self.list_to_type(name, typeList[2], typeDict))
+
+        ## This is a list which refers to a type which is already defined
+        if typeList[0] in self.types:
+            return Curry(self.types[typeList[0]], name=name)
+
+        ## Does it refer to a type which will be defined in future? in
+        ## this case we just curry the NewObject function to provide
+        ## it on demand. This allows us to define structures
+        ## recursively.
+        ##if typeList[0] in typeDict:
+        if 1:
+            try:
+                args = typeList[1]
+            except IndexError: args = {}
+            
+            obj_name = typeList[0]
+            return Curry(NewObject, obj_name, **args)
+
+        ## If we get here we have no idea what this list is
+        #raise RuntimeError("Error in parsing list %s" % (typeList))
+        print "Warning - Unable to find a type for %s, assuming int" % typeList[0]
+        return Curry(self.types['int'], name=name)
+
+    def get_obj_offset(self, name, member):
+        """ Returns a members offset within the struct """
+        tmp = self.types[name](name,None, profile=self)
+        offset, cls = tmp.members[member]
+        
+        return offset
         
     def convert_members(self, cname, typeDict):
+        """ Convert the member named by cname from the c description
+        provided by typeDict into a list of members that can be used
+        for later parsing.
+
+        cname is the name of the struct.
+        
+        We expect typeDict[cname] to be a list of the following format
+
+        [ Size of struct, members_dict ]
+
+        members_dict is a dict of all members (fields) in this
+        struct. The key is the member name, and the value is a list of
+        this form:
+
+        [ offset_from_start_of_struct, specification_list ]
+
+        The specification list has the form specified by self.list_to_type() above.
+
+        We return a list of CTypeMember objects. 
+        """
         ctype = typeDict[cname]
         members = {}
-        for i in ctype[1].keys():
-            members[i] = CTypeMember(i, ctype[1][i][0], self.list_to_type(ctype[1][i][1], typeDict))
-        return members
+        size = ctype[0]
+        for k,v in ctype[1].items():
+            members[k] = (v[0], self.list_to_type(k, v[1], typeDict))
+
+        ## Allow the plugins to over ride the class constructor here
+        if cname in MemoryRegistry.OBJECT_CLASSES.objects:
+            cls = MemoryRegistry.OBJECT_CLASSES[cname]
+        else:
+            cls = CType
+        
+        return Curry(cls, cls, members=members, size=size)
+
+class BufferAddressSpace(addrspace.FileAddressSpace):
+    def __init__(self, buff):
+        self.fname = "Buffer"
+        self.fhandle = StringIO.StringIO(buff)
+        self.fsize = len(buff)
+
+if __name__=='__main__':
+    ## If called directly we run unit tests on this stuff
+    import unittest
+
+    class ObjectTests(unittest.TestCase):
+        """ Tests the object implementation. """
+
+        def make_object(self, obj, offset, type, data):
+            address_space = BufferAddressSpace(data)
+            profile = Profile(abstract_types=type)
+            o = NewObject(obj, offset, address_space, profile=profile)
+            
+            return o
+        
+        def test01SimpleStructHandling(self):
+            """ Test simple struct handling """
+            mytype = {
+                "HEADER": [ 0x20,
+                            { 'MAGIC': [ 0x00, ['array', 3, ['char'] ]],
+                              'Size': [ 0x04, ['unsigned int']],
+                              'Count': [ 0x08, ['unsigned short int']],
+                              }],
+                }
+
+            test_data = "ABAD\x06\x00\x00\x00\x02\x00\xff\xff"
+
+            o = self.make_object('HEADER', 0, mytype, test_data)
+            ## Can we decode ints?
+            self.assertEqual(o.Size.v(), 6)
+            self.assertEqual(int(o.Size), 6)
+            self.assertEqual(o.Size + 6, 12)
+            self.assertEqual(o.Size - 3, 3)
+            self.assertEqual(o.Size + o.Count, 8)
+            
+            ## This demonstrates how array members print out
+            print o.MAGIC[0], o.MAGIC[1]
+
+            ## test comparison of array members
+            self.assertEqual(o.MAGIC[0], 'A')
+            self.assertEqual(o.MAGIC[0], o.MAGIC[2])
+            self.assertEqual(o.MAGIC, ['A','B','A'])
+            self.assertEqual(o.MAGIC, 'ABA')
+            
+            ## Iteration over arrays:
+            tmp = 'ABA'
+            count = 0
+            for t in o.MAGIC:
+                self.assertEqual(t,tmp[count])
+                count+=1
+
+        def test02Links(self):
+            """ Tests intrastruct links, pointers etc """
+            mytype = {
+                '_LIST_ENTRY' : [ 0x8, { \
+                      'Flink' : [ 0x0, ['pointer', ['_LIST_ENTRY']]], \
+                      'Blink' : [ 0x4, ['pointer', ['_LIST_ENTRY']]], \
+                      } ],
+                '_HANDLE_TABLE' : [ 0x44, { \
+                      'TableCode' : [ 0x0, ['unsigned long']], \
+                      'UniqueProcessId' : [ 0x8, ['pointer', ['void']]], \
+                      'HandleTableList' : [ 0x1c, ['_LIST_ENTRY']], \
+                      'HandleCount' : [ 0x3c, ['long']], \
+                      } ],
+                }
+
+            test_data = '\x01\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\\\x00\x00\x00\\\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\x1c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+
+            o = self.make_object('_HANDLE_TABLE', 0, mytype, test_data)
+
+            self.assertEqual(o.TableCode, 1)
+            self.assertEqual(o.UniqueProcessId, 0x1c)
+            self.assertEqual(o.UniqueProcessId.dereference(), 0x5c)
+            self.assertEqual(o.UniqueProcessId.dereference_as("unsigned int"), 0x5c)
+
+            n = o.HandleTableList.next
+            self.assertEqual(n.TableCode, 3)
+            self.assertEqual(n.HandleCount, 5)
+
+            ## Make sure next.prev == o
+            self.assertEqual(n.HandleTableList.prev, o)
+            self.assertEqual(n.HandleTableList.prev.TableCode, 1)
+            
+    suite = unittest.makeSuite(ObjectTests)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
