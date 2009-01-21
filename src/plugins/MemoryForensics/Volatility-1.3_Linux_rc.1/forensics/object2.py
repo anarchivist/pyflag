@@ -213,8 +213,9 @@ class VType:
 
 class NativeType(Object):
     def __init__(self, theType, offset, vm, parent=None, profile=None,
-                 format_string=None, **args):
-        Object.__init__(self, theType, offset, vm, parent=parent, profile=profile)
+                 format_string=None, name=None, **args):
+        Object.__init__(self, theType, offset, vm, parent=parent,
+                        profile=profile, name=name)
         self.format_string = format_string
 
     def size(self):
@@ -558,7 +559,7 @@ class Profile:
             except IndexError: args = {}
             
             obj_name = typeList[0]
-            return Curry(NewObject, obj_name, **args)
+            return Curry(NewObject, obj_name, name=name, **args)
 
         ## If we get here we have no idea what this list is
         #raise RuntimeError("Error in parsing list %s" % (typeList))

@@ -27,6 +27,7 @@
 """
 
 from forensics.object import *
+from forensics.object2 import NewObject
 from forensics.win32.datetime import *
 #from forensics.win32.info import *
 from forensics.win32.info import find_psactiveprocesshead

@@ -1070,19 +1070,17 @@ class ssdt(forensics.commands.command):
         print "Gathering all referenced SSDTs from KTHREADs..."
         ssdts = set()
         for proc in procs:
-            print proc
             for thread in proc.ThreadListHead.list_of_type("_ETHREAD", "ThreadListEntry"):
-                print "Thread %s" % thread
-                
-            for thread in get_threads(proc):
-                ssdts.add(thread.Tcb.ServiceTable.dereference())
+                ssdt = thread.Tcb.ServiceTable.dereference()
+                ssdts.add(ssdt)
 
         # Get a list of *unique* SSDT entries. Typically we see only two.
         tables = set()
+        
         for ssdt in ssdts:
             for i,desc in enumerate(ssdt.Descriptors):
                 if desc.is_valid() and desc.ServiceLimit != 0:
-                    tables.add((i,desc.KiServiceTable.v(),desc.ServiceLimit))
+                    tables.add((i,desc.KiServiceTable.v(),desc.ServiceLimit.v()))
 
         print "Finding appropriate address space for tables..."
         tables_with_vm = []
