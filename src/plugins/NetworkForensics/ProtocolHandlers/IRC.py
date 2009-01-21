@@ -530,7 +530,7 @@ class IRCScanner(StreamScannerFactory):
     """ Collect information about IRC traffic """
     default = True
     depends = ['TypeScan']
-    group = "NetworkScanner"
+    group = "NetworkScanners"
 
     def process_stream(self, stream, factories):
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)

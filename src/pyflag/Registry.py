@@ -219,9 +219,9 @@ class Registry:
         raise ImportError("No module by name %s" % name)
 
     def get_name(self, cls):
-        #try:
-        #    return cls.name
-        #except AttributeError:
+        try:
+            name=cls.name
+        except AttributeError:
             name = ("%s" % cls).split(".")[-1]
             cls.name = name
             return name
@@ -287,7 +287,7 @@ class ReportRegistry(Registry):
         Class.name
         Class.parameters
 
-class ScannerRegistry(Registry):
+class OrderedRegistry(Registry):
     """ A class to register Scanners. """
     def __init__(self,ParentClass):
         Registry.__init__(self,ParentClass)
@@ -329,7 +329,17 @@ class ScannerRegistry(Registry):
         else:
             raise ValueError("Object %s does not exist in the registry. Is the relevant plugin loaded?" % scanner_name)
 
-class FileHandlerRegistry(ScannerRegistry):
+class ScannerRegistry(OrderedRegistry):
+    def get_name(self, cls):
+        name = ("%s" % cls).split(".")[-1]
+        cls.name = name
+        return name
+
+class CaseTableRegistry(OrderedRegistry):
+    def get_name(self, cls):
+        return cls.name
+
+class FileHandlerRegistry(OrderedRegistry):
     def __init__(self, ParentClass):
         Registry.__init__(self, ParentClass)
         self.class_names = [ i.method for i in self.classes ]
@@ -364,7 +374,7 @@ class ShellRegistry(Registry):
             except KeyError:
                 self.commands[command]=cls
 
-class LogDriverRegistry(ScannerRegistry):
+class LogDriverRegistry(OrderedRegistry):
     """ A class taking care of Log file drivers """
     drivers = {}
     def __init__(self,ParentClass):
@@ -395,16 +405,16 @@ class FileFormatRegistry(Registry):
             self.formats[("%s" % cls).split('.')[-1]] = cls
 
 import unittest
-class TestsRegistry(ScannerRegistry):
+class TestsRegistry(OrderedRegistry):
     pass
 
-class ColumnTypeRegistry(ScannerRegistry):
+class ColumnTypeRegistry(OrderedRegistry):
     pass
 
-class TaskRegistry(ScannerRegistry):
+class TaskRegistry(OrderedRegistry):
     pass
 
-class CarverRegistry(ScannerRegistry):
+class CarverRegistry(OrderedRegistry):
     pass
 
 ## These are some base classes which will be used by plugins to be
@@ -519,7 +529,7 @@ def Init():
     ## Pick all Log File drivers:
     import pyflag.LogFile as LogFile
     global LOG_DRIVERS
-    LOG_DRIVERS = ScannerRegistry(LogFile.Log)
+    LOG_DRIVERS = OrderedRegistry(LogFile.Log)
     
     ## Register all shell commands:
     import pyflag.pyflagsh as pyflagsh
@@ -529,7 +539,7 @@ def Init():
     ## Register Filesystem drivers
     import pyflag.FileSystem as FileSystem
     global FILESYSTEMS
-    FILESYSTEMS = ScannerRegistry(FileSystem.DBFS)
+    FILESYSTEMS = OrderedRegistry(FileSystem.DBFS)
 
     ## Register FileFormat drivers
     import pyflag.format as format
@@ -544,21 +554,21 @@ def Init():
     ## Register worker tasks
     import pyflag.Farm as Farm
     global TASKS
-    TASKS = ScannerRegistry(Farm.Task)
+    TASKS = OrderedRegistry(Farm.Task)
 
     ## Register carvers:
     global CARVERS
-    CARVERS = ScannerRegistry(Scanner.Carver)
+    CARVERS = OrderedRegistry(Scanner.Carver)
 
     ## Register SQL handlers
     import pyflag.FlagFramework as FlagFramework
     global EVENT_HANDLERS
-    EVENT_HANDLERS = ScannerRegistry(FlagFramework.EventHandler)
+    EVENT_HANDLERS = OrderedRegistry(FlagFramework.EventHandler)
 
     ## Register IO Images:
     import pyflag.IO as IO
     global IMAGES
-    IMAGES = ScannerRegistry(IO.Image)
+    IMAGES = OrderedRegistry(IO.Image)
 
     global FILE_HANDLERS
     FILE_HANDLERS = FileHandlerRegistry(IO.FileHandler)
@@ -566,39 +576,39 @@ def Init():
     ## Register packet handlers:
     import pyflag.Packets as Packets
     global PACKET_HANDLERS
-    PACKET_HANDLERS = ScannerRegistry(Packets.PacketHandler)
+    PACKET_HANDLERS = OrderedRegistry(Packets.PacketHandler)
 
     ## Register stats viewers:
     import pyflag.Stats as Stats
     global STATS_HANDLERS
-    STATS_HANDLERS = ScannerRegistry(Stats.Handler)
+    STATS_HANDLERS = OrderedRegistry(Stats.Handler)
 
     ## Register Case Tables for dynamic schema
     global CASE_TABLES
-    CASE_TABLES = ScannerRegistry(FlagFramework.CaseTable)
+    CASE_TABLES = CaseTableRegistry(FlagFramework.CaseTable)
 
     global MAGIC_HANDLERS
     import pyflag.Magic as Magic
 
-    MAGIC_HANDLERS = ScannerRegistry(Magic.Magic)
+    MAGIC_HANDLERS = OrderedRegistry(Magic.Magic)
 
     global TABLE_RENDERERS
     import pyflag.UI as UI
 
-    TABLE_RENDERERS = ScannerRegistry(UI.TableRendererBaseClass)
+    TABLE_RENDERERS = OrderedRegistry(UI.TableRendererBaseClass)
 
     global ACTIONS
-    ACTIONS = ScannerRegistry(Action)
+    ACTIONS = OrderedRegistry(Action)
 
     global PRECANNED
-    PRECANNED = ScannerRegistry(PreCanned)
+    PRECANNED = OrderedRegistry(PreCanned)
 
     global FSLOADERS
-    FSLOADERS = ScannerRegistry(FileSystemLoader)
+    FSLOADERS = OrderedRegistry(FileSystemLoader)
 
     global GRAPHERS
     import pyflag.Graph as Graph
-    GRAPHERS = ScannerRegistry(Graph.GenericGraph)
+    GRAPHERS = OrderedRegistry(Graph.GenericGraph)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

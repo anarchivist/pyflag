@@ -143,7 +143,7 @@ class POPScanner(StreamScannerFactory):
     """ Collect information about POP transactions.
     """
     default = True
-    group = 'NetworkScanner'
+    group = 'NetworkScanners'
     
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "POP3")

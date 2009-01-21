@@ -131,7 +131,7 @@ class SMTPScanner(StreamScannerFactory):
     This is an example of a scanner which uses packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
-    group = 'NetworkScanner'
+    group = 'NetworkScanners'
 
     def process_stream(self, stream, factories):
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)

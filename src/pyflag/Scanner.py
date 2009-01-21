@@ -227,7 +227,6 @@ class StoreAndScan(BaseScanner):
     def __init__(self, inode,ddfs,outer,factories=None,fd=None):
         BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
         self.file = None
-        self.name = None
         self.boring_status = True
 
     def boring(self,metadata, data=''):

@@ -272,7 +272,15 @@ def nanny(cb, *args, **kwargs):
             ## remember to kill it when we terminate ourselves.
             try:
                 children = [pid]
-                ret = os.waitpid(pid,0)
+                while 1:
+                    try:
+                        ret = os.waitpid(pid,0)
+                    except OSError,e:
+                        pass
+                    except Exception,e:
+                        ret = [pid]
+                        break
+                    
                 pyflaglog.log(pyflaglog.WARNING, "Child %s died... restaring" % ret[0])
             finally:
                 terminate_children()

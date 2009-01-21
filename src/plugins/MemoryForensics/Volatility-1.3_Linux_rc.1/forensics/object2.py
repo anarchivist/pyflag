@@ -601,7 +601,8 @@ class Profile:
             members[k] = (v[0], self.list_to_type(k, v[1], typeDict))
 
         ## Allow the plugins to over ride the class constructor here
-        if cname in MemoryRegistry.OBJECT_CLASSES.objects:
+        if MemoryRegistry.OBJECT_CLASSES and \
+               cname in MemoryRegistry.OBJECT_CLASSES.objects:
             cls = MemoryRegistry.OBJECT_CLASSES[cname]
         else:
             cls = CType
