@@ -319,7 +319,7 @@ class SanitizingTag(Tag):
             else:
                 attributes += DB.expand(' href="javascript: alert(%r)"',
                                         iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
-                postfix = self.mark_link(self.attributes['href'])
+                postfix = self.mark_link(self.attributes['href'] or '')
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':

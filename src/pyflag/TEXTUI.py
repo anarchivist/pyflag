@@ -37,13 +37,16 @@ config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 import cStringIO
 
+class TextObject:
+    generator = None
+
 class TEXTUI(UI.GenericUI):
     """ A simple text UI """
     def __init__(self, default= None, query=None):
         self.result = ""
         self.text_var = ''
         self.current_table=None
-
+        self.generator = TextObject()
 
         if query:
             self.defaults=query

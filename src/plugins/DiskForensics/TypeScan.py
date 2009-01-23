@@ -88,22 +88,24 @@ class ThumbnailType(InodeIDType):
         try:
             fd = self.fsfd.open(inode_id = inode_id)
             image = Graph.Thumbnailer(fd, 200)
+            inode_filename, ct, fd = table_renderer.make_archive_filename(inode_id)
 
             filename, ct, fd = table_renderer.make_archive_filename(inode_id, directory = "thumbnails/")
-            inode_filename, ct, fd = table_renderer.make_archive_filename(inode_id)
         
             table_renderer.add_file_from_string(filename,
                                                 image.display())
-        except IOError:
+        except IOError,e:
+            print e
             return "<a href=%r ><img src='images/broken.png' /></a>" % inode_filename
 
+        table_renderer.add_file_to_archive(inode_id)
         return "<a href=%r ><img src=%r /></a>" % (inode_filename, filename)
 
     def render_thumbnail_hook(self, inode_id, row, result):
         try:
             fd = self.fsfd.open(inode_id=inode_id)
             image = PIL.Image.open(fd)
-        except IOError:
+        except IOError,e:
             result.icon("broken.png")
             return
 

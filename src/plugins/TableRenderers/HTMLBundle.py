@@ -262,6 +262,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         hiddens = [ int(x) for x in query.getarray(self.hidden) ]
 
         self.column_names = []
+        for e in self.elements:
+            print "%s.%s " % (e.table, e.name)
         elements = []
         for e in range(len(self.elements)):
             if e in hiddens: continue
@@ -391,7 +393,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         will use.  it mapps the inodes we already visited with the key
         and their filename as the value.
         """
-           
         if not self.include_extra_files:
             return "#"
         
@@ -563,6 +564,7 @@ class Export(Farm.Task):
                 data = fd.html_export(tag_class = tag)
                 table_renderer.add_file_from_string(filename, data.encode("utf8"))
         except AttributeError,e:
+            print e
             pass
 
         ## Now explain this file:
