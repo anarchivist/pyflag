@@ -454,19 +454,12 @@ class ViewInodeHits(Reports.report):
         result.textfield('Inode ID', 'inode_id')
         result.textfield('Word ID', 'word_id')
 
-    def analyse(self, query):
-        ## Check to see if the inode is up to date
-        #count, size = Indexing.count_outdated_inodes(
-        #    query['case'],
-        #    "from inode where inode_id=%s" % query['inode_id'],
-        #    unique = False)
-
+    def display(self,query,result):
         ## This indexing will be done in process (i.e. not
         ## distributable) because its exactly one job:
         task = Index()
         task.run(query['case'], query['inode_id'], 2**30 + int(query['word_id']))
 
-    def display(self,query,result):
         case = query['case']
         result.table(
             elements = [ InodeIDType(case=case),
@@ -615,7 +608,7 @@ def reindex():
                 word = row['word'].decode("UTF-8").lower()
                 for e in config.INDEX_ENCODINGS.split(","):
                     w = word.encode(e)
-                    if len(w)>3:
+                    if len(w)>=3:
                         INDEX.add_word(w,id, index.WORD_ENGLISH)
             except UnicodeDecodeError,error:
                 pyflaglog.log(pyflaglog.ERROR, "Unable to encode in encoding %e: %s" % (e,error))
@@ -652,7 +645,7 @@ class AddWords(Reports.report):
         result.const_selector('Type:','type',('word','literal','regex'),('Word','Literal','RegEx'))
 
         result.hidden("cookie", time.time(), exclusive=True)
-        if query.has_key("class_override"):
+        if query.has_key("class_override") and len(query['class_override'])>2:
             query['class'] = query['class_override']
             ## Refresh ourselves to update to the new class name
             result.refresh(0, query)
@@ -1020,3 +1013,11 @@ class HashTrieIndexTests(unittest.TestCase):
 
             print "Indexed file in %s seconds (%s hits)" % (time.time() - new_t, count)
 
+if __name__=="__main__":
+    import pyflag.Registry as Registry
+    Registry.Init()
+    config.parse_options(True)
+
+    i=Index()
+    i.run("PyFlagTestCase", 330, 71186 + 2**30)
+    

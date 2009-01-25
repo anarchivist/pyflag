@@ -572,7 +572,7 @@ class BrowseHTTPRequests(Reports.CaseTableReports):
     name = "Browse HTTP Requests"
     family = "Network Forensics"
     default_table = 'HTTPCaseTable'
-    columns = ['InodeTable.Modified', 'Request Packet', 'Method', 'URL', 'Content Type' ]
+    columns = ['InodeTable.Modified', "InodeTable.Inode", 'Request Packet', 'Method', 'URL', 'Content Type' ]
     
 class BrowseHTTPRequestsXXX(Reports.report):
     """
@@ -636,7 +636,7 @@ class BrowseHTTPRequestsXXX(Reports.report):
                              #TimestampType(name='Date',column='date'),
                              PacketType(name='Request Packet',column='request_packet',
                                         case=query['case']),
-                             InodeIDType(case=query['case']),
+                             InodeIDType(),
                              StringType('Method','method'),
                              StringType('URL','url'),
                              StringType('Content Type','content_type') ],

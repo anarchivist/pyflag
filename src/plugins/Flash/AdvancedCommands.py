@@ -11,6 +11,7 @@ import pyflag.Scanner as Scanner
 import time, types
 import pyflag.pyflaglog as pyflaglog
 import BasicCommands
+import pyflag.ScannerUtils as ScannerUtils
 
 class scan_path(pyflagsh.command):
     """ This takes a path as an argument and runs the specified scanner on the path
@@ -126,6 +127,8 @@ class scan(pyflagsh.command):
         scanners = []
         for i in range(1,len(self.args)):
             scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
+
+        scanners = ScannerUtils.fill_in_dependancies(scanners)
 
         for row in dbh:
             inode = row['inode']

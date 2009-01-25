@@ -114,7 +114,7 @@ def insert_dictionary_word(word, word_type, classification='', binary=False):
             pdbh.insert('dictionary',
                         **{'__word': word,
                            'type': word_type,
-                           'class': classification,
+                           'class': classification or "English",
                            ## Cant be fast here - cache must be updated
                            ##'_fast': True,
                            })

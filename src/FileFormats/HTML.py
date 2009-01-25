@@ -477,6 +477,11 @@ class ResolvingHTMLTag(SanitizingTag):
 
         return '"f?%s"' % result
 
+    def follow_redirect(self, dbh, inode_id):
+        """ Follows a redirect in inode_id and return the new inode_id """
+        ## FIXME implement this
+        return inode_id
+
     def resolve_reference(self, reference, hint='', build_reference=True):
         original_reference = reference
 
@@ -514,14 +519,19 @@ class ResolvingHTMLTag(SanitizingTag):
                     "isnull(http.inode_id) and size > 0 limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
+            ## If the target was redirected - take care of that:
+            ## (DANGER - a circular redirection could be problematic)
+            ## FIXME - do this (we need to store the location header)
+            if row['status'] == 302:
+                inode_id = self.follow_redirect(dbh, row['inode_id'])
+            else:
+                inode_id = row['inode_id']
+
             ## This is needed to stop dbh leaks due to the highly
             ## recursive nature of this function.
             del dbh
 
-            ## If the target was redirected - take care of that:
-            ## (DANGER - a circular redirection could be problematic)
-            ## FIXME - do this (we need to store the location header)
-            result = self.make_reference_to_inode(row['inode_id'], hint)
+            result = self.make_reference_to_inode(inode_id, hint)
             
             if build_reference:
                 result += " reference=\"%s\" " % reference

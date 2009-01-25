@@ -221,6 +221,7 @@ class Registry:
     def get_name(self, cls):
         try:
             name=cls.name
+            return name
         except AttributeError:
             name = ("%s" % cls).split(".")[-1]
             cls.name = name
@@ -307,7 +308,7 @@ class OrderedRegistry(Registry):
             return 1
 
         self.classes.sort(sort_function)
-        self.class_names = [ self.get_class_name(i) for i in self.classes ]
+        self.class_names = [ self.get_name(i) for i in self.classes ]
         self.scanners = self.class_names
 
     def get_class_name(self, cls):
@@ -337,10 +338,6 @@ class ScannerRegistry(OrderedRegistry):
         name = ("%s" % cls).split(".")[-1]
         cls.name = name
         return name
-
-class CaseTableRegistry(OrderedRegistry):
-    def get_name(self, cls):
-        return cls.name
 
 class FileHandlerRegistry(OrderedRegistry):
     def __init__(self, ParentClass):
@@ -588,7 +585,7 @@ def Init():
 
     ## Register Case Tables for dynamic schema
     global CASE_TABLES
-    CASE_TABLES = CaseTableRegistry(FlagFramework.CaseTable)
+    CASE_TABLES = OrderedRegistry(FlagFramework.CaseTable)
 
     global MAGIC_HANDLERS
     import pyflag.Magic as Magic

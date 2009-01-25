@@ -404,7 +404,6 @@ class ScanInode(ScanFS):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Asking pyflash to scan the inode: %s with scanners %s" % (query['inode'], scanner_names))
         
         #Use pyflash to do all the work
-        print scanner_names
         env = pyflagsh.environment(case=query['case'])
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=[query['inode'],] + scanner_names)

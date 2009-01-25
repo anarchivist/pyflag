@@ -318,7 +318,6 @@ class istat(pyflagsh.command):
         for arg in args:
             ## Glob the inodes:
             dbh = DB.DBO(self.environment._CASE)
-            print arg
             if arg[0]=='/':
                 dbh.execute("select inode from inode where inode rlike %r", arg[1:-1])
             else:
@@ -377,7 +376,6 @@ class iiless(iless):
 class icp(iless):
     """ Copy Inodes from the VFS to the file system """
     def execute(self):
-        print self.args
         ## check that last arg is a dir
         mode = "file"
         if len(self.args)>2 and not os.isdir(self.args[-1]):
@@ -386,7 +384,6 @@ class icp(iless):
             mode = "directory"
         
         for inode in self.args[:-1]:
-            print inode
             fd=self.environment._FS.open(inode=inode)
             if mode =='directory':
                 output_filename = inode.replace("/","_")
@@ -406,7 +403,6 @@ class icp(iless):
 class iicp(iless):
     """ Copy Inodes from the VFS to the file system """
     def execute(self):
-        print self.args
         ## check that last arg is a dir
         mode = "file"
         if len(self.args)>2 and not os.isdir(self.args[-1]):

@@ -208,7 +208,8 @@ def terminate_children():
     
     for pid in children:
         try:
-            os.kill(pid, signal.SIGABRT)
+            #print "Terminating child %s" % pid
+            os.kill(pid, signal.SIGINT)
         except: pass
 
         ## Stop our logging thread
