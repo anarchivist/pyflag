@@ -105,29 +105,29 @@ class pslist_ex_3(forensics.commands.command):
                                                    handle_count,
                                                    create_time),defaults)
 
-class _EPROCESS(CType):
-    """Class representing an _EPROCESS.
+##class _EPROCESS(CType):
+##    """Class representing an _EPROCESS.
 
-    Adds the following special behavior:
-      * Uses self.Pcb.DirectoryTableBase to re-calculate its
-        address space.
-      * Presents ImageFileName as a Python string rather than
-        an array of unsigned chars.
-    """
-    hasMembers = True
-    name = "EPROCESS"
+##    Adds the following special behavior:
+##      * Uses self.Pcb.DirectoryTableBase to re-calculate its
+##        address space.
+##      * Presents ImageFileName as a Python string rather than
+##        an array of unsigned chars.
+##    """
+##    hasMembers = True
+##    name = "EPROCESS"
 
-    def __init__(self, *args, **kwargs):
-        CType.__init__(self, *args, **kwargs)
-        new_dtb = self.Pcb.DirectoryTableBase[0]
-        self.vm = create_addr_space(self.vm, new_dtb)
+##    def __init__(self, *args, **kwargs):
+##        CType.__init__(self, *args, **kwargs)
+##        new_dtb = self.Pcb.DirectoryTableBase[0]
+##        self.vm = create_addr_space(self.vm, new_dtb)
     
-    # Custom attributes
-    def getImageFileName(self):
-        return read_null_string(self.vm, types,
-                ['_EPROCESS', 'ImageFileName'], self.offset)
-    ImageFileName = property(fget=getImageFileName)
+##    # Custom attributes
+##    def getImageFileName(self):
+##        return read_null_string(self.vm, types,
+##                ['_EPROCESS', 'ImageFileName'], self.offset)
+##    ImageFileName = property(fget=getImageFileName)
 
-    def getCreateTime(self):
-        return process_create_time(self.vm, types, self.offset)
-    CreateTime = property(fget=getCreateTime)
+##    def getCreateTime(self):
+##        return process_create_time(self.vm, types, self.offset)
+##    CreateTime = property(fget=getCreateTime)

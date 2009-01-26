@@ -30,12 +30,41 @@ from forensics.object import *
 from forensics.object2 import NewObject
 from forensics.win32.datetime import *
 #from forensics.win32.info import *
-from forensics.win32.info import find_psactiveprocesshead
+from forensics.win32.info import find_psactiveprocesshead, kpcr_addr
 import os
 from struct import unpack
 
 from forensics.addrspace import *
 
+def pslist(addr_space, profile):
+    """ A Generator for _EPROCESS objects (uses _KPCR symbols) """
+
+    ## Locate the kpcr struct - this is hard coded right now
+    kpcr = NewObject("_KPCR", kpcr_addr, addr_space, profile=profile)
+
+    ## Try to dereference the KdVersionBlock as a 64 bit struct
+    DebuggerDataList = kpcr.KdVersionBlock.dereference_as("_DBGKD_GET_VERSION64").DebuggerDataList
+
+    if DebuggerDataList.is_valid():
+        offset = DebuggerDataList.dereference()
+
+        ## This is a pointer to a _KDDEBUGGER_DATA64 struct. We only
+        ## care about the PsActiveProcessHead entry:
+        PsActiveProcessHead = NewObject("_KDDEBUGGER_DATA64", offset,
+                                        addr_space, profile=profile).PsActiveProcessHead
+
+
+        if not PsActiveProcessHead.is_valid():
+            ## Ok maybe its a 32 bit struct
+            PsActiveProcessHead = NewObject("_KDDEBUGGER_DATA32", offset,
+                                            addr_space, profile=profile).PsActiveProcessHead
+            
+    ## Try to iterate over the process list in PsActiveProcessHead
+    ## (its really a pointer to a _LIST_ENTRY)
+    for l in PsActiveProcessHead.dereference_as("_LIST_ENTRY").list_of_type(
+        "_EPROCESS", "ActiveProcessLinks"):
+        yield l
+        
 def process_list(addr_space, types, symbol_table=None):
     """
     Get the virtual addresses of all Windows processes
@@ -43,6 +72,8 @@ def process_list(addr_space, types, symbol_table=None):
     plist = []
     
     PsActiveProcessHead = find_psactiveprocesshead(addr_space,types)
+
+    print "head is %s" % PsActiveProcessHead
 
     if not PsActiveProcessHead is None:
         (offset, tmp)  = get_obj_offset(types, ['_EPROCESS', 'ActiveProcessLinks'])

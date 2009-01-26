@@ -48,7 +48,7 @@ xpsp2types = { \
 } ], \
   '_EPROCESS' : [ 0x260, { \
     'Pcb' : [ 0x0, ['_KPROCESS']], \
-    'CreateTime' : [ 0x70, ['_LARGE_INTEGER']], \
+    'CreateTime' : [ 0x70, ['WinTimeStamp', {}]], \
     'ExitTime' : [ 0x78, ['_LARGE_INTEGER']], \
     'UniqueProcessId' : [ 0x84, ['pointer', ['void']]], \
     'ActiveProcessLinks' : [ 0x88, ['_LIST_ENTRY']], \
@@ -58,7 +58,8 @@ xpsp2types = { \
     'AddressCreationLock' : [ 0xf0, ['_FAST_MUTEX']], \
     'VadRoot' : [ 0x11c, ['pointer', ['void']]], \
     'InheritedFromUniqueProcessId' : [ 0x14c, ['pointer', ['void']]], \
-    'ImageFileName' : [ 0x174, ['array', 16,['unsigned char']]], \
+#    'ImageFileName' : [ 0x174, ['array', 16,['unsigned char']]], \
+    'ImageFileName' : [ 0x174, ['String', dict(length=16)]], \
     'ThreadListHead' : [ 0x190, ['_LIST_ENTRY']], \
     'ActiveThreads' : [ 0x1a0, ['unsigned long']], \
     'Peb' : [ 0x1b0, ['pointer', ['_PEB']]], \
@@ -101,7 +102,7 @@ xpsp2types = { \
     'LocalPort' : [ 0x30, ['unsigned short']], \
     'Protocol'  : [ 0x32, ['unsigned short']], \
     'Pid' : [ 0x148, ['unsigned long']], \
-    'CreateTime' : [ 0x158, ['_LARGE_INTEGER']], \
+    'CreateTime' : [ 0x158, ['WinTimeStamp', {}]], \
 } ], \
   '_TCPT_OBJECT' : [ 0x20, { \
   'Next' : [ 0x0, ['pointer', ['_TCPT_OBJECT']]], \
@@ -140,11 +141,11 @@ xpsp2types = { \
 } ], \
   '_KDDEBUGGER_DATA64' : [ 0x44, { \
   'PsLoadedModuleList' : [ 0x48, ['unsigned long']], \
-  'PsActiveProcessHead' : [ 0x50, ['unsigned long']], \
+  'PsActiveProcessHead' : [ 0x50, ['pointer', ['unsigned long']]], \
   'MmPfnDatabase' : [ 0xC0, ['unsigned long']], \
 } ], \
 '_DBGKD_GET_VERSION64' : [  0x2a, { \
-  'DebuggerDataList' : [ 0x20, ['unsigned long']], \
+  'DebuggerDataList' : [ 0x20, ['pointer', ['unsigned long']]], \
 } ], \
 '_MMVAD_LONG' : [  0x34, { \
   'StartingVpn' : [ 0x0, ['unsigned long']], \
@@ -251,7 +252,7 @@ xpsp2types = { \
   'DirectoryTableBase' : [ 0x10, ['unsigned long']], \
   'PfnDataBase' : [ 0x14, ['unsigned long']], \
   'PsLoadedModuleList' : [ 0x18, ['unsigned long']], \
-  'PsActiveProcessHead' : [ 0x1c, ['unsigned long']], \
+  'PsActiveProcessHead' : [ 0x1c, ['pointer' ,['unsigned long']]], \
   'MachineImageType' : [ 0x20, ['unsigned long']], \
   'NumberProcessors' : [ 0x24, ['unsigned long']], \
   'BugCheckCode' : [ 0x28, ['unsigned long']], \

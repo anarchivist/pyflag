@@ -23,9 +23,11 @@
 @contact:      bdolangavitt@wesleyan.edu
 """
 
-from forensics.object2 import CType, NewObject
+from forensics.object2 import CType, NewObject, NativeType
 from forensics.object import *
 from vtypes import xpsp2types as types
+from forensics.win32.datetime import *
+import vmodules
 
 class _UNICODE_STRING(CType):
     """Class representing a _UNICODE_STRING
@@ -35,16 +37,16 @@ class _UNICODE_STRING(CType):
         than a pointer to an unsigned short.
       * The __str__ method returns the value of the Buffer.
     """
+    def v(self):
+        try:
+            data = self.vm.read(self.Buffer.v(), self.Length.v())
+            return data.decode("utf16","ignore")
+        except Exception,e:
+            return ''
 
     def __str__(self):
-        return self.Buffer
+        return self.v()
 
-    # Custom Attributes
-    def getBuffer(self):
-        return read_unicode_string(self.vm, types, [], self.offset)
-    
-    Buffer = property(fget=getBuffer)
-    
 class _LIST_ENTRY(CType):
     """ Adds iterators for _LIST_ENTRY types """
     def list_of_type(self, type, member, forward=True):
@@ -80,4 +82,56 @@ class _LIST_ENTRY(CType):
             yield obj
 
     def __iter__(self):
+        print self.parent, self.name
         return self.list_of_type(self.parent, self.name)
+
+class String(NativeType):
+    def __init__(self, type, offset, vm=None,
+                 length=1, parent=None, profile=None, name=None, **args):
+        NativeType.__init__(self, type, offset, vm, parent=parent, profile=profile,
+                            name=name, format_string="%ss" % length)
+
+    def __str__(self):
+        data = self.v()
+        ## Make sure its null terminated:
+        return data.strip("\x00")
+
+class WinTimeStamp(NativeType):
+    def __init__(self, type, offset, vm=None,
+                 parent=None, profile=None, name=None, **args):
+        NativeType.__init__(self, type, offset, vm, parent=parent, profile=profile,
+                            name=name, format_string="q")
+
+    def v(self):
+        return windows_to_unix_time(NativeType.v(self))
+
+    def __str__(self):
+        return vmodules.format_time(self.v())
+
+class _EPROCESS(CType):
+    """ An extensive _EPROCESS with bells and whistles """
+    def _Peb(self,attr):
+        """ Returns a _PEB object which is using the process address space.
+
+        The PEB structure is referencing back into the process address
+        space so we need to switch address spaces when we look at
+        it. This method ensure this happens automatically.
+        """
+        process_ad = self.get_process_address_space()
+        if process_ad:
+            offset =  self.m("Peb").v()
+
+            peb = NewObject("_PEB",offset, vm=process_ad, profile=self.profile,
+                            name = "Peb", parent=self)
+
+            if peb.is_valid():
+                return peb
+            
+    def get_process_address_space(self):
+        """ Gets a process address space for a task given in _EPROCESS """
+        directory_table_base = self.Pcb.DirectoryTableBase[0].v()
+
+        process_as= self.vm.__class__(self.vm.base, directory_table_base)
+        process_as.name = "Process"
+        return process_as
+    

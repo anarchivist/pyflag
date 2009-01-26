@@ -86,6 +86,8 @@ def NewObject(theType, offset, vm, parent=None, profile=None, name=None, **kwarg
     a string) from the type in profile passing optional args of
     kwargs.
     """
+    if name==None: name=theType
+    
     if theType in profile.types:
         result = profile.types[theType](offset=offset, vm=vm, name=name,
                                         parent=parent, profile=profile)
@@ -97,8 +99,8 @@ def NewObject(theType, offset, vm, parent=None, profile=None, name=None, **kwarg
         if theType:
             if MemoryRegistry.OBJECT_CLASSES.objects.has_key(theType):
                 return MemoryRegistry.OBJECT_CLASSES[theType](
-                    theType=theType,
-                    offset = offset,
+                    theType,
+                    offset,
                     vm = vm, parent=parent, profile=profile, name=name,
                     **kwargs)
     except AttributeError:
@@ -265,11 +267,17 @@ class Pointer(NativeType):
         self.target = target
         self.format_string = "=L"
 
+    def is_valid(self):
+        """ Returns if what we are pointing to is valid """
+        return self.vm.is_valid_address(self.v())
+
     def dereference(self):
         offset = self.v()
 
-        return self.target(offset=offset, vm=self.vm, parent=self,
-                           profile=self.profile, name=self.name)
+        result = self.target(offset=offset, vm=self.vm, parent=self,
+                             profile=self.profile, name=self.name)
+
+        return result
 
     def dereference_as(self, derefType):
         return NewObject(derefType, self.v(), \
@@ -284,12 +292,20 @@ class Pointer(NativeType):
     def __str__(self):
         return "<%s pointer to [0x%08X]>" % (self.dereference().__class__.__name__, self.v())
 
+    def __int__(self):
+        return self.v()
+
     def __getattribute__(self, attr):
         try:
             return super(Pointer,self).__getattribute__(attr)
         except AttributeError:
             ## We just dereference ourself
-            return self.dereference()
+            result = self.dereference()
+
+            #if isinstance(result, CType):
+            #    return result.m(attr)
+
+            return result
 
 class CTypeMember:
     """ A placeholder for a type in a struct.
@@ -374,7 +390,7 @@ class Array(Object):
         return self.target(offset = offset, vm=self.vm,
                            profile=self.profile, parent=self,
                            name="%s %s" % (self.name, self.position))
-
+    
     def __str__(self):
         return "Array (len=%s of %s)\n" % (self.count, self.current.name)
 
@@ -443,8 +459,14 @@ class CType(Object):
 
     def __getattribute__(self,attr):
         try:
+            return Object.__getattribute__(self, "_"+attr)(attr)
+        except AttributeError,e:
+            pass
+
+        try:
             return Object.__getattribute__(self, attr)
-        except AttributeError: pass
+        except AttributeError,e:
+            pass
 
         ## Special code to follow flink,blink lists
         if attr=='next':

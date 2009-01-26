@@ -4,7 +4,7 @@ from vtypes import *
 from forensics.object2 import Profile, Object
 
 def add_new_type(structure, field, offset, type):
-    xpsp2types[structure][1][field] = [offset, type]
+    xpsp2types[structure][1][field] = [offset, [type]]
 
 class pstree(forensics.commands.command):
     def parser(self):
@@ -21,6 +21,7 @@ class pstree(forensics.commands.command):
             '_SE_AUDIT_PROCESS_CREATION_INFO' : [ 0x4, {
             'ImageFileName' : [ 0x0, ['pointer', ['_OBJECT_NAME_INFORMATION']]],
             } ],
+                                              
             '_OBJECT_NAME_INFORMATION' : [ 0x8, {
             'Name' : [ 0x0, ['_UNICODE_STRING']],
             } ],
@@ -38,7 +39,7 @@ class pstree(forensics.commands.command):
                 if task_info['inherited_from'] == inherited_from:
                     outfd.write("%s 0x%08X:%-20s %-6d %-6d %-6d %-6d %-26s\n" % (
                         "." * pad,
-                        task_info['eprocess'],
+                        task_info['eprocess'].offset,
                         task_info['image_file_name'],
                         task_info['process_id'],
                         task_info['inherited_from'],
@@ -63,82 +64,44 @@ class pstree(forensics.commands.command):
     def calculate(self):
         result = {}
         self.pids = {}
+        
+        self.profile = Profile()
+
         (addr_space, self.symtab, types) = load_and_identify_image(self.op, self.opts)
 
-        all_tasks = process_list(addr_space, types, self.symtab)
-
-        for task in all_tasks:
-            if not addr_space.is_valid_address(task):
-                continue
-
+        for task in pslist(addr_space, self.profile):
             task_info = {}
             task_info['eprocess'] = task
-            task_info['image_file_name'] = process_imagename(addr_space, types,
-                                                             task) or 'UNKNOWN'
+            task_info['image_file_name'] = task.ImageFileName or 'UNKNOWN'
+            task_info['process_id']      = task.UniqueProcessId or -1
+            task_info['active_threads']  = task.ActiveThreads or -1
+            task_info['inherited_from']  = task.InheritedFromUniqueProcessId.v() or -1
+            task_info['handle_count']    = task.ObjectTable.HandleCount.v() or -1
+            task_info['create_time']     = task.CreateTime
 
-            task_info['process_id']      = process_pid(addr_space, types,
-                                                       task) or -1
+            ## Get the Process Environment Block - Note that _EPROCESS
+            ## will automatically switch to process address space by
+            ## itself.
+            peb = task.Peb
+            if peb:
+                task_info['command_line'] = peb.ProcessParameters.dereference().CommandLine.v()
+                task_info['ImagePathName'] = peb.ProcessParameters.dereference().ImagePathName
 
-            task_info['active_threads']  = process_num_active_threads(addr_space,
-                                                                      types, task) or -1
+            task_info['Audit ImageFileName'] = task.SeAuditProcessCreationInfo.ImageFileName.dereference().Name or 'UNKNOWN'
+                
+            ## Thats the tedious way:
+            ##process_ad = get_process_address_space(task)
+##            if process_ad:
+##                peb = NewObject("_PEB", task.m("Peb").offset, vm=process_ad,profile=self.profile)
 
-            task_info['inherited_from']  = process_inherited_from(addr_space,
-                                                                  types,task) or -1
-
-            task_info['handle_count']    = process_handle_count(addr_space, types,
-                                                                task) or -1
-
-            create_time     = process_create_time(addr_space, types,
-                                                               task)
-            if create_time is None:
-                task_info['create_time'] = "UNKNOWN"
-            else:
-                task_info['create_time'] = format_time(create_time)
-
-            self.find_command_line(addr_space,types, task, task_info)
-            self.find_se_audit(addr_space, types, task, task_info)
+##                if peb.is_valid():
+##                    task_info['command_line'] = peb.ProcessParameters.CommandLine
+##                    task_info['ImagePathName'] = peb.ProcessParameters.ImagePathName
+            
+            #self.find_command_line(addr_space,types, task, task_info)
+            #self.find_se_audit(addr_space, types, task, task_info)
             
             result[task] = task_info
             self.pids[task_info['process_id']] = task
             
         return result
-
-    def find_se_audit(self, addr_space, types, task, task_info):
-        ## This is an EPROCESS object
-        proc = Object("_EPROCESS", task, addr_space, profile=Profile())
-        
-        info = Object("_SE_AUDIT_PROCESS_CREATION_INFO", proc.SeAuditProcessCreationInfo.v(),
-                      addr_space, profile=Profile())
-
-        ## This is the command line:
-        task_info['Audit ImageFileName'] = read_unicode_string(
-            addr_space, types,'',
-            info.ImageFileName.v() ) or 'UNKNOWN'
-        
-    def find_command_line(self, addr_space,types, task, task_info):
-        if self.opts.verbose:
-            ## We need to print the command_line as well
-            process_address_space = process_addr_space(addr_space, types,
-                                                       task, self.opts.filename)
-            if process_address_space is None:
-                #print "Error obtaining address space for process [%d]" % (process_id)
-                return
-
-            peb = process_peb(addr_space, types, task)
-
-            if not process_address_space.is_valid_address(peb):
-                #print "Unable to read PEB for task."
-                return
-
-            process_parameters = read_obj(process_address_space, types,
-                                          ['_PEB', 'ProcessParameters'], peb)
-            if process_parameters:
-                task_info['command_line'] = read_unicode_string(
-                    process_address_space, types,
-                    ['_RTL_USER_PROCESS_PARAMETERS', 'CommandLine'],
-                    process_parameters)
-
-                task_info['ImagePathName'] = read_unicode_string(
-                    process_address_space, types,
-                    ['_RTL_USER_PROCESS_PARAMETERS', 'ImagePathName'],
-                    process_parameters)
