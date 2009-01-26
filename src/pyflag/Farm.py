@@ -277,7 +277,11 @@ def nanny(cb, *args, **kwargs):
                     try:
                         ret = os.waitpid(pid,0)
                     except OSError,e:
-                        pass
+                        if "Interrupted system call" in e.__str__():
+                            continue
+                        print "Error %s Exiting" % e
+                        os._exit(0)
+                        return
                     except Exception,e:
                         ret = [pid]
                         break
@@ -420,7 +424,7 @@ def start_workers():
        
        ## Parents:
        if pid:
-         children.append(pid)
+           children.append(pid)
        else:   
            nanny(worker_run)
            

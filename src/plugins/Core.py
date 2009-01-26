@@ -36,7 +36,7 @@ import pyflag.IO as IO
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import os.path
+import os.path,os
 import pyflag.DB as DB
 import pyflag.Farm as Farm
 import pyflag.Scanner as Scanner
@@ -251,6 +251,12 @@ class OffsetFileTests(tests.FDTest):
         self.assertEqual(data2, data)
         self.assertEqual(fd2.tell(), 2000)
 
+class Exit(Farm.Task):
+    """ A task to force the worker to exit """
+    def run(self, case, *args):
+        pyflaglog.log(pyflaglog.INFO, "Exiting Worker due to broadcast")
+        os._exit(0)
+        
 class Scan(Farm.Task):
     """ A task to distribute scanning among all workers """
     def run(self,case, inode, scanners, *args):

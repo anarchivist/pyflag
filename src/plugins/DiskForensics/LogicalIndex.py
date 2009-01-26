@@ -68,8 +68,6 @@ class IndexScan(GenScanFactory):
 
     group = "GeneralForensics"
     
-    ##contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
-
     class Drawer(Scanner.Drawer):
         description = "General Forensics"
         group = "GeneralForensics"
@@ -131,6 +129,11 @@ class IndexScan(GenScanFactory):
 
         def finish(self):
             self.dbh.mass_insert_commit()
+            ## Update the version
+            self.dbh.update("inode",
+                            where = DB.expand('inode_id = %r', self.inode_id),
+                            version = INDEX_VERSION)
+            
             del self.dbh
 ##            for k,v in self.stats.items():
 ##                self.dbh.execute("select 1 from LogicalIndexStats where id=%r", k)
