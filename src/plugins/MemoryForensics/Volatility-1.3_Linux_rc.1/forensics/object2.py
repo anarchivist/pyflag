@@ -352,7 +352,7 @@ class XXCType(VType):
             return "union %s" % self.name
 
 class Array(Object):
-    """ A array of objects of the same size """
+    """ An array of objects of the same size """
     def __init__(self, targetType, offset, vm, parent=None,
                  profile=None, count=1, name=None, target=None):
         ## Instantiate the first object on the offset:
@@ -368,7 +368,7 @@ class Array(Object):
         self.original_offset = offset
         self.target = target
         self.current = self.target(offset=offset, vm=vm, parent=self,
-                                   profile=profile, name= name)
+                                       profile=profile, name= name)
         
     def __iter__(self):
         self.position = 0
@@ -448,10 +448,14 @@ class CType(Object):
             raise AttributeError("Struct %s has no member %s" % (self.name, attr))
 
         try:
-            offset = offset(self).v()
-        except TypeError: pass
+            ## If offset is specified as a callable its an absolute
+            ## offset
+            offset = int(offset(self))
+        except TypeError:
+            ## Otherwise its relative to the start of our struct
+            offset = int(offset) + int(self.offset)
 
-        result = cls(offset = self.offset + offset, vm=self.vm,
+        result = cls(offset = offset, vm=self.vm,
                      profile=self.profile, parent=self, name=attr)
 
         return result

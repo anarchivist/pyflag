@@ -1,7 +1,7 @@
 from vutils import *
 from vmodules import *
 from vtypes import *
-from forensics.object2 import Profile, Object
+from forensics.object2 import Profile
 
 def add_new_type(structure, field, offset, type):
     xpsp2types[structure][1][field] = [offset, [type]]

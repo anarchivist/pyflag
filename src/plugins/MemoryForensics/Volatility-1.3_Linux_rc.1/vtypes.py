@@ -124,7 +124,7 @@ xpsp2types = { \
 } ], \
   '_OBJECT_HEADER' : [ 0x20, { \
     'Type' : [ 0x8, ['pointer', ['_OBJECT_TYPE']]], \
-    'Body' : [ 0x18, ['_QUAD']], \
+    'Body' : [ 0x18, ['unsigned int']], \
 } ], \
   '_OBJECT_TYPE' : [ 0x190, { \
     'Name' : [ 0x40, ['_UNICODE_STRING']], \

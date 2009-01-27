@@ -23,7 +23,7 @@
 @contact:      bdolangavitt@wesleyan.edu
 """
 
-from forensics.object2 import CType, NewObject, NativeType
+from forensics.object2 import CType, NewObject, NativeType, Curry
 from forensics.object import *
 from vtypes import xpsp2types as types
 from forensics.win32.datetime import *
@@ -107,6 +107,9 @@ class WinTimeStamp(NativeType):
     def __str__(self):
         return vmodules.format_time(self.v())
 
+LEVEL_MASK = 0xfffffff8
+
+
 class _EPROCESS(CType):
     """ An extensive _EPROCESS with bells and whistles """
     def _Peb(self,attr):
@@ -133,4 +136,55 @@ class _EPROCESS(CType):
         process_as= self.vm.__class__(self.vm.base, directory_table_base)
         process_as.name = "Process"
         return process_as
-    
+
+    def _make_handle_array(self, offset, level):
+        """ Returns an array of _HANDLE_TABLE_ENTRY rooted at offset,
+        and iterates over them.
+
+        """
+        table = NewObject("Array", offset, self.vm,
+                            count=0x200, parent=self, profile=self.profile,
+                            target = Curry(NewObject, "_HANDLE_TABLE_ENTRY"))
+        for t in table:
+            offset = t.dereference_as('unsigned int')
+            if not offset.is_valid(): break
+
+            if level > 0:
+                ## We need to go deeper:
+                for h in self._make_handle_array(offset, level-1):
+                    yield h
+            else:
+                ## OK We got to the bottom table, we just resolve
+                ## objects here:
+                offset = int(offset) & ~0x00000007;
+                obj = NewObject("_OBJECT_HEADER", offset, self.vm,
+                                parent=self, profile=self.profile)
+                try:
+                    if obj.Type.Name.__str__()=='File':
+                        file = NewObject("_FILE_OBJECT", obj.Body.offset, self.vm,
+                                         parent=self, profile=self.profile)
+                        yield file
+
+                except Exception,e:
+                    pass
+        
+    def handles(self):
+        """ A generator which yields this process's handles
+
+        _HANDLE_TABLE tables are multi-level tables at the first level
+        they are pointers to second level table, which might be
+        pointers to third level tables etc, until the final table
+        contains the real _OBJECT_HEADER table.
+
+        This generator iterates over all the handles recursively
+        yielding all handles. We take care of recursing into the
+        nested tables automatically.
+        """
+        h = self.ObjectTable
+        if h.is_valid():
+            TableCode = h.TableCode.v() & LEVEL_MASK
+            table_levels = h.TableCode.v() & ~LEVEL_MASK
+            offset = TableCode
+
+            for h in self._make_handle_array(offset, table_levels):
+                yield h

@@ -29,8 +29,6 @@ from bisect import bisect_right
 from forensics.object2 import *
 from forensics.win32.tasks import pslist
 from forensics.win32.modules import lsmod
-from forensics.win32.lists import list_entry
-from forensics.object import get_obj_offset
 from vutils import *
 
 ssdt_types = {
