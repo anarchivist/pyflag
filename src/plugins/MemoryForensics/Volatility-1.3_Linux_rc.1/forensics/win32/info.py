@@ -79,13 +79,11 @@ def find_psactiveprocesshead(addr_space, types):
         return None
 
     KdVersionBlock = info_kdversionblock(addr_space, types, kpcr_addr)
-
     if not addr_space.is_valid_address(KdVersionBlock):
         print "Unable to find PsActiveProcessHead"
         return None
 
     DebuggerDataList = info_debuggerdatalist(addr_space, types, KdVersionBlock)
-
     if addr_space.is_valid_address(DebuggerDataList):
         current = read_value(addr_space, 'unsigned long', DebuggerDataList)
         PsActiveProcessHead = info_psactiveprocesshead64(addr_space, types, current)

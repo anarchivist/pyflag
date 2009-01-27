@@ -73,8 +73,6 @@ def process_list(addr_space, types, symbol_table=None):
     
     PsActiveProcessHead = find_psactiveprocesshead(addr_space,types)
 
-    print "head is %s" % PsActiveProcessHead
-
     if not PsActiveProcessHead is None:
         (offset, tmp)  = get_obj_offset(types, ['_EPROCESS', 'ActiveProcessLinks'])
 
@@ -133,7 +131,6 @@ def find_dtb(addr_space, types):
     try:
         flat_address_space = FileAddressSpace(addr_space.name,fast=True)
     except Exception,e:
-        print e
         op.error("Unable to open image file %s" % (filename))
 
     offset = 0

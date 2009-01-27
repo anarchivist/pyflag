@@ -57,7 +57,8 @@ xpsp2types = { \
     'WorkingSetLock' : [ 0xcc, ['_FAST_MUTEX']], \
     'AddressCreationLock' : [ 0xf0, ['_FAST_MUTEX']], \
     'VadRoot' : [ 0x11c, ['pointer', ['void']]], \
-    'InheritedFromUniqueProcessId' : [ 0x14c, ['pointer', ['void']]], \
+#    'InheritedFromUniqueProcessId' : [ 0x14c, ['pointer', ['void']]], \
+    'InheritedFromUniqueProcessId' : [ 0x14c, ['unsigned int']], \
 #    'ImageFileName' : [ 0x174, ['array', 16,['unsigned char']]], \
     'ImageFileName' : [ 0x174, ['String', dict(length=16)]], \
     'ThreadListHead' : [ 0x190, ['_LIST_ENTRY']], \

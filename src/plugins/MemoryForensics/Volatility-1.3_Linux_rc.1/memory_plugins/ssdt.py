@@ -27,8 +27,8 @@ from operator import itemgetter
 from bisect import bisect_right
 
 from forensics.object2 import *
-from forensics.win32.tasks import process_list
-from forensics.win32.modules import modules_list
+from forensics.win32.tasks import pslist
+from forensics.win32.modules import lsmod
 from forensics.win32.lists import list_entry
 from forensics.object import get_obj_offset
 from vutils import *
@@ -1006,11 +1006,6 @@ xpsp2_syscalls = [
     ],
 ]
 
-def get_threads(proc):
-    return list_entry(proc.vm, types, proc.profile, 
-                      proc.ThreadListHead.v(), "_ETHREAD",
-                      fieldname="ThreadListEntry")
-
 def find_module(modlist, mod_addrs, addr):
     """Uses binary search to find what module a given address resides in.
 
@@ -1029,18 +1024,16 @@ def find_module(modlist, mod_addrs, addr):
         return None
 
 class ssdt(forensics.commands.command):
-
     # Declare meta information associated with this plugin
+    meta_info = {
+        'author': 'Brendan Dolan-Gavitt',
+        'copyright': 'Copyright (c) 2007,2008 Brendan Dolan-Gavitt',
+        'contact': 'bdolangavitt@wesleyan.edu',
+        'license': 'GNU General Public License 2.0 or later',
+        'url': 'http://moyix.blogspot.com/',
+        'os': 'WIN_32_XP_SP2',
+        'version': '1.0'}
     
-    meta_info = forensics.commands.command.meta_info 
-    meta_info['author'] = 'Brendan Dolan-Gavitt'
-    meta_info['copyright'] = 'Copyright (c) 2007,2008 Brendan Dolan-Gavitt'
-    meta_info['contact'] = 'bdolangavitt@wesleyan.edu'
-    meta_info['license'] = 'GNU General Public License 2.0 or later'
-    meta_info['url'] = 'http://moyix.blogspot.com/'
-    meta_info['os'] = 'WIN_32_XP_SP2'
-    meta_info['version'] = '1.0'
-
     def help(self):
         return  "Display SSDT entries"
     
@@ -1055,21 +1048,15 @@ class ssdt(forensics.commands.command):
 
 	(addr_space, symtab, types) = load_and_identify_image(self.op,
             self.opts)
-        
-        pslist = process_list(addr_space, types, symtab)
-        procs = [ NewObject("_EPROCESS", p, addr_space, profile=profile)
-                  for p in pslist ]
 
-        modlist = modules_list(addr_space, types, symtab)
-        mods =  [ NewObject("_LDR_MODULE", m, addr_space, profile=profile)
-                  for m in modlist ]
-        mods = dict( (mod.BaseAddress.v(),mod) for mod in mods )
+        ## Get a sorted list of module addresses
+        mods = dict( (mod.BaseAddress.v(),mod) for mod in lsmod(addr_space, profile) )
         mod_addrs = sorted(mods.keys())
 
         # Gather up all SSDTs referenced by threads
         print "Gathering all referenced SSDTs from KTHREADs..."
         ssdts = set()
-        for proc in procs:
+        for proc in pslist(addr_space, profile):
             for thread in proc.ThreadListHead.list_of_type("_ETHREAD", "ThreadListEntry"):
                 ssdt = thread.Tcb.ServiceTable.dereference()
                 ssdts.add(ssdt)
@@ -1086,15 +1073,19 @@ class ssdt(forensics.commands.command):
         tables_with_vm = []
         for idx, table, n in tables:
             found = False
-            for p in procs:
-                if p.vm.is_valid_address(table):
-                    tables_with_vm.append( (idx, table, n, p.vm) )
+            for p in pslist(addr_space, profile):
+                ## This is the process address space
+                ps_ad = p.get_process_address_space()
+                ## Is the table accessible from the process AS?
+                if ps_ad.is_valid_address(table):
+                    tables_with_vm.append( (idx, table, n, ps_ad) )
                     found = True
                     break
+            ## If not we use the kernel address space
             if not found:
                 # Any VM is equally bad...
                 tables_with_vm.append( (idx, table, n, addr_space) )
-            
+
         # Print out the entries for each table
         for idx,table,n,vm in sorted(tables_with_vm, key=itemgetter(0)):
             print "SSDT[%d] at %x with %d entries" % (idx,table, n)
@@ -1117,4 +1108,4 @@ class ssdt(forensics.commands.command):
                                                                        syscall_name,
                                                                        syscall_modname)
             else:
-                print "  [SSDT not resident]"
+                print "  [SSDT not resident at 0x%08X ]" % table

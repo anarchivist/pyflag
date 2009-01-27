@@ -82,7 +82,6 @@ class _LIST_ENTRY(CType):
             yield obj
 
     def __iter__(self):
-        print self.parent, self.name
         return self.list_of_type(self.parent, self.name)
 
 class String(NativeType):
@@ -94,7 +93,7 @@ class String(NativeType):
     def __str__(self):
         data = self.v()
         ## Make sure its null terminated:
-        return data.strip("\x00")
+        return data.split("\x00")[0]
 
 class WinTimeStamp(NativeType):
     def __init__(self, type, offset, vm=None,

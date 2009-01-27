@@ -25,6 +25,33 @@
 
 from forensics.object import *
 from forensics.win32.info import *
+from forensics.object2 import NewObject
+
+def lsmod(addr_space, profile):
+    """ A Generator for modules (uses _KPCR symbols) """
+    ## Locate the kpcr struct - this is hard coded right now
+    kpcr = NewObject("_KPCR", kpcr_addr, addr_space, profile=profile)
+
+    ## Try to dereference the KdVersionBlock as a 64 bit struct
+    DebuggerDataList = kpcr.KdVersionBlock.dereference_as("_DBGKD_GET_VERSION64").DebuggerDataList
+
+    if DebuggerDataList.is_valid():
+        offset = DebuggerDataList.dereference().v()
+        ## This is a pointer to a _KDDEBUGGER_DATA64 struct. We only
+        ## care about the PsActiveProcessHead entry:
+        tmp = NewObject("_KDDEBUGGER_DATA64", offset,
+                        addr_space, profile=profile).PsLoadedModuleList
+
+        if not tmp.is_valid():
+            ## Ok maybe its a 32 bit struct
+            tmp = NewObject("_KDDEBUGGER_DATA32", offset,
+                            addr_space, profile=profile).PsLoadedModuleList
+
+        ## Try to iterate over the process list in PsActiveProcessHead
+        ## (its really a pointer to a _LIST_ENTRY)
+        for l in tmp.dereference_as("_LIST_ENTRY").list_of_type(
+            "_LDR_MODULE", "InLoadOrderModuleList"):
+            yield l
 
 def modules_list(addr_space, types, symbol_table):
     """

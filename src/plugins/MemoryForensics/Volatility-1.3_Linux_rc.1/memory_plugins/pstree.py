@@ -76,31 +76,20 @@ class pstree(forensics.commands.command):
             task_info['process_id']      = task.UniqueProcessId or -1
             task_info['active_threads']  = task.ActiveThreads or -1
             task_info['inherited_from']  = task.InheritedFromUniqueProcessId.v() or -1
-            task_info['handle_count']    = task.ObjectTable.HandleCount.v() or -1
+            task_info['handle_count']    = task.ObjectTable.HandleCount or -1
             task_info['create_time']     = task.CreateTime
 
             ## Get the Process Environment Block - Note that _EPROCESS
             ## will automatically switch to process address space by
             ## itself.
-            peb = task.Peb
-            if peb:
-                task_info['command_line'] = peb.ProcessParameters.dereference().CommandLine.v()
-                task_info['ImagePathName'] = peb.ProcessParameters.dereference().ImagePathName
+            if self.opts.verbose:
+                peb = task.Peb
+                if peb:
+                    task_info['command_line'] = peb.ProcessParameters.CommandLine
+                    task_info['ImagePathName'] = peb.ProcessParameters.ImagePathName
 
-            task_info['Audit ImageFileName'] = task.SeAuditProcessCreationInfo.ImageFileName.dereference().Name or 'UNKNOWN'
-                
-            ## Thats the tedious way:
-            ##process_ad = get_process_address_space(task)
-##            if process_ad:
-##                peb = NewObject("_PEB", task.m("Peb").offset, vm=process_ad,profile=self.profile)
-
-##                if peb.is_valid():
-##                    task_info['command_line'] = peb.ProcessParameters.CommandLine
-##                    task_info['ImagePathName'] = peb.ProcessParameters.ImagePathName
-            
-            #self.find_command_line(addr_space,types, task, task_info)
-            #self.find_se_audit(addr_space, types, task, task_info)
-            
+                task_info['Audit ImageFileName'] = task.SeAuditProcessCreationInfo.ImageFileName.Name or 'UNKNOWN'
+             
             result[task] = task_info
             self.pids[task_info['process_id']] = task
             

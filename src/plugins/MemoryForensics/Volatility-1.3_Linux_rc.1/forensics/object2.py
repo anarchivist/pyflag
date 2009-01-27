@@ -165,8 +165,9 @@ class Object(object):
     def dereference(self):
         return None
 
-    def dereference_as(self, castType):
-        return None
+    def dereference_as(self, derefType):
+        return NewObject(derefType, self.v(), \
+                         self.vm, parent=self ,profile=self.profile)
 
     def cast(self, castString):
         return Object(castString, self.offset, self.vm, None, self.profile)
@@ -225,7 +226,7 @@ class NativeType(Object):
 
     def value(self):
         (val, ) = struct.unpack(self.format_string, \
-	    self.vm.read(self.offset, self.size()))
+                                self.vm.read(self.offset, self.size()))
         return val
 
     def cdecl(self):
@@ -273,15 +274,12 @@ class Pointer(NativeType):
 
     def dereference(self):
         offset = self.v()
-
         result = self.target(offset=offset, vm=self.vm, parent=self,
                              profile=self.profile, name=self.name)
 
+        if not result.is_valid(): return None
+        
         return result
-
-    def dereference_as(self, derefType):
-        return NewObject(derefType, self.v(), \
-                         self.vm, parent=self ,profile=self.profile)
 
     def cdecl(self):
         return "Pointer %s" % self.v()
@@ -305,7 +303,8 @@ class Pointer(NativeType):
             #if isinstance(result, CType):
             #    return result.m(attr)
 
-            return result
+            if result:
+                return result.__getattribute__(attr)
 
 class CTypeMember:
     """ A placeholder for a type in a struct.
