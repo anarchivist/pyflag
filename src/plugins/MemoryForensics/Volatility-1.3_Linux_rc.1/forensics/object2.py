@@ -533,7 +533,7 @@ class Profile:
         for ctype in addDict.keys():
 	    self.import_type(ctype, addDict)
         
-    def list_to_type(self, name, typeList, typeDict):
+    def list_to_type(self, name, typeList, typeDict=None):
         """ Parses a specification list and returns a VType object.
 
         This function is a bit complex because we support lots of

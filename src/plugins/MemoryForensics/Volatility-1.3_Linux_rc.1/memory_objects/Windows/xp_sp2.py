@@ -188,3 +188,18 @@ class _EPROCESS(CType):
 
             for h in self._make_handle_array(offset, table_levels):
                 yield h
+
+import socket, struct
+
+class _TCPT_OBJECT(CType):
+    def _RemoteIpAddress(self, attr):
+        return socket.inet_ntoa(struct.pack("<I",self.m(attr).v()))
+    
+    def _LocalIpAddress(self, attr):
+        return socket.inet_ntoa(struct.pack("<I",self.m(attr).v()))
+
+    def _RemotePort(self, attr):
+        return socket.ntohs(self.m(attr).v())
+
+    def _LocalPort(self, attr):
+        return socket.ntohs(self.m(attr).v())
