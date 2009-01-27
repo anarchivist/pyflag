@@ -7,6 +7,7 @@ def add_new_type(structure, field, offset, type):
     xpsp2types[structure][1][field] = [offset, [type]]
 
 class pstree(forensics.commands.command):
+    """Print process list as a tree"""
     def parser(self):
         forensics.commands.command.parser(self)
         self.op.add_option('-v', '--verbose',action='store_true',

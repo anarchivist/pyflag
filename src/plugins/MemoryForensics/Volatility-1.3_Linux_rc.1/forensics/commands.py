@@ -45,7 +45,10 @@ class command:
         """ This function returns a string that will be displayed when a
         user lists available plugins.
         """
-        return ""
+        try:
+            return self.__doc__
+        except:
+            return ""
 
     def parser(self):
         """ This method defines a parser for this plugin command. It is used
