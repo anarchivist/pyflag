@@ -82,13 +82,26 @@ class _LIST_ENTRY(CType):
             yield obj
 
     def __iter__(self):
-        return self.list_of_type(self.parent, self.name)
+        return self.list_of_type(self.parent.name, self.name)
 
 class String(NativeType):
     def __init__(self, type, offset, vm=None,
                  length=1, parent=None, profile=None, name=None, **args):
+        ## Allow length to be a callable:
+        try:
+            length = length(parent)
+        except:
+            pass
+        
+        ## length must be an integer
         NativeType.__init__(self, type, offset, vm, parent=parent, profile=profile,
-                            name=name, format_string="%ss" % length)
+                            name=name, format_string="%ds" % length)
+
+    def upper(self):
+        return self.__str__().upper()
+
+    def lower(self):
+        return self.__str__().lower()
 
     def __str__(self):
         data = self.v()

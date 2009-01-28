@@ -66,6 +66,57 @@ class Curry:
             
         return self.fun(*(self.pending+args), **kw)
 
+import sys
+import traceback
+import cStringIO
+
+def get_bt_string(e=None):    
+    return ''.join(traceback.format_stack()[:-3])
+
+class NoneObject(object):
+    """ A magical object which is like None but swallows bad
+    dereferences, __getattribute__, iterators etc to return itself.
+
+    Instantiate with the reason for the error.
+    """
+    def __init__(self, reason):
+        self.reason = reason
+        self.bt = get_bt_string()
+
+    def __str__(self):
+        result = "Error: %s\n%s" % (self.reason, self.bt)
+        print result
+        sys.exit(0)
+
+    ## Behave like an empty set
+    def __iter__(self):
+        return self
+
+    def next(self):
+        raise StopIteration()
+
+    def __getattribute__(self,attr):
+        try:
+            return object.__getattribute__(self, attr)
+        except AttributeError:
+            return self
+
+    def __bool__(self):
+        return False
+
+    def __nonzero__(self):
+        return False
+
+    def __eq__(self):
+        return False
+
+    ## Make us subscriptable obj[j]
+    def __getitem__(self, item):
+        return self
+
+    def __add__(self, x):
+        return self
+        
 class InvalidType(Exception):
     def __init__(self, typename=None):
         self.typename = typename
@@ -87,11 +138,19 @@ def NewObject(theType, offset, vm, parent=None, profile=None, name=None, **kwarg
     kwargs.
     """
     if name==None: name=theType
+
+    offset = int(offset)
     
+    ## If we cant instantiate the object here, we just error out:
+    if not vm.is_valid_address(offset):
+        return NoneObject("Invalid Address 0x%08X, instantiating %s from %s"\
+                          % (offset, name, parent))
+
     if theType in profile.types:
         result = profile.types[theType](offset=offset, vm=vm, name=name,
                                         parent=parent, profile=profile)
         return result
+    
 
     # Need to check for any derived object types that may be 
     # found in the global memory registry.
@@ -163,7 +222,7 @@ class Object(object):
         return self.vm.is_valid_address(self.offset)
 
     def dereference(self):
-        return None
+        return NoneObject("Cant derenference %s" % self.name)
 
     def dereference_as(self, derefType):
         return NewObject(derefType, self.v(), \
@@ -178,7 +237,7 @@ class Object(object):
     def value(self):
         """ Do the actual reading and decoding of this member
         """
-        return None
+        return NoneObject("No value for %s" % self.name)
 
     def get_member_names(self):
         return False
@@ -274,12 +333,12 @@ class Pointer(NativeType):
 
     def dereference(self):
         offset = self.v()
-        result = self.target(offset=offset, vm=self.vm, parent=self,
-                             profile=self.profile, name=self.name)
-
-        if not result.is_valid(): return None
-        
-        return result
+        if self.vm.is_valid_address(offset):
+            result = self.target(offset=offset, vm=self.vm, parent=self.parent,
+                                 profile=self.profile, name=self.name)
+            return result
+        else:
+            return NoneObject("Pointer %s invalid" % self.name)
 
     def cdecl(self):
         return "Pointer %s" % self.v()
@@ -302,9 +361,7 @@ class Pointer(NativeType):
 
             #if isinstance(result, CType):
             #    return result.m(attr)
-
-            if result:
-                return result.__getattribute__(attr)
+            return result.__getattribute__(attr)
 
 class CTypeMember:
     """ A placeholder for a type in a struct.
@@ -360,9 +417,10 @@ class Array(Object):
                         parent=parent, profile=profile,
                         name=name)
         try:
-            self.count = count(parent)
-        except TypeError:
-            self.count = int(count)
+            count = count(parent)
+        except TypeError: pass
+        
+        self.count = int(count)
 
         self.position = 0
         self.original_offset = offset
@@ -381,17 +439,23 @@ class Array(Object):
         if self.position >= self.count:
             raise StopIteration()
 
-
         offset = self.original_offset + self.position * self.current.size()
         self.position += 1
 
         ## Instantiate the target here:
-        return self.target(offset = offset, vm=self.vm,
-                           profile=self.profile, parent=self,
-                           name="%s %s" % (self.name, self.position))
-    
+        if self.vm.is_valid_address(offset):
+            return self.target(offset = offset, vm=self.vm,
+                               profile=self.profile, parent=self,
+                               name="%s %s" % (self.name, self.position))
+        else:
+            return NoneObject("Array %s, Invalid position %s" % (self.name, self.position))
+        
     def __str__(self):
         return "Array (len=%s of %s)\n" % (self.count, self.current.name)
+
+    def __repr__(self):
+        result = [ x.__str__() for x in self ]
+        return "<Array %s >" % (",".join(result))
 
     def __eq__(self, other):
         if self.count != len(other):
@@ -404,11 +468,16 @@ class Array(Object):
         return True
     
     def __getitem__(self, pos):        
-        return self.target(offset = self.original_offset + \
-                           pos * self.current.size(),
-                           vm=self.vm, parent=self,
-                           profile=self.profile)
-
+        ## Check if the offset is valid
+        offset = self.original_offset + \
+                 pos * self.current.size()
+        if pos <= self.count and self.vm.is_valid_address(offset):
+            return self.target(offset = offset,
+                               vm=self.vm, parent=self,
+                               profile=self.profile)
+        else:
+            return NoneObject("Array %s invalid member %s" % (self.name, pos))
+        
 class CType(Object):
     """ A CType is an object which represents a c struct """
     def __init__(self, theType, offset, vm, parent=None, profile=None, members=None, name=None, size=0):
@@ -471,34 +540,6 @@ class CType(Object):
         except AttributeError,e:
             pass
 
-        ## Special code to follow flink,blink lists
-        if attr=='next':
-            try:
-                flink = self.m("Flink")
-                offset,cls = self.parent.members[self.name]
-                offset = flink.v() - offset
-
-                return  self.__class__(self.name, offset = offset, vm=self.vm,
-                                       profile=self.profile, parent=self,
-                                       members=self.parent.members,
-                                       name=self.parent.name)
-            except (KeyError,AttributeError):
-                pass
-
-        elif attr=='prev':
-            try:
-                blink = self.m("Blink")
-
-                offset,cls = self.parent.members[self.name]
-                offset = blink.v() - offset
-
-                return  self.__class__(self.name, offset = offset, vm=self.vm,
-                                       profile=self.profile, parent=self,
-                                       members=self.parent.members,
-                                       name=self.parent.name)
-            except KeyError:
-                pass
-
         result = self.m(attr)
         return result
     
@@ -518,8 +559,10 @@ class Profile:
             if type(value)==list:
                 self.types[nt] = Curry(NativeType, nt, format_string=value[1])
 
+        self.import_typeset(abstract_types)
+
         # Load the abstract data types
-        
+    def import_typeset(self, abstract_types):
         for name, value in abstract_types.items():
            self.import_type(name, abstract_types)
 	
