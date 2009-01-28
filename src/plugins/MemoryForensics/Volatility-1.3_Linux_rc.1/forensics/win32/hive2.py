@@ -139,6 +139,8 @@ class HiveAddressSpace:
     #    return Obj("_HMAP_ENTRY", table, self.base)
 
     def read(self, vaddr, length, zero=False):
+        length = int(length)
+        vaddr = int(vaddr)
         first_block = BLOCK_SIZE - vaddr % BLOCK_SIZE
         full_blocks = ((length + (vaddr % BLOCK_SIZE)) / BLOCK_SIZE) - 1
         left_over = (length + vaddr) % BLOCK_SIZE

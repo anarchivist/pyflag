@@ -79,14 +79,20 @@ class NoneObject(object):
 
     Instantiate with the reason for the error.
     """
-    def __init__(self, reason):
+    def __init__(self, reason, strict=False):
         self.reason = reason
-        self.bt = get_bt_string()
+        self.strict = strict
+        if strict:
+            self.bt = get_bt_string()
 
     def __str__(self):
-        result = "Error: %s\n%s" % (self.reason, self.bt)
-        print result
-        sys.exit(0)
+        ## If we are strict we blow up here
+        if self.strict:
+            result = "Error: %s\n%s" % (self.reason, self.bt)
+            print result
+            sys.exit(0)
+        else:
+            return "Error: %s" % (self.reason)
 
     ## Behave like an empty set
     def __iter__(self):
@@ -107,7 +113,7 @@ class NoneObject(object):
     def __nonzero__(self):
         return False
 
-    def __eq__(self):
+    def __eq__(self, other):
         return False
 
     ## Make us subscriptable obj[j]
@@ -115,6 +121,9 @@ class NoneObject(object):
         return self
 
     def __add__(self, x):
+        return self
+
+    def __call__(self, *arg, **kwargs):
         return self
         
 class InvalidType(Exception):
@@ -144,7 +153,7 @@ def NewObject(theType, offset, vm, parent=None, profile=None, name=None, **kwarg
     ## If we cant instantiate the object here, we just error out:
     if not vm.is_valid_address(offset):
         return NoneObject("Invalid Address 0x%08X, instantiating %s from %s"\
-                          % (offset, name, parent))
+                          % (offset, name, parent), strict=profile.strict)
 
     if theType in profile.types:
         result = profile.types[theType](offset=offset, vm=vm, name=name,
@@ -185,12 +194,6 @@ class Object(object):
     def __neg__(self):
         return -self.v()
     
-    def __getattribute__(self, attr):
-        """ We use this to evaluate ourselves or dereference or
-        whatever
-        """
-        return object.__getattribute__(self, attr)
-       
     def __eq__(self, other):
         if isinstance(other, Object):
 	   return (self.__class__ == other.__class__) and (self.offset == other.offset)
@@ -222,7 +225,7 @@ class Object(object):
         return self.vm.is_valid_address(self.offset)
 
     def dereference(self):
-        return NoneObject("Cant derenference %s" % self.name)
+        return NoneObject("Cant derenference %s" % self.name, self.profile.strict)
 
     def dereference_as(self, derefType):
         return NewObject(derefType, self.v(), \
@@ -237,7 +240,7 @@ class Object(object):
     def value(self):
         """ Do the actual reading and decoding of this member
         """
-        return NoneObject("No value for %s" % self.name)
+        return NoneObject("No value for %s" % self.name, self.profile.strict)
 
     def get_member_names(self):
         return False
@@ -303,6 +306,12 @@ class NativeType(Object):
     def __str__(self):
         return " [%s]: %s" % (self.theType, self.v())
 
+    def __and__(self, other):
+        return int(self) & other
+
+    def __mod__(self, other):
+        return int(self) % other
+
 class Void(NativeType):
     def __init__(self, theType, offset, vm, parent=None, profile=None,
                  format_string=None, **args):
@@ -338,7 +347,7 @@ class Pointer(NativeType):
                                  profile=self.profile, name=self.name)
             return result
         else:
-            return NoneObject("Pointer %s invalid" % self.name)
+            return NoneObject("Pointer %s invalid" % self.name, self.profile.strict)
 
     def cdecl(self):
         return "Pointer %s" % self.v()
@@ -448,7 +457,8 @@ class Array(Object):
                                profile=self.profile, parent=self,
                                name="%s %s" % (self.name, self.position))
         else:
-            return NoneObject("Array %s, Invalid position %s" % (self.name, self.position))
+            return NoneObject("Array %s, Invalid position %s" % (self.name, self.position),
+                              self.profile.strict)
         
     def __str__(self):
         return "Array (len=%s of %s)\n" % (self.count, self.current.name)
@@ -476,7 +486,8 @@ class Array(Object):
                                vm=self.vm, parent=self,
                                profile=self.profile)
         else:
-            return NoneObject("Array %s invalid member %s" % (self.name, pos))
+            return NoneObject("Array %s invalid member %s" % (self.name, pos),
+                              self.profile.strict)
         
 class CType(Object):
     """ A CType is an object which represents a c struct """
@@ -531,13 +542,8 @@ class CType(Object):
 
     def __getattribute__(self,attr):
         try:
-            return Object.__getattribute__(self, "_"+attr)(attr)
-        except AttributeError,e:
-            pass
-
-        try:
-            return Object.__getattribute__(self, attr)
-        except AttributeError,e:
+            return object.__getattribute__(self, attr)
+        except AttributeError:
             pass
 
         result = self.m(attr)
@@ -551,9 +557,10 @@ class Profile:
     system. We parse the abstract_types and join them with
     native_types to make everything work together.
     """
-    def __init__(self, native_types=x86_native_types, abstract_types=types):
+    def __init__(self, native_types=x86_native_types, abstract_types=types, strict=False):
         self.types = {}
-
+        self.strict = strict
+        
         # Load the native types
         for nt, value in native_types.items():
             if type(value)==list:

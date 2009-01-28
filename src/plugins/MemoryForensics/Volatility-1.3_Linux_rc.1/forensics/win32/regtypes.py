@@ -73,7 +73,7 @@ regtypes = {
     'Dacl' : [ 0x10, ['unsigned long']],
 } ],
   '_CM_KEY_VALUE' : [ 0x18, {
-    'Signature' : [ 0x0, ['unsigned short']],
+    'Signature' : [ 0x0, ['String', dict(length=2)]],
     'NameLength' : [ 0x2, ['unsigned short']],
     'DataLength' : [ 0x4, ['unsigned long']],
     'Data' : [ 0x8, ['unsigned long']],

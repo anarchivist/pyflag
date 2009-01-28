@@ -83,13 +83,12 @@ def open_key(root, key):
     return None
 
 def read_sklist(sk):
-    sub_list = []
-    if (sk.Signature == LH_SIG or
-        sk.Signature == LF_SIG):
-        return sk.List
+    if (sk.Signature.v() == LH_SIG or
+        sk.Signature.v() == LF_SIG):
+        for i in sk.List:
+            yield i
     
-    elif sk.Signature == RI_SIG:
-        l = []
+    elif sk.Signature.v() == RI_SIG:
         for i in range(sk.Count):
             # Read and dereference the pointer
             ptr_off = sk.get_member_offset('List')+(i*4)
@@ -98,24 +97,21 @@ def read_sklist(sk):
             if not self.vm.is_valid_address(ssk_off): continue
             
             ssk = NewObject("_CM_KEY_INDEX", ssk_off, sk.vm, profile=sk.profile)
-            l += read_sklist(ssk)
-        return l
-    else:
-        return []
-
+            for i in read_sklist(ssk):
+                yield i
+        
 # Note: had to change SubKeyLists to be array of 2 pointers in vtypes.py
 def subkeys(key):
-    if not key.is_valid(): return []
-    sub_list = []
+    if not key.is_valid(): return
     if key.SubKeyCounts[0] > 0:
         sk_off = key.SubKeyLists[0]
         sk = NewObject("_CM_KEY_INDEX", sk_off, key.vm, profile=key.profile)
         if not sk or not sk.is_valid():
             pass
         else:
-            tmp = read_sklist(sk)
-            for tmp in tmp:
-                sub_list.append(tmp.dereference())
+            for i in read_sklist(sk):
+                if i.Signature.v() == NK_SIG:
+                        yield i
             
     if key.SubKeyCounts[1] > 0:
         sk_off = key.SubKeyLists[1]
@@ -123,24 +119,19 @@ def subkeys(key):
         if not sk or not sk.is_valid():
             pass
         else:
-            tmp = read_sklist(sk)
-            for tmp in tmp:
-                sub_list.append(tmp.dereference())
-
-    #sub_list = [s.value for s in sub_list]
-    return [ s for s in sub_list if 
-             s and s.is_valid() and s.Signature == NK_SIG]
+            for i in read_sklist(sk):
+                if i and i.Signature.v() == NK_SIG:
+                    yield i
 
 def values(key):
     return [ v for v in key.ValueList.List.dereference()
-             if v and v.is_valid() and
-             v.Signature == VK_SIG ]
+             if v.Signature.v() == VK_SIG ]
 
 def key_flags(key):
     return [ k for k in KEY_FLAGS if key.Flags & KEY_FLAGS[k] ]
 
 def value_data(val):
-    valtype = VALUE_TYPES[val.Type]
+    valtype = VALUE_TYPES[val.Type.v()]
     inline =  val.DataLength & 0x80000000
 
     if inline:
@@ -150,9 +141,9 @@ def value_data(val):
 
     if (valtype == "REG_SZ" or valtype == "REG_EXPAND_SZ" or
         valtype == "REG_LINK"):
-        valdata = valdata.decode('utf-16-le')
+        valdata = valdata.decode('utf-16-le',"ignore")
     elif valtype == "REG_MULTI_SZ":
-        valdata = valdata.decode('utf-16-le').split('\0')
+        valdata = valdata.decode('utf-16-le',"ignore").split('\0')
     elif valtype == "REG_DWORD":
         valdata = unpack("<L", valdata)[0]
     elif valtype == "REG_DWORD_BIG_ENDIAN":

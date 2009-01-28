@@ -118,6 +118,8 @@ class IA32PagedMemory:
         return retVal
 
     def read(self, vaddr, length):
+        length = int(length)
+        vaddr = int(vaddr)
         first_block = 0x1000 - vaddr % 0x1000
         full_blocks = ((length + (vaddr % 0x1000)) / 0x1000) - 1
         left_over = (length + vaddr) % 0x1000
@@ -314,6 +316,7 @@ class IA32PagedMemoryPae:
         return retVal
 
     def read(self, vaddr, length):
+        length = int(length)
         first_block = 0x1000 - vaddr % 0x1000
         full_blocks = ((length + (vaddr % 0x1000)) / 0x1000) - 1
         left_over = (length + vaddr) % 0x1000
@@ -354,6 +357,7 @@ class IA32PagedMemoryPae:
         return stuff_read
 
     def zread(self, vaddr, length):
+        length=int(length)
         first_block = 0x1000 - vaddr % 0x1000
         full_blocks = ((length + (vaddr % 0x1000)) / 0x1000) - 1
         left_over = (length + vaddr) % 0x1000
