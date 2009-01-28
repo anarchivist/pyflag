@@ -546,8 +546,11 @@ class CType(Object):
         except AttributeError:
             pass
 
-        result = self.m(attr)
-        return result
+        try:
+            return object.__getattribute__(self, "_"+attr)(attr)
+        except: pass
+        
+        return self.m(attr)
     
 ## Profiles are the interface for creating/interpreting
 ## objects
