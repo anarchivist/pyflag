@@ -30,6 +30,7 @@ sys.path.append(".")
 sys.path.append("..")
 
 from vtypes import xpsp2types as types
+from forensics.win32.overlay import xpsp2overlays
 from forensics.object import *
 from forensics.x86 import x86_native_types
 import forensics.registry as MemoryRegistry
@@ -560,7 +561,8 @@ class Profile:
     system. We parse the abstract_types and join them with
     native_types to make everything work together.
     """
-    def __init__(self, native_types=x86_native_types, abstract_types=types, strict=False):
+    def __init__(self, native_types=x86_native_types, abstract_types=types,
+                 overlay=xpsp2overlays, strict=False):
         self.types = {}
         self.strict = strict
         
@@ -569,22 +571,21 @@ class Profile:
             if type(value)==list:
                 self.types[nt] = Curry(NativeType, nt, format_string=value[1])
 
-        self.import_typeset(abstract_types)
+        self.import_typeset(abstract_types, overlay)
 
         # Load the abstract data types
-    def import_typeset(self, abstract_types):
+    def import_typeset(self, abstract_types, overlay={}):
         for name, value in abstract_types.items():
-           self.import_type(name, abstract_types)
+           self.import_type(name, abstract_types, overlay)
 	
-    def import_type(self, ctype, typeDict):
+    def import_type(self, ctype, typeDict, overlay):
         """ Parses the abstract_types by converting their string
         representations to class instances.
         """
-        self.types[ctype] = self.convert_members(ctype, typeDict)
+        self.types[ctype] = self.convert_members(ctype, typeDict, overlay)
 
     def add_types(self, addDict):
-        for ctype in addDict.keys():
-	    self.import_type(ctype, addDict)
+        self.import_typeset(addDict)
         
     def list_to_type(self, name, typeList, typeDict=None):
         """ Parses a specification list and returns a VType object.
@@ -650,8 +651,33 @@ class Profile:
         offset, cls = tmp.members[member]
         
         return offset
+
+    def apply_overlay(self, type_member, overlay):
+        """ Update the overlay with the missing information from type.
+
+        Basically if overlay has None in any alot it gets applied from vtype.
+        """
+        if not overlay: return type_member
+
+        if type(type_member)==dict:
+            for k,v in type_member.items():
+                if k not in overlay:
+                    overlay[k] = v
+                else:
+                    overlay[k] = self.apply_overlay(v, overlay[k])
+                    
+        elif type(overlay)==list:
+            if len(overlay)!=len(type_member): return overlay
+            
+            for i in range(len(overlay)):
+                if overlay[i]==None:
+                    overlay[i] = type_member[i]
+                else:
+                    overlay[i] = self.apply_overlay(type_member[i], overlay[i])
+
+        return overlay
         
-    def convert_members(self, cname, typeDict):
+    def convert_members(self, cname, typeDict, overlay):
         """ Convert the member named by cname from the c description
         provided by typeDict into a list of members that can be used
         for later parsing.
@@ -672,7 +698,7 @@ class Profile:
 
         We return a list of CTypeMember objects. 
         """
-        ctype = typeDict[cname]
+        ctype = self.apply_overlay(typeDict[cname], overlay.get(cname))
         members = {}
         size = ctype[0]
         for k,v in ctype[1].items():
