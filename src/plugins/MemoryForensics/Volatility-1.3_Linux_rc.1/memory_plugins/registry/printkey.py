@@ -26,7 +26,6 @@
 
 from forensics.win32.datetime import windows_to_unix_time
 from forensics.win32.hive2 import HiveAddressSpace
-from forensics.win32.regtypes import regtypes
 from forensics.win32.rawreg import get_root, open_key, subkeys, values, value_data
 from forensics.object2 import *
 from vutils import *
@@ -74,8 +73,6 @@ class printkey(forensics.commands.command):
             self.opts)
 
         profile = Profile()
-        profile.import_typeset(regtypes)
-
         if not self.opts.hive:
             op.error("No hive offset provided!")
         

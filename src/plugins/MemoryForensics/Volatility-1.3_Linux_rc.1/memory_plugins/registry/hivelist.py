@@ -24,7 +24,6 @@
 @organization: Volatile Systems
 """
 
-from forensics.win32.regtypes import regtypes
 from forensics.win32.hive2 import hive_list, hive_fname
 from forensics.object2 import *
 from vutils import *
@@ -59,7 +58,6 @@ class hivelist(forensics.commands.command):
 	(addr_space, symtab, types) = load_and_identify_image(self.op,
             self.opts)
         profile = Profile()
-        profile.import_typeset(regtypes)
 
         if not self.opts.offset:
             print "You must specify a hive offset (-o)"

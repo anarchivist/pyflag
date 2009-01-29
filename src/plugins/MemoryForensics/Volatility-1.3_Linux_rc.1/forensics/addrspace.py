@@ -32,6 +32,26 @@
 import os
 import struct
 
+class BaseAddressSpace:
+    """ This is the base class of all Address Spaces. """
+    def __init__(self, base, opts):
+        """ base is the AS we will be stacking on top of, opts are
+        options which we may use.
+        """
+        self.base = base
+        self.opts = opts
+
+    def read(self, addr, len):
+        """ Read some date from a certain offset """
+
+    def get_available_addresses(self):
+        """ Return a list of address ranges covered by this AS """
+
+    def is_valid_address(self, addr):
+        """ Tell us if the address is valid """
+
+
+## Maintained for backward compatibility do not use in new code
 class FileAddressSpace:
     def __init__(self, fname, mode='rb', fast=False):
         self.fname = fname

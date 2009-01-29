@@ -2,6 +2,7 @@ from vutils import *
 from vmodules import *
 from vtypes import *
 from forensics.object2 import Profile
+import forensics.utils as utils
 
 def add_new_type(structure, field, offset, type):
     xpsp2types[structure][1][field] = [offset, [type]]
@@ -68,7 +69,8 @@ class pstree(forensics.commands.command):
         
         self.profile = Profile()
 
-        (addr_space, self.symtab, types) = load_and_identify_image(self.op, self.opts)
+        ## Load a new address space
+        addr_space = utils.load_as(self.opts)
 
         for task in pslist(addr_space, self.profile):
             task_info = {}

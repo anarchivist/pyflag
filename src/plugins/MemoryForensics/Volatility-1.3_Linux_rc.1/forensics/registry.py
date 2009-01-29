@@ -251,6 +251,7 @@ class VolatilityObjectRegistry(MemoryRegistry):
 LOCK = 0
 PLUGIN_COMMANDS = None
 OBJECT_CLASSES = None
+AS_CLASSES = None
 
 ## This is required for late initialization to avoid dependency nightmare.
 def Init():
@@ -269,3 +270,7 @@ def Init():
     import forensics.object2 as object2
     global OBJECT_CLASSES
     OBJECT_CLASSES = VolatilityObjectRegistry(object2.Object)
+
+    import forensics.addrspace as addrspace
+    global AS_CLASSES
+    AS_CLASSES = VolatilityObjectRegistry(addrspace.BaseAddressSpace)

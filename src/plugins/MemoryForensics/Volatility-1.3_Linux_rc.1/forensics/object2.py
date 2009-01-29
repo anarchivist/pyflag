@@ -189,6 +189,9 @@ class Object(object):
     def __add__(self, other):
         return other + self.v()
 
+    def __mul__(self, other):
+        return other * self.v()
+
     def __sub__(self, other):
         return -other + self.v()
 
@@ -428,7 +431,8 @@ class Array(Object):
                         name=name)
         try:
             count = count(parent)
-        except TypeError: pass
+        except TypeError,e:
+            pass
         
         self.count = int(count)
 

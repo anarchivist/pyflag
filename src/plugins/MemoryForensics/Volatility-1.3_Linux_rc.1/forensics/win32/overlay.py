@@ -32,25 +32,25 @@ xpsp2overlays = {
     'PsActiveProcessHead' : [ None, ['pointer' ,['unsigned long']]], \
     }],
 
-    '_CM_KEY_NODE' : [ 0x50, {
-    'Signature' : [ 0x0, ['String', dict(length=2)]],
-    'LastWriteTime' : [ 0x4, ['WinTimeStamp', {}]],
-    'Name' : [ 0x4c, ['String', dict(length=lambda x: x.NameLength)]],
+    '_CM_KEY_NODE' : [ None, {
+    'Signature' : [ None, ['String', dict(length=2)]],
+    'LastWriteTime' : [ None, ['WinTimeStamp', {}]],
+    'Name' : [ None, ['String', dict(length=lambda x: x.NameLength)]],
     }],
 
-    '_CHILD_LIST' : [ 0x8, {
-    'List' : [ 0x4, ['pointer', ['array', lambda x: x.Count,
+    '_CHILD_LIST' : [ None, {
+    'List' : [ None, ['pointer', ['array', lambda x: x.Count,
                                  ['pointer', ['_CM_KEY_VALUE']]]]],
     }],
 
-    '_CM_KEY_VALUE' : [ 0x18, {
-    'Signature' : [ 0x0, ['String', dict(length=2)]],
-    'Name' : [ 0x14, ['String', dict(length=lambda x: x.NameLength)]],
+    '_CM_KEY_VALUE' : [ None, {
+    'Signature' : [ None, ['String', dict(length=2)]],
+    'Name' : [ None, ['String', dict(length=lambda x: x.NameLength)]],
     } ],
 
-    '_CM_KEY_INDEX' : [ 0x8, {
-    'Signature' : [ 0x0, ['String', dict(length=2)]],
-    'List' : [ 0x4, ['array', lambda x: 2*x.Count.v(), ['pointer', ['_CM_KEY_NODE']]]],
+    '_CM_KEY_INDEX' : [ None, {
+    'Signature' : [ None, ['String', dict(length=2)]],
+    'List' : [ None, ['array', lambda x: x.Count.v() * 2, ['pointer', ['_CM_KEY_NODE']]]],
     } ],
     
     }
