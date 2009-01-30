@@ -45,7 +45,7 @@ class WindowsHiberFileSpace32(standard.FileAddressSpace):
 	self.PageIndex = 0
         self.AddressList = []
         self.LookupCache = {}
-        self.PageCache = Store(10)
+        self.PageCache = Store(20)
         self.MemRangeCnt = 0
         self.offset = 0
         # Extract header information

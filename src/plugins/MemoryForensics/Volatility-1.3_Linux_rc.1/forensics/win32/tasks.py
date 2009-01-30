@@ -44,21 +44,18 @@ def pslist(addr_space, profile):
 
     ## Try to dereference the KdVersionBlock as a 64 bit struct
     DebuggerDataList = kpcr.KdVersionBlock.dereference_as("_DBGKD_GET_VERSION64").DebuggerDataList
-
     if DebuggerDataList.is_valid():
-        offset = DebuggerDataList.dereference()
+        PsActiveProcessHead = DebuggerDataList.dereference_as("_KDDEBUGGER_DATA64"
+                                                              ).PsActiveProcessHead \
+                           or DebuggerDataList.dereference_as("_KDDEBUGGER_DATA32"
+                                                              ).PsActiveProcessHead
+    else:
+        PsActiveProcessHead = kpcr.KdVersionBlock.dereference_as("_KDDEBUGGER_DATA32"
+                                                                 ).PsActiveProcessHead
 
-        ## This is a pointer to a _KDDEBUGGER_DATA64 struct. We only
-        ## care about the PsActiveProcessHead entry:
-        PsActiveProcessHead = NewObject("_KDDEBUGGER_DATA64", offset,
-                                        addr_space, profile=profile).PsActiveProcessHead
 
-
-        if not PsActiveProcessHead.is_valid():
-            ## Ok maybe its a 32 bit struct
-            PsActiveProcessHead = NewObject("_KDDEBUGGER_DATA32", offset,
-                                            addr_space, profile=profile).PsActiveProcessHead
-            
+    if not PsActiveProcessHead:
+        raise RuntimeError("Unable to find PsActiveProcessHead - is this image supported?")
     ## Try to iterate over the process list in PsActiveProcessHead
     ## (its really a pointer to a _LIST_ENTRY)
     for l in PsActiveProcessHead.dereference_as("_LIST_ENTRY").list_of_type(

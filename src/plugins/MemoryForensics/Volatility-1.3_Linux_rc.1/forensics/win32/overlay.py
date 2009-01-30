@@ -10,6 +10,7 @@ xpsp2overlays = {
     'CreateTime' : [ None, ['WinTimeStamp', {}]], 
     'InheritedFromUniqueProcessId' : [ None, ['unsigned int']],
     'ImageFileName' : [ None, ['String', dict(length=16)]],
+    'UniqueProcessId' : [ None, ['unsigned int']], \
     }],
 
     '_ADDRESS_OBJECT' : [ None, { \
@@ -58,4 +59,7 @@ xpsp2overlays = {
     'SystemTime' : [ None, ['WinTimeStamp', {}]], \
     } ], \
 
+    '_PHYSICAL_MEMORY_DESCRIPTOR' : [ None, { \
+        'Run' : [ None, ['array', lambda x: x.NumberOfRuns, ['_PHYSICAL_MEMORY_RUN']]], \
+        } ], \
     }

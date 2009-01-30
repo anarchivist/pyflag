@@ -366,7 +366,8 @@ class Pointer(NativeType):
         return "<pointer to [%s ]>" % (self.v())
 
     def __str__(self):
-        return "<%s pointer to [0x%08X]>" % (self.dereference().__class__.__name__, self.v())
+        target = self.dereference()
+        return "<%s pointer to [0x%08X]>" % (target.__class__.__name__, self.v())
 
     def __int__(self):
         return self.v()

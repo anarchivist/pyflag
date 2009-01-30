@@ -32,6 +32,12 @@ class pstree(forensics.commands.command):
         ## Call our base class
         forensics.commands.command.execute(self)
 
+    def find_root(self, pid_dict, pid):
+        while pid in pid_dict:
+            pid = pid_dict[pid]['inherited_from']
+            
+        return pid
+
     def render_text(self, outfd, data):
         outfd.write("%-20s %-6s %-6s %-6s %-6s %-6s\n" %(
             'Name','Pid','PPid','Thds','Hnds','Time'))
@@ -60,13 +66,15 @@ class pstree(forensics.commands.command):
                         except KeyError: pass
                         
                     draw_branch(pad + 1, task_info['process_id'])
+                    del data[task]
 
-        draw_branch(0, -1)
+        while len(data.keys())>0:
+            keys = data.keys()
+            root = self.find_root(data, keys[0])
+            draw_branch(0, root)
         
     def calculate(self):
         result = {}
-        self.pids = {}
-        
         self.profile = Profile()
 
         ## Load a new address space
@@ -76,7 +84,7 @@ class pstree(forensics.commands.command):
             task_info = {}
             task_info['eprocess'] = task
             task_info['image_file_name'] = task.ImageFileName or 'UNKNOWN'
-            task_info['process_id']      = task.UniqueProcessId or -1
+            task_info['process_id']      = task.UniqueProcessId.v() or -1
             task_info['active_threads']  = task.ActiveThreads or -1
             task_info['inherited_from']  = task.InheritedFromUniqueProcessId.v() or -1
             task_info['handle_count']    = task.ObjectTable.HandleCount or -1
@@ -93,7 +101,6 @@ class pstree(forensics.commands.command):
 
                 task_info['Audit ImageFileName'] = task.SeAuditProcessCreationInfo.ImageFileName.Name or 'UNKNOWN'
              
-            result[task] = task_info
-            self.pids[task_info['process_id']] = task
+            result[task_info['process_id']] = task_info
             
         return result
