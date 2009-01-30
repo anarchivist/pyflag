@@ -2,7 +2,7 @@
 is now built using object2.py.  These functions are basically the same
 as the built in ones.
 """
-from vutils import *
+import forensics.utils as utils
 from vmodules import *
 from vtypes import *
 from forensics.win32.tasks import pslist
@@ -36,7 +36,7 @@ class lsof(forensics.commands.command):
 
     def calculate(self):
         profile = Profile()
-        (addr_space, self.symtab, types) = load_and_identify_image(self.op, self.opts)
+        addr_space = utils.load_as(self.opts)
 
         ## Grab all the handle tables from processes
         def files_in_pid(p):
@@ -73,7 +73,7 @@ class lsdll(lsof):
 
     def calculate(self):
         profile = Profile()
-        (addr_space, self.symtab, types) = load_and_identify_image(self.op, self.opts)
+        addr_space = utils.load_as(self.opts)
 
         def list_modules(p):
             peb = p.Peb
@@ -138,7 +138,7 @@ class lscon(lsof):
 
     def calculate(self):
         self.profile = Profile()
-        (self.addr_space, self.symtab, types) = load_and_identify_image(self.op, self.opts)
+        self.addr_space = utils.load_as(self.opts)
 
         ## Find the tcpip module:
         tcpip = None

@@ -238,6 +238,23 @@ class VolatilityObjectRegistry(MemoryRegistry):
     
     def __init__(self,ParentClass):
         MemoryRegistry.__init__(self,ParentClass)
+        ## First we sort the classes according to their order
+        def sort_function(x,y):
+            try:
+                a=x.order
+            except: a=10
+            
+            try:
+                b=y.order
+            except: b=10
+            
+            if a<b:
+                return -1
+            elif a==b: return 0
+            return 1
+        
+        self.classes.sort(sort_function)
+        
         for cls in self.classes:
             ## The name of the class is the object name
             obj = ("%s" % cls).split('.')[-1]

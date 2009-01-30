@@ -124,6 +124,12 @@ class NoneObject(object):
     def __add__(self, x):
         return self
 
+    def __sub__(self, x):
+        return self
+
+    def __int__(self):
+        return -1
+
     def __call__(self, *arg, **kwargs):
         return self
         

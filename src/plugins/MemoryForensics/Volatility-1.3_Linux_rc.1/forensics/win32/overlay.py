@@ -53,4 +53,9 @@ xpsp2overlays = {
     'List' : [ None, ['array', lambda x: x.Count.v() * 2, ['pointer', ['_CM_KEY_NODE']]]],
     } ],
     
+    '_IMAGE_HIBER_HEADER' : [ None, { \
+    'Signature':   [ None, ['String', dict(length=4)]],
+    'SystemTime' : [ None, ['WinTimeStamp', {}]], \
+    } ], \
+
     }

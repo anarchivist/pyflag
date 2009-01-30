@@ -124,7 +124,14 @@ def xpress_decode(inputBuffer):
                 outputIndex += 1 
                 length -= 1 
 
-    return recombine(outputBuffer)
+    result = recombine(outputBuffer)
+    return result
+
+try:
+    import pyxpress
+
+    xpress_decode = pyxpress.decode
+except ImportError: pass
 
 if __name__ == "__main__":
     import sys

@@ -39,8 +39,10 @@ class _UNICODE_STRING(CType):
     """
     def v(self):
         try:
-            data = self.vm.read(self.Buffer.v(), self.Length.v())
-            return data.decode("utf16","ignore")
+            length = self.Length.v()
+            if length > 1024: length=0
+            data = self.vm.read(self.Buffer.v(), length)
+            return data.decode("utf16","ignore").encode("ascii",'backslashreplace')
         except Exception,e:
             return ''
 
@@ -135,7 +137,6 @@ class _EPROCESS(CType):
         process_ad = self.get_process_address_space()
         if process_ad:
             offset =  self.m("Peb").v()
-
             peb = NewObject("_PEB",offset, vm=process_ad, profile=self.profile,
                             name = "Peb", parent=self)
 
@@ -145,9 +146,10 @@ class _EPROCESS(CType):
     def get_process_address_space(self):
         """ Gets a process address space for a task given in _EPROCESS """
         directory_table_base = self.Pcb.DirectoryTableBase[0].v()
-
-        process_as= self.vm.__class__(self.vm.base, directory_table_base)
+        
+        process_as= self.vm.__class__(self.vm.base, dict(dtb = directory_table_base))
         process_as.name = "Process"
+
         return process_as
 
     def _make_handle_array(self, offset, level):
