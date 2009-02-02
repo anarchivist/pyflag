@@ -192,6 +192,10 @@ class Object(object):
         self.name = name
         self.theType = theType
 
+    def __nonzero__(self):
+        if self.v(): return True
+        return False
+
     def __add__(self, other):
         return other + self.v()
 
@@ -342,7 +346,6 @@ class Pointer(NativeType):
     def __init__(self, theType, offset, vm, parent=None, profile=None, target=None, name=None):
         NativeType.__init__(self, theType, offset = offset, vm=vm, name=name,
                             parent=parent, profile=profile)
-        
         self.target = target
         self.format_string = "=L"
 
@@ -361,6 +364,10 @@ class Pointer(NativeType):
 
     def cdecl(self):
         return "Pointer %s" % self.v()
+
+    def __nonzero__(self):
+        if self.dereference(): return True
+        return False
 
     def __repr__(self):
         return "<pointer to [%s ]>" % (self.v())

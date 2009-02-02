@@ -152,7 +152,8 @@ class MountedFS(DBFS):
         ## the filesystem first, we also need to be running as root or
         ## we may not be able to stat all the files :-(
         def insert_into_table(mode ,root ,name):
-            rel_root = FlagFramework.normpath(mount_point + "/" + root[len(path):] + "/")
+            rel_root = FlagFramework.normpath(DB.expand("%s/%s/" ,
+                                                        (mount_point, root[len(path):])))
             try:
                 s=os.lstat(os.path.join(root,name))
             except OSError:

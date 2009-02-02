@@ -44,24 +44,23 @@ def pslist(addr_space, profile):
 
     ## Try to dereference the KdVersionBlock as a 64 bit struct
     DebuggerDataList = kpcr.KdVersionBlock.dereference_as("_DBGKD_GET_VERSION64").DebuggerDataList
-    if DebuggerDataList.is_valid():
-        PsActiveProcessHead = DebuggerDataList.dereference_as("_KDDEBUGGER_DATA64"
-                                                              ).PsActiveProcessHead \
-                           or DebuggerDataList.dereference_as("_KDDEBUGGER_DATA32"
-                                                              ).PsActiveProcessHead
-    else:
-        PsActiveProcessHead = kpcr.KdVersionBlock.dereference_as("_KDDEBUGGER_DATA32"
-                                                                 ).PsActiveProcessHead
-
-
-    if not PsActiveProcessHead:
-        raise RuntimeError("Unable to find PsActiveProcessHead - is this image supported?")
+    PsActiveProcessHead = DebuggerDataList.dereference_as("_KDDEBUGGER_DATA64"
+                                                          ).PsActiveProcessHead \
+                     or DebuggerDataList.dereference_as("_KDDEBUGGER_DATA32"
+                                                        ).PsActiveProcessHead \
+                     or kpcr.KdVersionBlock.dereference_as("_KDDEBUGGER_DATA32"
+                                                           ).PsActiveProcessHead
+    
+    if PsActiveProcessHead:
+        print type(PsActiveProcessHead)
     ## Try to iterate over the process list in PsActiveProcessHead
     ## (its really a pointer to a _LIST_ENTRY)
-    for l in PsActiveProcessHead.dereference_as("_LIST_ENTRY").list_of_type(
-        "_EPROCESS", "ActiveProcessLinks"):
-        yield l
-        
+        for l in PsActiveProcessHead.dereference_as("_LIST_ENTRY").list_of_type(
+            "_EPROCESS", "ActiveProcessLinks"):
+            yield l
+    else:
+        raise RuntimeError("Unable to find PsActiveProcessHead - is this image supported?")
+
 def process_list(addr_space, types, symbol_table=None):
     """
     Get the virtual addresses of all Windows processes

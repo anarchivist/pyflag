@@ -189,7 +189,7 @@ class HTMLUI(UI.GenericUI):
         
         for k,v in options.items():
             if v:
-                result.append("%s=%r"% (k,quote_quotes(v.__str__())))
+                result.append(DB.expand("%s=%r", (k,quote_quotes(unicode(v)))))
 
         return ' '.join(result)
 
@@ -1204,7 +1204,7 @@ class HTMLUI(UI.GenericUI):
         ## Do not propagate __ parameters:
         for k,v in self.form_parms:
             if not k.startswith("__"):
-                base += "<input type=hidden name='%s' value=\"%s\">\n" % (k,cgi.escape(v.__str__(), True))
+                base += DB.expand("<input type=hidden name='%s' value=\"%s\">\n", (k,unicode(cgi.escape(v, True))))
 
         base += self.submit(value,name, target=self.form_target, **opts)
 
