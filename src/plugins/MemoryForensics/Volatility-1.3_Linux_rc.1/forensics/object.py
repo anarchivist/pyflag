@@ -62,7 +62,7 @@ def read_value(addr_space, value_type, vaddr):
     """
     Read the low-level value for a built-in type. 
     """
-
+    ##raise RuntimeError("Deprecated object framework")
     if not builtin_types.has_key(value_type):
         raise Exception('Invalid built-in type %s' % (value_type))
 

@@ -55,70 +55,6 @@ lookup = {
     VERBOSE_DEBUG: "Debug++",
     }
 
-from Queue import Queue, Full, Empty
-
-LOG_QUEUE = Queue(100)
-
-class LoggingThread(threading.Thread):
-    def try_to_connect(self):
-        import pyflag.DB as DB
-
-        dbh = DB.DBO(None)
-        dbh.cursor.ignore_warnings = True
-        ## We get some weird thread related dead locks if we use the
-        ## timeout feature here.
-        dbh.cursor.timeout = 0
-        dbh.cursor.logged  = False
-        
-        return dbh
-        
-    def run(self):
-        log(INFO, "Log thread starting in thread %s, pid %s" % (threading.currentThread().getName(), os.getpid()))
-        try:
-            dbh = self.try_to_connect()
-        except:
-            dbh = None
-            
-        while 1:
-            try:
-                ## This is done so we can receive signals while
-                ## blocked on the logging thread.
-                try:
-                    level, message = LOG_QUEUE.get(block=True, timeout=1)
-                except Empty:
-                    continue
-                
-                ## Terminate the thread
-                if level==0:
-                    break
-                ## dbh.mass_insert(level=level, message=message)
-                if not dbh:
-                    dbh = self.try_to_connect()
-                    
-                #if dbh:
-                #    dbh.insert('logs', level=level, message=message[:250], _fast=True)
-            except Exception,e:
-                sys.stdout.write( "Logging service: %s\nIf PyFlag is not configured yet just connect to its URL. (http://%s:%s/)\n" % (e,config.HTTPSERVER_BINDIF, config.HTTPSERVER_PORT))
-                sys.stdout.flush()
-                time.sleep(10)
-
-def kill_logging_thread():
-    LOG_QUEUE.put((0,None))
-
-def start_log_thread():
-    """ This needs to be called to start the log thread.
-
-    NOTE: It is very important to start this _after_ any forking that
-    will be done in the main process. We do not want the db handled
-    here to be shared between processes or we will get dead locks.
-    """
-    t = LoggingThread()
-    t.start()
-
-    import atexit
-
-    atexit.register(kill_logging_thread)
-
 def log(level,message, *args):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
     if config.LOG_LEVEL >= level:
@@ -136,10 +72,6 @@ def log(level,message, *args):
             string = message
 
         ## Pass the message to the logger queue:
-        try:
-            LOG_QUEUE.put((level,message), False)
-        except Full:
-            pass
         import pyflag.FlagFramework as FlagFramework
         
         log_fd.write(FlagFramework.smart_str(string) + "\n")

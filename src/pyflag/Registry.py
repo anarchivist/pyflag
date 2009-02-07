@@ -180,7 +180,7 @@ class Registry:
         """ Adds the class provided to our self. This is here to be
         possibly over ridden by derived classes.
         """
-        if Class not in self.classes:
+        if Class not in self.classes and Class != ParentClass:
             self.classes.append(Class)
             self.filenames[self.get_name(Class)] = filename
             try:

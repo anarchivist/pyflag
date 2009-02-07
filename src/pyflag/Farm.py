@@ -169,7 +169,7 @@ required to manage working threads (other than ensuring the UPLOAD and
 RESULTDIR are synctonised).
 
 """ 
-import sys,os
+import sys,os,select
 
 sys.path.append(os.path.join(os.path.dirname(__file__),"pyflag"))
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
@@ -212,9 +212,6 @@ def terminate_children():
             os.kill(pid, signal.SIGINT)
         except: pass
 
-        ## Stop our logging thread
-        pyflaglog.kill_logging_thread()
-
 config.add_option("MAXIMUM_WORKER_MEMORY", default=0, type='int',
                   help='Maximum amount of memory (Mb) the worker is allowed to consume (0=unlimited,default)')
 
@@ -250,7 +247,7 @@ config.add_option("WORKERS", default=2, type='int',
 config.add_option("JOB_QUEUE", default=10, type='int',
                   help='Number of jobs to take on at once')
 
-def nanny(cb, *args, **kwargs):
+def nanny(cb, keepalive=None, *args, **kwargs):
     """ Runs cb in another process persistently. If the child process
     quits we restart it.
     """
@@ -262,6 +259,8 @@ def nanny(cb, *args, **kwargs):
     children = []
     while 1:
         try:
+            ## create a socket pair for communications
+            r, w = os.pipe()
             pid = os.fork()
         except AttributeError:
             ## For windows we just call directly
@@ -269,38 +268,36 @@ def nanny(cb, *args, **kwargs):
 
         ## Parent
         if pid:
-            ## Add the child to the list of our children so we
-            ## remember to kill it when we terminate ourselves.
-            try:
-                children = [pid]
-                while 1:
-                    try:
-                        ret = os.waitpid(pid,0)
-                    except OSError,e:
-                        if "Interrupted system call" in e.__str__():
-                            continue
-                        print "Error %s Exiting" % e
+            os.close(w)
+            while 1:
+                ## Check that our parent is still around
+                fds = select.select([keepalive],[],[], 0)
+                if fds[0]:
+                    data = os.read(fds[0][0],1024)
+                    if len(data)==0:
+                        pyflaglog.log(pyflaglog.INFO, "Main process disappeared - closing children")
+                        ## Parent quit - kill our child
+                        os.kill(pid,signal.SIGABRT)
                         os._exit(0)
-                        return
-                    except Exception,e:
-                        ret = [pid]
-                        break
-                    
-                pyflaglog.log(pyflaglog.WARNING, "Child %s died... restaring" % ret[0])
-            finally:
-                terminate_children()
+
+                time.sleep(1)
+                data = os.read(r,1024)
+                if len(data)==0:
+                    ## Other end is closed:
+                    os.close(r)
+
+                    ## Try to read its pid so it doesnt become a
+                    ## zombie:
+                    os.waitpid(pid,0)
+                    break
             
         ## Child
         else:
-            cb(*args, **kwargs)
+            os.close(r)
+            cb(keepalive=w, *args, **kwargs)
             sys.exit(0)
 
-        ## This should never return but just in case we wait a bit
-        ## so as not to spin if the child fails to start
-        time.sleep(10)
-
-
-def worker_run():
+def worker_run(keepalive=None):
      """ The main loop of the worker """
      ## It is an error to fork with db connections
      ## established... they can not be shared:
@@ -312,9 +309,6 @@ def worker_run():
          DB.DBO.DBH_old = DB.DBO.DBH
          DB.DBO.DBH = Store.Store(max_size=10)
          DB.db_connections = 0
-
-     ## Start the logging thread for each worker:
-     pyflaglog.start_log_thread()
 
      ## These are all the methods we support
      jobs = []
@@ -330,6 +324,13 @@ def worker_run():
      except: pass
 
      while 1:
+         ## Ping the parent
+         try:
+             os.write(keepalive,"Checking")
+         except:
+             pyflaglog.log(pyflaglog.WARNING,"Our nanny died - quitting")
+             os._exit(1)
+
          ## Check for memory usage
          check_mem(sys.exit,0)
 
@@ -374,7 +375,7 @@ def worker_run():
                  try:
                      task = Registry.TASKS.dispatch(row['command'])
                  except:
-                     print "Dont know how to process job %s" % row['command']
+                     pyflaglog.log(pyflaglog.DEBUG, "Dont know how to process job %s" % row['command'])
                      continue
 
                  try:
@@ -384,6 +385,11 @@ def worker_run():
                      pyflaglog.log(pyflaglog.ERRORS, "Error %s(%s,%s,%s) %s" % (task.__class__.__name__,row['arg1'], row['arg2'],row['arg3'],e))
 
              finally:
+                 try:
+                     os.write(keepalive, " ".join(row))
+                 except:
+                     pyflaglog.log(pyflaglog.WARNING,"Our nanny died - quitting")
+                     os._exit(1)
                  if row['state'] != 'broadcast':
                      dbh.execute("delete from jobs where id=%r", row['id'])
 
@@ -391,14 +397,21 @@ def worker_run():
 def start_workers():
     if config.FLUSH:
         dbh = DB.DBO()
-        print "Deleting job queue"
+        pyflaglog.log(pyflaglog.WARNING,"Deleting job queue and killing workers")
+        #dbh.execute("select max(id) as max from jobs")
+        #row = dbh.fetch()
+        #broadcast_id = row['max'] or 0
         dbh.execute("delete from jobs")
+        #dbh.insert("jobs", _fast=True,
+        #           command='Exit', state='broadcast',
+        #           )
 
     if config.WORKERS == 0:
         return
 
     for i in range(config.WORKERS):
        try:
+           r,w = os.pipe()
            pid = os.fork()
        except AttributeError:
            ## When running under windows we can not fork...  We must
@@ -424,9 +437,11 @@ def start_workers():
        
        ## Parents:
        if pid:
+           os.close(r)
            children.append(pid)
-       else:   
-           nanny(worker_run)
+       else:
+           os.close(w)
+           nanny(worker_run, keepalive=r)
            
     atexit.register(terminate_children)
 
@@ -438,7 +453,6 @@ def start_workers():
             pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
         
 def handler(sig, frame):
-    pyflaglog.kill_logging_thread()
     if sig==signal.SIGABRT:
         for child in children:
             try:
@@ -492,7 +506,7 @@ if __name__ == "__main__":
 
     Registry.Init()
 
-    config.parse_options()
+    #config.parse_options()
     
-    print "Starting PyFlag worker"
+    pyflaglog.log(pyflaglog.INFO,"Starting PyFlag worker")
     nanny(worker_run)

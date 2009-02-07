@@ -162,17 +162,17 @@ class HTMLUI(UI.GenericUI):
 
     def heading(self,string):
         """ Place string as a heading """
-        self.result += "<h1>%s</h1>"%string
+        self.result += DB.expand("<h1>%s</h1>", string)
 
     def para(self,string,**options):
         """ Creates a new paragraph of text """
         string = cgi.escape(string)
         if options.has_key('font'):
             if options['font'].lower() == "pre":
-                self.result += "<pre>%s</pre>" %string
+                self.result += DB.expand("<pre>%s</pre>", string)
                 return
             
-        self.result += "\n\n<p>%s</p>\n\n" % string
+        self.result += DB.expand("\n\n<p>%s</p>\n\n", string)
 
     def opt_to_str(self,opts={}, **options):
         """ Converts options into a html attribute string. """
@@ -213,7 +213,8 @@ class HTMLUI(UI.GenericUI):
             name = file.inode.replace("|",'_')
             name = name.replace("/","-")
 
-        self.generator.headers=[("Content-Disposition","attachment; filename=%s" % name)]
+        self.generator.headers=[("Content-Disposition",expand("attachment; filename=%s",
+                                                              name))]
 
         file.seek(0)
         self.generator.generator=file
@@ -264,7 +265,7 @@ class HTMLUI(UI.GenericUI):
         """ Starts a new table """
         self.table_depth += 1
         #if not options.has_key("class"): options['class'] = "Row"
-        self.result += "<table %s>\n" % self.opt_to_str(options)
+        self.result += expand("<table %s>\n", self.opt_to_str(options))
 
     def row(self,*columns, **options):
         """ Place the columns in a row.
@@ -286,7 +287,7 @@ class HTMLUI(UI.GenericUI):
         if not self.table_depth:
             self.start_table()
                         
-        self.result+="<tr %s>\n" % self.opt_to_str(options)
+        self.result+=expand("<tr %s>\n", self.opt_to_str(options))
         for column in columns:
             if not options.has_key('align'):
                 try:
@@ -295,7 +296,8 @@ class HTMLUI(UI.GenericUI):
                 except:
                     td_opts['class'] = ''
         
-            self.result += "<%s %s>%s</%s>" % (type,self.opt_to_str(td_opts),column,type)
+            self.result += expand("<%s %s>%s</%s>",
+                                  (type,self.opt_to_str(td_opts),column,type))
 
         self.result+="</tr>\n"
 
@@ -307,7 +309,7 @@ class HTMLUI(UI.GenericUI):
         self.result += "<br>"
 
     def pre(self,string):
-        self.result += "<pre>%s</pre>" % string
+        self.result += expand("<pre>%s</pre>", string)
 
     def _calculate_js_for_pane(self, target=None, pane="main", **opts):
         """ Returns the JS string required to facilitate opening in the requested pane

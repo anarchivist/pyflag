@@ -157,10 +157,10 @@ class MountedFS(DBFS):
             try:
                 s=os.lstat(os.path.join(root,name))
             except OSError:
-                pyflaglog.log(pyflaglog.WARNING, "Unable to stat %s - mount the directory with the uid option" % root)
+                pyflaglog.log(pyflaglog.WARNING, DB.expand("Unable to stat %s - mount the directory with the uid option", root))
                 return
 
-            inode = "I%s|M%s" % (iosource_name, s.st_ino)
+            inode = DB.expand("I%s|M%s", (iosource_name, s.st_ino))
             dbh_inode.insert('inode',
                              inode = inode,
                              uid = s.st_uid,
@@ -193,7 +193,7 @@ class MountedFS(DBFS):
                                  
             ## Fixme - handle symlinks
             try:
-                link=os.readlink("%s/%s" % (root,name))
+                link=os.readlink(DB.expand("%s/%s", (root,name)))
             except OSError:
                 link=''
 
@@ -231,8 +231,8 @@ class MountedFS_file(File):
         mount_point = fd.io.mount_point
         ## Prune the path down to the mount point:
         if path[:len(mount_point)] != mount_point:
-            raise RuntimeError("Something went wrong - %s should be mounted on %s" % \
-                               (path, mount_point))
+            raise RuntimeError(DB.expand("Something went wrong - %s should be mounted on %s",
+                                         (path, mount_point)))
         
         path = path[len(mount_point):]
         path=basepath+'/'+path+"/"+row['name']
@@ -268,7 +268,7 @@ class MountedFS_file(File):
         if name.startswith(config.UPLOADDIR):
             name = name[len(config.UPLOADDIR):]
             
-        result.row("Filename","%s" % name, **{'class':'explainrow'})
+        result.row("Filename",DB.expand("%s", name), **{'class':'explainrow'})
 
 ## Unit tests:
 import pyflag.tests as tests

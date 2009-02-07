@@ -3,6 +3,7 @@ import forensics.registry as registry
 def load_as(opts):
     base_as = None
     while 1:
+        print "Voting round"
         found = False
         for cls in  registry.AS_CLASSES.classes:
             print "Trying %s " % cls
