@@ -537,13 +537,12 @@ class execute(pyflagsh.command):
                 dbh = DB.DBO()
                 
             canonical_query = FlagFramework.canonicalise(query)
-            dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
-
             ## We call the display method just in case this report
             ## does something in the display
             result=TEXTUI.TEXTUI(query=query)
             report.display(query,result)
             yield result.display()
+            dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Flash successfully ran the following query: %s" % query)
         except Exception,e:

@@ -170,7 +170,8 @@ class ColumnType:
                  ):
         
         if not name or not column:
-            raise RuntimeError("You must set both name and column")
+            raise RuntimeError("%s: You must set both name (%s) and column (%s)" % (
+                self,name, column))
         
         self.name = name
         self.extended_names = [ name ]
@@ -648,6 +649,10 @@ class StringType(ColumnType,LogParserMixin):
         defaults = LogParser.defaults[:]
         defaults.append(['regex','RegEx', r"[^\s]+"])
         defaults.append(['boundary', 'Boundary', r"\s+"])
+
+class BlobType(StringType):
+    def create(self):
+        return "`%s` BLOB default NULL" % (self.column)
 
 class LongStringType(StringType):
     def create(self):

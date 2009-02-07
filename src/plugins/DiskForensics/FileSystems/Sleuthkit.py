@@ -65,7 +65,7 @@ class Sleuthkit_File(File):
         self.skfd.seek(self.readptr)
         
         if length!=None:
-            result= self.skfd.read(length, slack=self.slack, overread=self.overread)
+            result= self.skfd.read(int(length), slack=self.slack, overread=self.overread)
         else:
             result= self.skfd.read(slack=self.slack, overread=self.overread)
 

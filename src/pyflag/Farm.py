@@ -253,6 +253,7 @@ def nanny(cb, keepalive=None, *args, **kwargs):
     """
     atexit.register(terminate_children)
     signal.signal(signal.SIGABRT, handler)
+    signal.signal(signal.SIGUSR1, handler)
     signal.signal(signal.SIGINT, handler)
     global children
     
@@ -269,6 +270,7 @@ def nanny(cb, keepalive=None, *args, **kwargs):
         ## Parent
         if pid:
             os.close(w)
+            children.append(pid)
             while 1:
                 ## Check that our parent is still around
                 fds = select.select([keepalive],[],[], 0)
@@ -281,15 +283,19 @@ def nanny(cb, keepalive=None, *args, **kwargs):
                         os._exit(0)
 
                 time.sleep(1)
-                data = os.read(r,1024)
-                if len(data)==0:
-                    ## Other end is closed:
-                    os.close(r)
-
-                    ## Try to read its pid so it doesnt become a
-                    ## zombie:
-                    os.waitpid(pid,0)
-                    break
+                try:
+                    data = os.read(r,1024)
+                    if len(data)==0:
+                        ## Other end is closed:
+                        os.close(r)
+                        
+                        ## Try to read its pid so it doesnt become a
+                        ## zombie:
+                        os.waitpid(pid,0)
+                        children.pop(children.index(pid))
+                        break
+                except OSError:
+                    pass
             
         ## Child
         else:
@@ -453,11 +459,13 @@ def start_workers():
             pyflaglog.log(pyflaglog.WARNING, "Error: %s" % e)
         
 def handler(sig, frame):
-    if sig==signal.SIGABRT:
-        for child in children:
+    if sig==signal.SIGABRT or sig==signal.SIGUSR1:
+        ## Pass these signals directly to our children
+        for pid in children:
             try:
                 os.kill(pid, sig)
-            except: pass
+            except Exception,e:
+                pass
 
     if sig!=signal.SIGUSR1:
         sys.exit(0)
@@ -478,6 +486,7 @@ def wake_workers():
     """ Try to wake workers if possible. If we fail we must wait until
     the worker polls next, so its not a big deal.
     """
+    print "Waking workers %s" % (children,)
     try:
         for i in range(config.WORKERS):
             win32event.PulseEvent(SyncEvent)

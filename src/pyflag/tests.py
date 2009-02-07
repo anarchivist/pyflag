@@ -86,7 +86,7 @@ class ScannerTest(unittest.TestCase):
     mount_point = '/'
     TZ="SYSTEM"
 
-    def test00preLoadCase(self):
+    def setUp(self):
         """ Load test Case"""
         try:
             pyflagsh.shell_execv(command="execute",

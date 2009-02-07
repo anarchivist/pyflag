@@ -78,8 +78,8 @@ def log(level,message, *args):
         log_fd.flush()
         
     if level<=ERRORS and level>0:
-        log_fd.write("-%s\n" % string)
-        log_fd.write("-%s\n" % traceback.print_tb(sys.exc_info()[2]))
+        log_fd.write("%s\n" % string)
+        log_fd.write("%s\n" % traceback.print_tb(sys.exc_info()[2]))
         log_fd.flush()
 
 def render_system_messages(result):

@@ -64,10 +64,6 @@ config.add_option('log', default=None,
 Registry.Init()
 config.parse_options()
 
-## Start up some workers:
-import pyflag.Farm as Farm
-Farm.start_workers()
-
 test_registry = Registry.InitTests()
 if config.match:
     classes = [ x for x in test_registry.classes if \
@@ -104,6 +100,10 @@ if config.list:
         print "%s (%s)" % (test.__doc__,
                            test_registry.filename(test_registry.get_name(test)))
     sys.exit()
+
+## Start up some workers:
+import pyflag.Farm as Farm
+Farm.start_workers()
 
 import gc
 #gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_SAVEALL | gc.DEBUG_LEAK)

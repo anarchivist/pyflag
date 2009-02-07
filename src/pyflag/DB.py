@@ -1010,7 +1010,7 @@ class DirectDBO(PooledDBO):
             mysql_connection_args = None            
             raise DBError("Unable to connects - does the DB Exist?: %s" % e)
 
-    def __del__(self):
+    def __xxxdel__(self):
         if self.transaction:
             self.end_transaction()
 

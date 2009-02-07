@@ -547,5 +547,5 @@ if __name__ == "__main__":
             pyflaglog.log(pyflaglog.ERROR, "Error %s" % e)
         
     finally:
-        pyflaglog.log(0,"Terminating Logger")
+        pyflaglog.log(pyflaglog.INFO,"Terminating PyFlag Server")
         sys.exit(0)
