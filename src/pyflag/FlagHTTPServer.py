@@ -536,9 +536,6 @@ if __name__ == "__main__":
     import pyflag.Farm as Farm
     Farm.start_workers()
 
-    ## Start the logging thread:
-    pyflaglog.start_log_thread()
-
     ## Check the schema:
     FlagFramework.check_schema()
 

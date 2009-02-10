@@ -99,6 +99,8 @@ class ThumbnailType(InodeIDType):
             print e
             return "<a href=%r ><img src='images/broken.png' /></a>" % inode_filename
 
+        InodeIDType.render_html(self, inode_id, table_renderer)
+        table_renderer.add_file_to_archive(inode_id)
         return "<a href=%r ><img src=%r /></a>" % (inode_filename, filename)
 
     def render_thumbnail_hook(self, inode_id, row, result):

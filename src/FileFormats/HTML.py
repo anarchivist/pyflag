@@ -313,14 +313,16 @@ class SanitizingTag(Tag):
         if 'src' in self.attributes:
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
 
-        if 'href' in self.attributes:
-            if self.name == 'link':
-                attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
-            else:
-                attributes += DB.expand(' href="javascript: alert(%r)"',
-                                        iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
-                postfix = self.mark_link(self.attributes['href'])
-
+        try:
+            if 'href' in self.attributes:
+                if self.name == 'link':
+                    attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
+                else:
+                    attributes += DB.expand(' href="javascript: alert(%r)"',
+                                            iri_to_uri(DB.expand("%s",self.attributes['href'])[:100]))
+                    postfix = self.mark_link(self.attributes['href'])
+        except: pass
+        
         ## CSS needs to be filtered extra well
         if self.name == 'style':
             return expand("<style %s>%s</style>" , (attributes,

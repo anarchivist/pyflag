@@ -141,7 +141,8 @@ class GenericUI:
                 values.append(row[value])
 
         ## If the SQL failed, we present an empty selector
-        except DB.DBError:
+        except DB.DBError,e:
+            print e
             pass
 
         self.const_selector(description,name,keys,values,**options)
