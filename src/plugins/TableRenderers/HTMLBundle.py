@@ -523,13 +523,13 @@ import pyflag.pyflaglog as pyflaglog
 class Export(Farm.Task):
     """ A Distributable table for exporting an inode into HTML """
     def run(self, case, inode_id, *args):
-        pyflaglog.log(pyflaglog.DEBUG, "Exporting inode_id %s" % inode_id)
         table_renderer = HTMLDirectoryRenderer(case=case, include_extra_files=True)
         self.export(case, inode_id, table_renderer)
 
     def export(self, case, inode_id, table_renderer):
         filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/',
                                                       visited = {})
+        pyflaglog.log(pyflaglog.DEBUG, "Exporting inode_id %s" % inode_id)
 
         ## A link to the file's body
         fsfd = FileSystem.DBFS(case)
@@ -547,7 +547,6 @@ class Export(Farm.Task):
                 data = fd.html_export(tag_class = tag)
                 table_renderer.add_file_from_string(filename, data.encode("utf8"))
         except AttributeError,e:
-            print e
             pass
 
         ## Now explain this file:

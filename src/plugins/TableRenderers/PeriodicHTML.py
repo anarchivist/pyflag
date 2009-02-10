@@ -81,7 +81,6 @@ class PeriodicRenderer(HTMLBundle.HTMLDirectoryRenderer):
         return result
 
     def real_render_table(self):
-        self.parse_limits(self.query)
         ## Ok we need to figure out which pages need updating - we
         ## assume that data is only added to the tables not removed.
         self.limit = 0
@@ -105,6 +104,7 @@ class PeriodicRenderer(HTMLBundle.HTMLDirectoryRenderer):
             page = 1
 
         print "Doing page %s from %s" % (page, self.query['start_limit'])
+        self.parse_limits(self.query)
         g = self.generate_rows(self.query, ordering=False)
         self.add_constant_files()
 

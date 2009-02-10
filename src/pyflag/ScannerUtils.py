@@ -67,7 +67,7 @@ def fill_in_dependancies(scanners):
         elif s in groups:
             for g in groups[s]:
                 #name = ("%s" % g).split(".")[-1]
-                name = g.clsname
+                name = g.name
                 dependancies.append(name)
                 find_dependencies(name, dependancies)
 

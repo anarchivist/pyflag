@@ -219,6 +219,7 @@ class Registry:
     def get_name(self, cls):
         try:
             name=cls.name
+            cls.clsname = name
             return name
         except AttributeError:
             name = ("%s" % cls).split(".")[-1]

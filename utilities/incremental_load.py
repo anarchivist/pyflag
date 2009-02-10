@@ -31,6 +31,8 @@ import pyflag.DB as DB
 import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Farm as Farm
+import pyflag.FlagFramework as FlagFramework
+import select
 
 Registry.Init()
 
@@ -96,8 +98,8 @@ print scanners
 output_fd = None
 
 def create_output_file():
-    global output_fd
-    
+    global output_fd, output_file
+
     print "Will read from %s and write to %s. Will use these scanners: %s" % (directory, output_file, scanners)
 
     ## Check if the file is already there:
@@ -141,7 +143,9 @@ def create_output_file():
                                    "filename=%s" % (output_file),
                                    "offset=0",
                                    ])
-    except Reports.ReportError: pass
+    except Reports.ReportError:
+        FlagFramework.print_bt_string()
+    
 
 pcap_id = 0
 
@@ -203,7 +207,7 @@ offset = 0
 ## Start up some workers if needed:
 Farm.start_workers()
 
-def run():
+def run(keepalive=None):
     global last_mtime, offset, output_fd
 
     create_output_file()
@@ -237,6 +241,16 @@ def run():
     last_mtime = os.stat(directory).st_mtime
 
     while 1:
+        ## Check that our parent process is still there:
+        fds = select.select([keepalive],[],[], 0)
+        if fds[0]:
+            data = os.read(fds[0][0],1024)
+            if len(data)==0:
+                pyflaglog.log(pyflaglog.INFO, "Main process disappeared - closing children")
+                ## Parent quit - kill our child
+                os.kill(pid,signal.SIGABRT)
+                os._exit(0)
+        
         t = os.stat(directory).st_mtime
         if t>=last_mtime:
             last_mtime = t
@@ -295,4 +309,9 @@ def finish():
     os._exit(0)
 
 ## Run the main loader under the nanny
-Farm.nanny(run)
+import os
+r,w = os.pipe()
+Farm.nanny(run, keepalive=r)
+while 1:
+    print "Waiting"
+    time.sleep(10)
