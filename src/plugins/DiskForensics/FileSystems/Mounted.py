@@ -17,6 +17,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path
 import stat
+import StringIO
 
 ## This is just a psuedo filesystem to load the image into the VFS:
 class Raw(DBFS):
@@ -56,7 +57,7 @@ class Mounted(IO.Image):
     def close(self):
         pass
 
-    def read(self, length):
+    def read(self, length=None):
         return ''
 
     def form(self,query, result):
@@ -100,7 +101,10 @@ class Mounted(IO.Image):
             dbh.execute("select parameters from iosources where name = %r" , name)
             row = dbh.fetch()
             query = FlagFramework.query_type(string=row['parameters'])
-            self.directory = query['directory']
+            try:
+                self.directory = query['directory']
+            except:
+                self.directory = query['filename']
 
             ## Find the mount point:
             dbh.execute("select value from filesystems where property='mount point' and iosource=%r", name)
@@ -239,7 +243,10 @@ class MountedFS_file(File):
         if not path.startswith(posixpath.normpath(config.UPLOADDIR)):
             path = FlagFramework.sane_join(config.UPLOADDIR, path)
 
-        self.fd = open(path,'r')
+        if os.path.isdir(path):
+            self.fd = StringIO.StringIO('')
+        else:
+            self.fd = open(path,'r')
 
         s = os.stat(path)
         self.size = s.st_size

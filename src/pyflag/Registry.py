@@ -49,7 +49,6 @@ class Registry:
     module_desc = []
     module_paths = []
     classes = []
-    class_names = []
     order = []
     filenames = {}
     ## These are the modules which have been disabled
@@ -65,7 +64,6 @@ class Registry:
         """
         ## Create instance variables
         self.classes = []
-        self.class_names = []
         self.order = []
         
         ## Recurse over all the plugin directories recursively
@@ -309,6 +307,7 @@ class OrderedRegistry(Registry):
 
         self.classes.sort(sort_function)
         self.class_names = [ self.get_name(i) for i in self.classes ]
+        self.class_names_ex = [ self.get_class_name(i) for i in self.classes ]
         self.scanners = self.class_names
 
     def get_class_name(self, cls):
@@ -328,7 +327,9 @@ class OrderedRegistry(Registry):
         return groups
 
     def dispatch(self,scanner_name):
-        if scanner_name in self.class_names:
+        if scanner_name in self.class_names_ex:
+            return self.classes[self.class_names_ex.index(scanner_name)]
+        elif scanner_name in self.class_names:
             return self.classes[self.class_names.index(scanner_name)]
         else:
             raise ValueError("Object %s does not exist in the registry. Is the relevant plugin loaded?" % scanner_name)
@@ -343,6 +344,7 @@ class FileHandlerRegistry(OrderedRegistry):
     def __init__(self, ParentClass):
         Registry.__init__(self, ParentClass)
         self.class_names = [ i.method for i in self.classes ]
+        self.class_names_ex = self.class_names
 
 class VFSFileRegistry(Registry):
     """ A class to register VFS (Virtual File System) File classes """

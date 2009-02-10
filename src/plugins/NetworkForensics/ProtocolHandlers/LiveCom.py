@@ -442,7 +442,9 @@ class LiveAttachements(FlagFramework.EventHandler):
         """ A periodic handler to ensure that attachements are matched
         to their respective messages
         """
-        self.find_uploaded_attachments(dbh)
+        try:
+            self.find_uploaded_attachments(dbh)
+        except: return
         dbh2 = dbh.clone()
         dbh3 = dbh.clone()
         dbh4 = dbh.clone()

@@ -726,7 +726,7 @@ class TableRenderer:
             icon = "sql.png", pane = 'popup',
             )
     
-    def _make_sql(self, query):
+    def _make_sql(self, query, ordering=True):
         """ Calculates the SQL for the table widget based on the query """
         ## Calculate the SQL
         query_str = "select "
@@ -775,13 +775,14 @@ class TableRenderer:
             query_str += "group by %s " % self.groupby
             
         ## Now calculate the order by:
-        try:
-            query_str += "order by %s " % self.elements[self.order].order_by()
-            if self.direction == 1:
-                query_str += "asc"
-            else: query_str += "desc"
-        except IndexError:
-            pass
+        if ordering:
+            try:
+                query_str += "order by %s " % self.elements[self.order].order_by()
+                if self.direction == 1:
+                    query_str += "asc"
+                else: query_str += "desc"
+            except IndexError:
+                pass
 
         return query_str
 
@@ -886,7 +887,7 @@ class TableRenderer:
                 if i==self.order:
                     tds+="<td class='sorted-column'>%s</td>" % (FlagFramework.smart_unicode(cell_ui))
                 else:
-                    tds+="<td class='table-cell'>%s</td>" % (FlagFramework.smart_unicode(cell_ui))
+                    tds+=DB.expand("<td class='table-cell'>%s</td>",cell_ui)
 
             result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
             self.row_count += 1

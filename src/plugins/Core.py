@@ -251,6 +251,39 @@ class OffsetFileTests(tests.FDTest):
         self.assertEqual(data2, data)
         self.assertEqual(fd2.tell(), 2000)
 
+config.add_option("PERIOD", default=60, type='int',
+                  help="Run house keeping every this many seconds")
+
+class Periodic(Farm.Task):
+    """ A task to run events periodically.
+
+    Note that periodic events will be fired in a very relaxed manner
+    within the timeframe, config.PERIOD to config.PERIOD +
+    config.JOB_QUEUE_POLL
+    """
+    def schedule(self):
+        """ We send a request to start the periodic scheduler - there
+        can only be one pending request no matter how many workers are
+        present.
+        """
+        dbh=DB.DBO()
+        dbh.execute("lock table jobs write")
+        try:
+            dbh.execute("delete from jobs where command='Periodic' and state='pending'")
+            dbh.insert("jobs", _fast=True,
+                       command="Periodic", priority=20,
+                       _when_valid="from_unixtime(%r)" % (int(time.time()) + config.PERIOD),
+                       state = 'pending', cookie=0)
+        finally:
+            dbh.execute("unlock tables")
+
+    def run(self, *args):
+        pyflaglog.log(pyflaglog.DEBUG, "Running Housekeeping tasks on %s" % time.ctime())
+        try:
+            FlagFramework.post_event('periodic', None)
+        finally:
+            self.schedule()
+
 class Exit(Farm.Task):
     """ A task to force the worker to exit """
     def run(self, case, *args):
@@ -396,6 +429,8 @@ class CaseDBInit(FlagFramework.EventHandler):
 	arg2 text,
 	arg3 text,
 	state enum('broadcast','pending','processing') default 'pending',
+        priority int default 10,
+        when_valid TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
 	`cookie` INT(11) not null,
 	key `id`(id)
 	)""")
@@ -426,7 +461,7 @@ class CaseDBInit(FlagFramework.EventHandler):
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
     def startup(self):
-        print "Starting Database Cache manager"
+        print "Checking schema for compliance"
         ## Make sure that the schema conforms
         dbh = DB.DBO()
         dbh.execute("select value from meta where property='flag_db'")
@@ -438,8 +473,13 @@ class CaseDBInit(FlagFramework.EventHandler):
                                          'enum("progress","dirty","cached")')
             except: continue
 
-
-        ## We now spawn the cache manager thread TODO
+        ## Check the schema:
+        DB.check_column_in_table(None, 'jobs', 'priority', 'int default 10')
+        DB.check_column_in_table(None, 'jobs', 'when_valid',
+                                 'TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL')
+        ## Schedule the first periodic task:
+        task = Periodic()
+        task.schedule()
         
     def exit(self, dbh, case):
         IO.IO_Cache.flush()

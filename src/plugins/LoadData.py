@@ -508,6 +508,9 @@ class LoadFS(Reports.report):
     progress_str=None
 
     def __init__(self, flag, ui=None):
+        ## We dont want to update the whole class's parameters just our
+        ## copy:
+        self.parameters = self.parameters.copy()
         if ui:
             try:
                 c = Registry.FILESYSTEMS.dispatch(ui.defaults['fstype'])

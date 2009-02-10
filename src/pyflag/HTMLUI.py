@@ -158,7 +158,7 @@ class HTMLUI(UI.GenericUI):
         return self.result
 
     def __unicode__(self):
-        return self.__str__()
+        return self.__str__().decode("utf8",'ignore')
 
     def heading(self,string):
         """ Place string as a heading """

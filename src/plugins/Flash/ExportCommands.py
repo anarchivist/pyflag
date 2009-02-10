@@ -16,7 +16,7 @@ class export(pyflagsh.command):
     def execute(self):
         ## Derive an element list
         elements = []
-        for t in self.args[1:]:
+        for t in self.args[2:]:
             yield t
             if '.' in t:
                 class_name , column_name = t.split(".")
@@ -27,7 +27,7 @@ class export(pyflagsh.command):
                 print t
                 self.opts.set(key, value)
 
-        exporter = Registry.TABLE_RENDERERS.dispatch("HTMLDirectoryRenderer")
+        exporter = Registry.TABLE_RENDERERS.dispatch(self.args[1])
         exporter = exporter(elements=elements,
                             case=self.environment._CASE)
 
@@ -36,24 +36,27 @@ class export(pyflagsh.command):
         self.opts.set('include_extra_files',1)
         self.opts.set('explain_inodes',1)
 
-        print self.opts
-        
-        g = exporter.generate_rows(self.opts)
-        print self.opts
-        
         ## Render it
         ui = TEXTUI.TEXTUI(query=self.opts)
+
+        ## Render the table:
         exporter.render(self.opts, ui)
-        for i in ui.generator.generator:
-            print i
-        print ui
+        try:
+            for i in ui.generator.generator:
+                print i
+        except TypeError:
+            print ui
         #return ui.generator
         
     def complete(self, text, state):
         args = self.args
         if len(args)<2: return
 
-        if '.' in text:
+        if len(args)==2 or (text and len(args)==3):
+            exporters = [t for t in Registry.TABLE_RENDERERS.class_names_ex if t.startswith(text)]
+            return exporters[state]
+
+        elif '.' in text:
             ## complete the column name
             table, column = text.split(".")
             tbl = Registry.CASE_TABLES.dispatch(table)()
@@ -61,7 +64,7 @@ class export(pyflagsh.command):
                 columns = [ c.name for c in tbl.instantiate_columns() if c.name.startswith(column)]
                 return "%s.%s" % (table,columns[state])
         else:
-            tables = [ t for t in Registry.CASE_TABLES.class_names if t.startswith(text)]
+            tables = [ t for t in Registry.CASE_TABLES.class_names_ex if t.startswith(text)]
             return tables[state]
 
 import pyflag.tests
@@ -80,8 +83,9 @@ class HTMLExportTest(pyflag.tests.ScannerTest):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'TypeScan'])
 
-        env['filter'] = "Type contains html"
         pyflagsh.shell_execv(env=env, command="export",
-                             argv=["Images","TypeCaseTable.Thumbnail",
+                             argv=["Images","HTMLDirectoryRenderer",
+                                   "TypeCaseTable.Thumbnail",
                                    "TypeCaseTable.Type","InodeTable.Size",
-                                   'filter=Type contains html'])
+                                   #'filter=Type contains JPEG',
+                                   ])

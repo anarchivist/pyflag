@@ -247,6 +247,9 @@ config.add_option("WORKERS", default=2, type='int',
 config.add_option("JOB_QUEUE", default=10, type='int',
                   help='Number of jobs to take on at once')
 
+config.add_option("JOB_QUEUE_POLL", default=10, type='int',
+                  help='Number of seconds to wait between worker queue polls')
+
 def nanny(cb, keepalive=None, *args, **kwargs):
     """ Runs cb in another process persistently. If the child process
     quits we restart it.
@@ -349,15 +352,22 @@ def worker_run(keepalive=None):
                      sys.exit(0)
                  
              except (NameError,AttributeError),e:
-                 time.sleep(10)
+                 time.sleep(config.JOB_QUEUE_POLL)
 
          dbh = None
          try:
              dbh = DB.DBO()
              try:
                  dbh.execute("lock tables jobs write")
-                 sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
-                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
+                 ## Higher priority jobs take precendence over lower
+                 ## priority jobs. We only want jobs which are valid
+                 ## now (jobs can be set in the future). We assume
+                 ## that we actually can process all jobs (all workers
+                 ## must have all the same plugins).
+                 dbh.execute("select * from jobs where when_valid <= now() "
+                             " and ((state='pending') or (state='broadcast' and "
+                             " id>%r)) order by id asc, priority desc limit %s",
+                             (broadcast_id, config.JOB_QUEUE))
                  jobs = [ row for row in dbh ]
 
                  if not jobs:

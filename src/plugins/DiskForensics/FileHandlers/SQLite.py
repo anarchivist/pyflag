@@ -44,6 +44,13 @@ import pyflag.DB as DB
 import sqlite
 import pyflag.Reports as Reports
 
+## FIXME: We are making a big assumption here that the same column
+## name in all sqlite files has the same definition. This is done so
+## we can show all table contents in all files together (so we can
+## search them all at once). What happens if the same column name is
+## defined with different schema in different files? Bad things
+## happen.
+
 class SQLiteColumn(StringType):
     def link_display_hook(self, value, row, result):
         q = FlagFramework.query_type(report='SQLite',
@@ -52,7 +59,7 @@ class SQLiteColumn(StringType):
                                      case = self.case,
                                      table_name = value)
         result.clear()
-        result.link(value, q,pane='popup')
+        result.link(value, q,pane='new')
 
     display_hooks = [link_display_hook]
 
@@ -116,11 +123,15 @@ table = Literal("CREATE TABLE").suppress() + tablename + Literal("(").suppress()
         delimitedList(keys | column) + Literal(")").suppress()
 
 
-## These are table fixups which can be used to over ride the default
-## mapping between SQLite columns and PyFlag columns.
+## These are table fixups which can be used to override the default
+## mapping between SQLite columns and PyFlag columns. The format is an
+## list of class, prebound args dict, sql filter used to filter the
+## result upon insert.
 fixups = {
-#    'dateAdded': [ TimestampType, {} ],
-#    'expiry': [ TimestampType, {} ],
+    'expiry': [ TimestampType, {}, "from_unixtime(%r)" ],
+    'lastAccessed': [ TimestampType, {}, "from_unixtime(%r)" ],
+    'dateAdded': [ TimestampType, {}, "from_unixtime(%r)" ],
+    'lastModified': [ TimestampType, {}, "from_unixtime(%r)" ],
     }
 
 def build_case_table(prefix, definition):
@@ -137,8 +148,9 @@ def build_case_table(prefix, definition):
     
     case_table = FlagFramework.CaseTable()
     case_table.name = "%s_%s" % (prefix, result[0])
-    case_table.columns = []
+    case_table.columns = [(InodeIDType, {}),]
     case_table.column_names = []
+    case_table.sql_filters = []
     
     ## This is a lookup dictionary converting from SQLite table types
     ## to PyFlag ColumnTypes
@@ -160,16 +172,22 @@ def build_case_table(prefix, definition):
             col_type = "VARCHAR"
 
         try:
-            new_column_type, args = fixups[col_name]
+            tmp = fixups[col_name]
+            new_column_type, args = tmp[0], tmp[1]
             args['name'] = col_name
             args['column'] = col_name
             new_column = [ new_column_type, args]
         except KeyError:
             new_column = [ lookup_types.get(col_type.upper(), StringType), 
                            dict(name = col_name, column = col_name) ]
+            tmp = []
             
         case_table.columns.append( new_column )
         case_table.column_names.append(col_name)
+
+        try:
+            case_table.sql_filters.append(tmp[2])
+        except: case_table.sql_filters.append(None)
         
     return case_table
 
@@ -198,20 +216,28 @@ class SQLiteScanner(Scanner.GenScanFactory):
                                inode_id = self.fd.inode_id,
                                definition = row[4])
 
-                    case_table = build_case_table("sqlite_%s" % self.fd.inode_id,
+                    case_table = build_case_table("sqlite",
                                                   row[4])
                     
-                    ## Create our copy of this table
-                    case_table.create(dbh)
+                    ## Create our copy of this table (if its not
+                    ## already there
+                    try:
+                        case_table.create(dbh)
+                    except Exception,e:
+                        pass
                     
                     ## Insert all the data into our copy of the table
                     ldbh2.execute("select * from %s" % row[1])
                     dbh.mass_insert_start(case_table.name)                    
                     for row in ldbh2:
-                        args = {}
+                        args = {'inode_id': self.fd.inode_id}
                         for i in range(len(row)):
                             if row[i]!=None:
-                                args[case_table.column_names[i]] = row[i]
+                                if case_table.sql_filters[i]:
+                                    args["_"+case_table.column_names[i]] = DB.expand(
+                                        case_table.sql_filters[i],row[i])
+                                else:
+                                    args[case_table.column_names[i]] = row[i]
 
                         dbh.mass_insert(**args)
 
@@ -220,8 +246,12 @@ class SQLiteScanner(Scanner.GenScanFactory):
 class SQLiteScannerTest(pyflag.tests.ScannerTest):
     """ Test handling of SQLite files """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.5.dd"
-    subsystem = 'Standard'
+    subsystem = 'Mounted'
+    fstype = 'Mounted'
+    test_file = '08nt1q67.default/formhistory.dat'
+#    test_file = "pyflag_stdimage_0.5.dd"
+#    subsystem = 'Standard'
+
     offset = "16128s"
     
     def test01RunScanner(self):
@@ -236,20 +266,18 @@ class BrowseSQLiteTables(Reports.report):
     name = 'SQLite'
     family = "Disk Forensics"
     parameters = {'case': 'flag_db',
-                  'inode_id': 'numeric',
                   'table_name': 'string'}
     
     def display(self, query, result):
-        inode_id = int(query['inode_id'])
         name = query['table_name']
         
         ## Which table is it?
         dbh = DB.DBO(query['case'])
-        dbh.execute("select * from sqlite where inode_id = %r and name=%r",
-                    inode_id, name)
+        dbh.execute("select * from sqlite where name=%r",
+                    name)
         row = dbh.fetch()
         if row:
-            case_table = build_case_table("sqlite_%s" % inode_id,
+            case_table = build_case_table("sqlite",
                                           row['definition'])
             result.table(
                 table = case_table.name,

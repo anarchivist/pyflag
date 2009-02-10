@@ -1,3 +1,27 @@
+# ******************************************************
+# Copyright 2009: Commonwealth of Australia.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+
 """ This table renderer produces a bundle (a tar file or a directory)
 of a set of html pages from the table. The bundle can be viewed as a
 stand alone product (i.e. all html pages are self referential and
@@ -30,6 +54,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     page_name = "Page"
     description = "PyFlag Exported Page"
     explain_inodes = False
+    count = 0
     
     def form(self, query,result):
         result.heading(self.message)
@@ -130,7 +155,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         start_value = None
         end_value = None
 
-        ## Total number of rows
+        ## This is the row this page starts on
+        start_limit = self.count + self.limit
         self.row_count=0
 
         for row in row_generator:
@@ -173,12 +199,17 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             if self.row_count >= self.pagesize:
                 break
 
+        if self.row_count==0:
+            return ''
+        
         ## Store critical information about the page in the db:
         dbh = DB.DBO(self.case)
+        DB.check_column_in_table(self.case, 'reporting', 'limit', 'int')
         dbh.delete("reporting", where=DB.expand("page_name = %r", page_name))
         dbh.insert("reporting",
                    start_value = start_value,
                    end_value = end_value,
+                   limit = start_limit,
                    page_name = page_name,
                    description = self.description)
 
@@ -247,8 +278,19 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             return True
         except OSError:
             return False
-        
+
+    def parse_limits(self, query):
+        try:    self.limit = int(query.get('start_limit',0))
+        except: self.limit = 0
+        try:    self.end_limit = int(query.get('end_limit',0))
+        except: self.end_limit = 0
+
+        ## Doesnt make sense to finish before we started
+        if self.end_limit <= self.limit:
+            self.end_limit = sys.maxint
+
     def render_table(self, query, result):
+        self.parse_limits(query)
         ## Fill in some provided parameters:
         self.page_name = query['filename']
 
@@ -331,33 +373,24 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         self.add_file_from_string("toc.html", page.encode("utf8"))
 
-    def generate_rows(self, query):
+    def generate_rows(self, query, ordering=True):
         """ This implementation gets all the rows, but makes small
         queries to maximise the chance of getting cache hits.
         """
         dbh = DB.DBO(self.case)
-        self.sql = self._make_sql(query)
+        self.sql = self._make_sql(query, ordering=ordering)
+        print self.sql
         
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries. FIXME - implement
-##        try:    self.limit = int(query.get(self.limit_context,0))
-        try:    self.limit = int(query.get('start_limit',0))
-        except: self.limit = 0
-        try:    self.end_limit = int(query.get('end_limit',0))
-        except: self.end_limit = 0
-
-        ## Doesnt make sense to finish before we started
-        if self.end_limit <= self.limit:
-            self.end_limit = sys.maxint
-
         dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit))
-        count = 0
+        self.count = 0
         for row in dbh:
+            self.count += 1
             yield row
-            count += 1
 
             if self.end_limit > 0 \
-               and count > self.end_limit: return
+               and self.count > self.end_limit: return
 
     def make_archive_filename(self, inode_id, directory = 'inodes/'):
         ## Add the inode to the exported bundle:
@@ -435,66 +468,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             self.add_file(filename, fd)
 
         return filename
-
-## This is disabled now because its not distributable.
-##import zipfile
-
-##class HTMLBundleRenderer(HTMLDirectoryRenderer):
-##    name = "HTML Bundle"
-##    ## We can not distribute this across children
-##    distributable = False
-
-##    def __init__(self, *args, **kwargs):
-##        self.outfd = cStringIO.StringIO()
-##        self.zip = zipfile.ZipFile(self.outfd, "w", zipfile.ZIP_DEFLATED)
-##        HTMLDirectoryRenderer.__init__(self, *args, **kwargs)
-
-##    def add_file(self, filename, infd):
-##        outfd = tempfile.NamedTemporaryFile()
-##        while 1:
-##            data = infd.read(1024*1024)
-##            if not data: break
-##            outfd.write(data)
-
-##        outfd.flush()
-##        self.zip.write(outfd.name, filename)
-##        outfd.close()
-
-##    def add_file_from_string(self, filename, string):
-##        self.zip.writestr(filename, string)
-
-##    message = "Export HTML Files into a zip file"
-
-##    def render_table(self, query, result):
-##        g = self.generate_rows(query)
-##        self.add_constant_files()
-##        self.include_extra_files = query.get('include_extra_files',False)
-        
-##        hiddens = [ int(x) for x in query.getarray(self.hidden) ]
-
-##        self.column_names = []
-##        elements = []
-##        for e in range(len(self.elements)):
-##            if e in hiddens: continue
-##            self.column_names.append(self.elements[e].name)
-##            elements.append(self.elements[e])
-            
-##        def generator(query, result):
-##            page = 1
-##            self.add_file_from_string("%s/%s.html" % (self.page_name,page),
-##                                      self.render_page(1, elements, g))
-
-##            self.zip.close()
-##            self.outfd.seek(0)
-##            while 1:
-##                data = self.outfd.read(1024*1024)
-##                if not data: break
-
-##                yield data
-
-##        result.generator.generator = generator(query,result)
-##        result.generator.content_type = "application/x-zip"
-##        result.generator.headers = [("Content-Disposition","attachment; filename=table.zip"),]
         
 ## Here we provide the InodeIDType the ability to render html
 ## correctly:
@@ -517,7 +490,7 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
                  name=None, attributes=None, charset=None):
         self.table_renderer = table_renderer
         self.prefix = prefix
-        self.visited = visited
+        self.visited = visited or {}
         HTML.ResolvingHTMLTag.__init__(self, table_renderer.case, inode_id,
                                        name, attributes, charset=charset)
         
@@ -622,7 +595,14 @@ class ReportingTables(FlagFramework.EventHandler):
     def create(self, case_dbh, case):
         case_dbh.execute("""CREATE TABLE reporting(
         `page_name` VARCHAR(250),
+        `limit` int,
         `description` TEXT,
         `start_value` VARCHAR(250),
         `end_value` VARCHAR(250))""")
+        
+        case_dbh.execute("""CREATE TABLE reporting_jobs(
+        id int primary key auto_increment,
+        `tables` BLOB,
+        `renderer` BLOB)
+        """)
 

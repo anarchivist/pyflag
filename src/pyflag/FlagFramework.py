@@ -889,6 +889,11 @@ class EventHandler:
         """ This is called when we are about to exit on the default db
         """
 
+    def periodic(self, dbh, case):
+        """ This event is called periodically. Used to do some
+        housekeeping stuff.
+        """
+
     def reset(self, dbh, case):
         """ This is called when the case is deleted. Its used by
         modules to delete local caches etc.
