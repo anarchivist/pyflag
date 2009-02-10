@@ -1884,12 +1884,12 @@ import re
 class ChatMessages(Reports.PreCannedCaseTableReports):
     args = { 'filter': ' "Type" = MESSAGE',
              'order':0, 'direction':1,
-             '_hidden': 1}
+             '_hidden': [0,2]}
     family = 'Network Forensics'
     description = 'View MSN/Yahoo chat messages'
     name = "/Network Forensics/Communications/Chats/MSN"
     default_table = "MSNSessionTable"
-    columns = ['Timestamp', 'Type', "Sender", "Recipient", "Message" ]
+    columns = ['Packet', 'InodeTable.Modified', 'Type', "Sender", "Recipient", "Message", ]
 
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """

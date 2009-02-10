@@ -89,6 +89,9 @@ def get_bt_string(e=None):
     result = a.read()
     a.close()
     return result
+
+def print_bt_string():
+    print get_bt_string()
     
 def get_traceback(e,result):
     result.heading("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))

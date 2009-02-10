@@ -93,65 +93,59 @@ scanners = config.scanners.split(',')
 scanners = ScannerUtils.fill_in_dependancies(scanners)
 print scanners
 
-print "Will read from %s and write to %s. Will use these scanners: %s" % (directory, output_file, scanners)
+output_fd = None
 
-## Check if the file is already there:
-filename = config.UPLOADDIR + '/' + output_file
-if output_file != '-':
-    try:
-        os.stat(filename)
-        ## Yep its there:
-        output_fd = open(filename, 'a')
-        output_fd.seek(0,os.SEEK_END)
-        offset = output_fd.tell()
-
-        ## There can be only one:
-        try:
-            fcntl.flock(output_fd,fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except IOError,e:
-            print "Highlander Error: %s" % e
-            sys.exit(1)
-
-    except OSError:
-        output_fd = open(filename, 'w')
-
-        ## This is a hardcoded header for the output file:
-        header = '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x01\x00\x00\x00'
-        offset = len(header)
-
-        ## Write the file header on
-        output_fd.write(header)
-        output_fd.flush()
-else:
-    output_fd = None
-    offset =0
-
+def create_output_file():
+    global output_fd
     
-## Make a new IO source for the output:
-try:
-    pyflagsh.shell_execv(command="execute",
-                         argv=["Load Data.Load IO Data Source",'case=%s' % config.case,
-                               "iosource=%s" % config.iosource,
-                               "subsys=Standard",
-                               "filename=%s" % (output_file),
-                               "offset=0",
-                               ])
-except Reports.ReportError: pass
+    print "Will read from %s and write to %s. Will use these scanners: %s" % (directory, output_file, scanners)
 
-## Get the PCAPFS class and instantiate it:
-pcapfs = Registry.FILESYSTEMS.dispatch("PCAP Filesystem")(config.case)
-pcapfs.mount_point = config.mountpoint
-pcapfs.VFSCreate(None, "I%s" % config.iosource, config.mountpoint, 
-                 directory=True)
+    ## Check if the file is already there:
+    filename = config.UPLOADDIR + '/' + output_file
+    if output_file != '-':
+        try:
+            os.stat(filename)
+            ## Yep its there:
+            output_fd = open(filename, 'a')
+            output_fd.seek(0,os.SEEK_END)
+            offset = output_fd.tell()
 
-pcap_dbh = DB.DBO(config.case)
-pcap_dbh.mass_insert_start("pcap")
+            ## There can be only one:
+            try:
+                fcntl.flock(output_fd,fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError,e:
+                print "Highlander Error: %s" % e
+                sys.exit(1)
 
-pcap_dbh.execute("select max(id) as m from pcap")
-pcap_id = pcap_dbh.fetch()['m'] or 0
-cookie, processor = pcapfs.make_processor(config.iosource, scanners)
+        except OSError:
+            output_fd = open(filename, 'w')
 
-def load_file(filename):
+            ## This is a hardcoded header for the output file:
+            header = '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x01\x00\x00\x00'
+            offset = len(header)
+
+            ## Write the file header on
+            output_fd.write(header)
+            output_fd.flush()
+    else:
+        output_fd = None
+        offset =0
+
+
+    ## Make a new IO source for the output:
+    try:
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % config.case,
+                                   "iosource=%s" % config.iosource,
+                                   "subsys=Standard",
+                                   "filename=%s" % (output_file),
+                                   "offset=0",
+                                   ])
+    except Reports.ReportError: pass
+
+pcap_id = 0
+
+def load_file(filename, processor,  pcap_dbh):
     global pcap_id
     global offset
 
@@ -203,86 +197,102 @@ def load_file(filename):
                     where = "inode_id is null")
     pcap_dbh.mass_insert_commit() 
 
-last_time = 0
-
-files_we_have = set()
-try:
-    log_fd = open(config.log)
-    print "Reading log file"
-    for l in log_fd:
-        files_we_have.add(l.strip())
-    print "Done - added %s files from log" % len(files_we_have)
-except IOError:
-    pass
-
-log_fd = open(config.log, "a")
-last_mtime = os.stat(directory).st_mtime
+last_mtime = 0
+offset = 0
 
 ## Start up some workers if needed:
 Farm.start_workers()
 
 def run():
-    global last_mtime, offset
-    
-    t = os.stat(directory).st_mtime
-    if t>=last_mtime:
-        last_mtime = t
-        files = os.listdir(directory)
-        files.sort()
-        count = 0
-        
-        if not os.access(config.lock, os.F_OK):
-            for f in files:
-               count +=1
-               if f in files_we_have: continue
-               
-               ## Detect if the lock file appeared:
-               if os.access(config.lock, os.F_OK): break
+    global last_mtime, offset, output_fd
 
-               if (count % 10) ==0 and config.MAXIMUM_WORKER_MEMORY > 0:
-                   Farm.check_mem(finish)
+    create_output_file()
 
-               filename = "%s/%s" % (directory,f)
-               load_file(filename)
-               if config.log:
-                   log_fd.write(f+"\n")
-                   log_fd.flush()
-                   files_we_have.add(f)
+    ## Get the PCAPFS class and instantiate it:
+    pcapfs = Registry.FILESYSTEMS.dispatch("PCAP Filesystem")(config.case)
+    pcapfs.mount_point = config.mountpoint
+    pcapfs.VFSCreate(None, "I%s" % config.iosource, config.mountpoint, 
+                     directory=True)
 
-               last_time = time.time()
-        else:
-           print "Lock file found"
+    pcap_dbh = DB.DBO(config.case)
+    pcap_dbh.mass_insert_start("pcap")
 
-        if config.single:
-            ## Wait untill all our jobs are done
-            pdbh = DB.DBO()
-            while 1:
-                pdbh.execute("select count(*) as c from jobs where cookie = %r", cookie)
-                row = pdbh.fetch()
-                if row and row['c'] >0:
-                    time.sleep(5)
-                    continue
-                else:
-                    break
+    pcap_dbh.execute("select max(id) as m from pcap")
+    pcap_id = pcap_dbh.fetch()['m'] or 0
+    cookie, processor = pcapfs.make_processor(config.iosource, scanners)
 
-            sys.exit(0)
+    last_time = 0
 
-        ## We need to flush the decoder:
-        if time.time() - last_time > config.timeout:
-            print "Flushing reassembler"
-            processor.flush()
-            last_time = time.time()
+    files_we_have = set()
+    try:
+        log_fd = open(config.log)
+        print "Reading log file"
+        for l in log_fd:
+            files_we_have.add(l.strip())
+        print "Done - added %s files from log" % len(files_we_have)
+    except IOError:
+        pass
+
+    log_fd = open(config.log, "a")
+    last_mtime = os.stat(directory).st_mtime
+
+    while 1:
+        t = os.stat(directory).st_mtime
+        if t>=last_mtime:
+            last_mtime = t
+            files = os.listdir(directory)
+            files.sort()
+            count = 0
+
+            if not os.access(config.lock, os.F_OK):
+                for f in files:
+                   count +=1
+                   if f in files_we_have: continue
+
+                   ## Detect if the lock file appeared:
+                   if os.access(config.lock, os.F_OK): break
+
+                   if (count % 10) ==0 and config.MAXIMUM_WORKER_MEMORY > 0:
+                       Farm.check_mem(finish)
+
+                   filename = "%s/%s" % (directory,f)
+                   load_file(filename, processor, pcap_dbh)
+                   if config.log:
+                       log_fd.write(f+"\n")
+                       log_fd.flush()
+                       files_we_have.add(f)
+
+                   last_time = time.time()
+            else:
+               print "Lock file found"
+
+            if config.single:
+                ## Wait untill all our jobs are done
+                pdbh = DB.DBO()
+                while 1:
+                    pdbh.execute("select count(*) as c from jobs where cookie = %r", cookie)
+                    row = pdbh.fetch()
+                    if row and row['c'] >0:
+                        time.sleep(5)
+                        continue
+                    else:
+                        break
+
+                sys.exit(0)
+
+            ## We need to flush the decoder:
+            if time.time() - last_time > config.timeout:
+                print "Flushing reassembler"
+                processor.flush()
+                last_time = time.time()
+
+        print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
+        time.sleep(config.sleep)
 
 def finish():
     print "Loader Process size increased above threashold. Exiting and restarting."
     processor.flush()
     os._exit(0)
 
-def main():
-    while 1:
-        run()
-        print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
-        time.sleep(config.sleep)
-
 ## Run the main loader under the nanny
-Farm.nanny(main)
+Farm.nanny(run)

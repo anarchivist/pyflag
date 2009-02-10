@@ -99,6 +99,10 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         outfd.close()
 
+    def output_filename_exists(self, filename):
+        output_file_name = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
+        return os.access(output_file_name, os.W_OK)
+
     def add_file_from_string(self, filename, string):
         """ Add a new file to the archive called filename with
         contents of string. Note string is not a unicode object here. """

@@ -303,7 +303,7 @@ class SanitizingTag(Tag):
                               self.allowable_attributes])
 
 	if 'style' in self.attributes:
-            attributes += ' style=%r' % self.css_filter(self.attributes['style'])
+            attributes += ' style=%r' % self.css_filter(self.attributes['style'] or '')
 
         if 'http-equiv' in self.attributes:
             if self.attributes['http-equiv'].lower() == "content-type":
