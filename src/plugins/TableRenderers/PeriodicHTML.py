@@ -147,7 +147,13 @@ class PeriodicExporter(FlagFramework.EventHandler):
                 case = row['value']
                 dbh = DB.DBO(case)
                 dbh2 = DB.DBO(case)
-                dbh.execute('select id, tables, renderer from reporting_jobs')
+                try:
+                    dbh.execute('select id, tables, renderer from reporting_jobs')
+                except:
+                    event = HTMLBundle.ReportingTables()
+                    event.create(dbh, case)
+                    continue
+                
                 for row in dbh:
                     try:
                         tables = cPickle.loads(row['tables'])

@@ -602,14 +602,14 @@ import pyflag.FlagFramework as FlagFramework
 class ReportingTables(FlagFramework.EventHandler):
     """ A handler to create reporting specific tables """
     def create(self, case_dbh, case):
-        case_dbh.execute("""CREATE TABLE reporting(
+        case_dbh.execute("""CREATE TABLE if not exists reporting(
         `page_name` VARCHAR(250),
         `limit` int,
         `description` TEXT,
         `start_value` VARCHAR(250),
         `end_value` VARCHAR(250))""")
         
-        case_dbh.execute("""CREATE TABLE reporting_jobs(
+        case_dbh.execute("""CREATE TABLE if not exists reporting_jobs(
         id int primary key auto_increment,
         `tables` BLOB,
         `renderer` BLOB)
