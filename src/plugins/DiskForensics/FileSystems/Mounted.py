@@ -197,7 +197,7 @@ class MountedFS(DBFS):
                                  
             ## Fixme - handle symlinks
             try:
-                link=os.readlink(DB.expand("%s/%s", (root,name)))
+                link=os.readlink(DB.expand("%s/%s", (root,name)).encode("utf8"))
             except OSError:
                 link=''
 
