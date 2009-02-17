@@ -637,7 +637,7 @@ def get_factories(case,scanners):
     required. Scanners is a list in the form case:scanner
     """
     ## Ensure dependencies are satisfied
-    ScannerUtils.fill_in_dependancies(scanners)
+    scanners = ScannerUtils.fill_in_dependancies(scanners)
     
     ## First prepare the required factories:
     result = []

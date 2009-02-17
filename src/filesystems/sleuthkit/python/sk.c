@@ -1208,10 +1208,10 @@ skfile_str(skfile *self) {
 static PyObject *
 skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     char *buf;
-    int written;
+    Py_ssize_t written;
     PyObject *retdata;
     TSK_FS_INFO *fs;
-    int readlen=-1;
+    Py_ssize_t readlen=-1;
     int slack=0, overread=0;
     off_t maxsize;
 
@@ -1250,9 +1250,15 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 
     if(readlen < 0) readlen = 0;
 
-    buf = (char *)talloc_size(NULL, readlen);
-    if(!buf)
-        return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
+    // Allocate the output string as a python String so there is no
+    // copying:
+    retdata = PyString_FromStringAndSize(NULL, readlen);
+    if(readlen==0) return retdata;
+
+    if(!retdata)
+      return NULL;
+    
+    buf = PyString_AsString(retdata);
 
     if(self->type == 0 && self->id == 0)
         if(slack)
@@ -1309,8 +1315,8 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 	}
     */
 
-    retdata = PyString_FromStringAndSize(buf, written);
-    talloc_free(buf);
+    // Make sure we dont return any extra data
+    _PyString_Resize(&retdata, written);
 
     self->readptr += readlen;
     return retdata;

@@ -338,7 +338,7 @@ class ScanFS(Reports.report):
                 scanner_names.append(k[l:])
 
         ## Now pull in any scanners which are needed
-        ScannerUtils.fill_in_dependancies(scanner_names)
+        scanner_names = ScannerUtils.fill_in_dependancies(scanner_names)
         return scanner_names
 
     def analyse(self,query):

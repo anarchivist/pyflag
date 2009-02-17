@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 return
         
         print h
-        offset = h['extra_field'].buffer.offset + h['extra_field_length'].get_value()
+        offset = h['extra_field'].buffer.offset + h['extra_field_len'].get_value()
         print hex(offset)
 
         ## Extract the file out
