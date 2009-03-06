@@ -154,7 +154,7 @@ echo "\n\nConfiguring PyFLAG timezone support...\n"
 mysql_tzinfo_to_sql /usr/share/zoneinfo/ | mysql -uroot --password=pyflag mysql
 
 # Create pyflag configuration file
-mkdir /usr/local/etc /tmp/{pyflag,pyflag/{upload,result}}
+mkdir -p /usr/local/etc /tmp/{pyflag,pyflag/{upload,result}}
 
 cat << EOF > /usr/local/etc/pyflagrc
 uploaddir=/tmp/pyflag/upload/ 
@@ -162,7 +162,7 @@ resultdir=/tmp/pyflag/result
 dbpasswd=pyflag 
 EOF
 
-chown -R $UID $DL_DIR 
+chown -R $UID $DL_DIR/
 
 
 exit 0
