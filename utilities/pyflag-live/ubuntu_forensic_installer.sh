@@ -143,7 +143,7 @@ for i in $LIBEWF $AFFLIB $AIMAGE $TSK $PYFLAG; do
 	echo "\n\nConfiguring $i...\n"; ./configure
 	echo "\n\nMaking $i...\n"; make
 	echo "\n\nInstalling $i...\n"; make install
-	echo "\n\nCleaning up...\n"; # make clean
+	echo "\n\nCleaning up...\n"; make clean
 done
 
 
