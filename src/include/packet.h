@@ -111,7 +111,7 @@ struct struct_property_t {
   /** This represents the number of bytes from the begining of the
       struct where this item may be found 
   */
-  int item;
+  uint64_t item;
 
   int size;
   
@@ -190,7 +190,7 @@ END_CLASS
     struct struct_property_t *p=talloc(NULL, struct struct_property_t);	\
     p->name=#ref_name;							\
     p->field_type = type;						\
-    p->item = (int)(&((typeof(this->struct_member_name) *)0)->member);	\
+    p->item = (typeof(p->item))(&((typeof(this->struct_member_name) *)0)->member); \
     p->size = sizeof(this->struct_member_name.member);			
 
 #define __NAME_ACCESS_end(struct_member_name, member, name, type)	\

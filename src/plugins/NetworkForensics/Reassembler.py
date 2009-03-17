@@ -97,6 +97,7 @@ class StreamFile(File):
             row = dbh.fetch()
 
         ## This updates our properties from the db
+        if not row: return
         self.__dict__.update(row)
 
         ## We allow the user to ask for a number of streams which will

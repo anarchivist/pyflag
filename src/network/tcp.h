@@ -42,7 +42,7 @@ struct tuple4
   uint16_t dest;
   uint32_t saddr;
   uint32_t daddr;
-  uint32_t pad; //This pad is needed to align this struct on 64 bit
+  int pad; //This pad is needed to align this struct on 64 bit
 		//machines for speed.
 } __attribute__((packed));
 
