@@ -37,6 +37,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.CacheManager import CachedWriter
 import pyflag.FlagFramework as FlagFramework
+import cStringIO
 
 parser = OptionParser(usage = """%prog [options] pcap_file ... pcap_file
 
@@ -58,11 +59,20 @@ parser.add_option("-v", "--verbose", default=5, type='int',
 if options.stats:
     stats_fd = open(options.stats,'wb')
     stats_fd.write("""## Stats for streams in the following format:
-## stream name: (packet_id, offselt, length) ....
+## stream name: (packet_id, offset, length) ....
 """)
     stats_fd.close()
 
 CONS = 0
+
+class MyCachedWriter(CachedWriter):
+    def __init__(self, filename):
+        self.filename = filename
+        self.fd = cStringIO.StringIO()
+        self.offset = 0
+
+    def close(self):
+        self.write_to_file()
 
 def Callback(mode, packet, connection, options = None):
     global CONS
@@ -76,8 +86,8 @@ def Callback(mode, packet, connection, options = None):
             connection['reverse']['con_id'] = CONS
             CONS +=1
 
-            connection['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['con_id']))
-            connection['reverse']['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['reverse']['con_id']))
+            connection['data'] = MyCachedWriter("%s/S%s" % (options.prefix, connection['con_id']))
+            connection['reverse']['data'] = MyCachedWriter("%s/S%s" % (options.prefix, connection['reverse']['con_id']))
 
         ip = packet.find_type("IP")
         connection['src_ip'] = ip.src

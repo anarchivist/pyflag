@@ -157,6 +157,8 @@ mysql_tzinfo_to_sql /usr/share/zoneinfo/ | mysql -uroot --password=pyflag mysql
 mkdir -p /usr/local/etc /tmp/{pyflag,pyflag/{upload,result}}
 
 cat << EOF > /usr/local/etc/pyflagrc
+[DEFAULT]
+
 uploaddir=/tmp/pyflag/upload/ 
 resultdir=/tmp/pyflag/result 
 dbpasswd=pyflag 
