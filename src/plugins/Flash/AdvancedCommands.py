@@ -12,6 +12,8 @@ import time, types
 import pyflag.pyflaglog as pyflaglog
 import BasicCommands
 import pyflag.ScannerUtils as ScannerUtils
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 class scan_path(pyflagsh.command):
     """ This takes a path as an argument and runs the specified scanner on the path
@@ -96,6 +98,20 @@ class scan_path(pyflagsh.command):
         
         yield "Scanning complete"
 
+import pyflag.FlagFramework as FlagFramework
+
+class init_flag_db(pyflagsh.command):
+    """ Creates the main flag db if needed """
+    def execute(self):
+        try:
+            dbh = DB.DBO()
+        except:
+            dbh = DB.DBO('mysql')
+            dbh.execute("create database `%s`" % config.FLAGDB)
+            dbh = DB.DBO()
+
+        FlagFramework.post_event("init_default_db", None)
+        yield "Done"
         
 class scan(pyflagsh.command):
     """ Scan a glob of inodes with a glob of scanners """

@@ -164,7 +164,11 @@ class PeriodicExporter(FlagFramework.EventHandler):
                     new_table = renderer.calculate_table_stats()
                     if tables != new_table:
                         pyflaglog.log(pyflaglog.DEBUG, "Re-exporting HTML Table %s" % renderer.page_name)
-                        renderer.real_render_table()
+                        try:
+                            renderer.real_render_table()
+                        except Exception,e:
+                            print e
+                            pass
                         dbh2.execute("update reporting_jobs set tables = %r where id=%r",
                                      cPickle.dumps(new_table), row['id'])
             except Exception,e:

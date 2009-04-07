@@ -135,6 +135,7 @@ class EmailTables(FlagFramework.EventHandler):
             """ CREATE TABLE if not exists `passwords` (
             `inode_id` INT,
             `username` VARCHAR(255) NOT NULL,
+
             `password` VARCHAR(255) NOT NULL,
             `type` VARCHAR(255) NOT NULL
             ) """)        
@@ -154,6 +155,7 @@ class POPScanner(StreamScannerFactory):
 
         ## We open the file and scan it for emails:
         fd = self.fsfd.open(inode=combined_inode)
+        inode_id = 0
         p=POP(fd)
         while 1:
             try:
