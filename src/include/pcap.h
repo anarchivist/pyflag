@@ -12,7 +12,8 @@ dependancy on libpcap. (We dont actually link against it). */
 #define DLT_NULL	0	/* BSD loopback encapsulation */
 #define DLT_EN10MB	1	/* Ethernet (10Mb) */
 #define DLT_EN3MB	2	/* Experimental Ethernet (3Mb) */
-#define DLT_AX25	3	/* Amateur Radio AX.25 */#define DLT_PRONET	4	/* Proteon ProNET Token Ring */
+#define DLT_AX25	3	/* Amateur Radio AX.25 */
+#define DLT_PRONET	4	/* Proteon ProNET Token Ring */
 #define DLT_CHAOS	5	/* Chaos */
 #define DLT_IEEE802	6	/* IEEE 802 Networks */
 #define DLT_ARCNET	7	/* ARCNET, with BSD-style header */

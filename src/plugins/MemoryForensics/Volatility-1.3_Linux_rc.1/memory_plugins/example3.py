@@ -32,7 +32,7 @@ class pslist_ex_3(forensics.commands.command):
 
     # Declare meta information associated with this plugin
     
-    meta_info = forensics.commands.command.meta_info 
+    meta_info = {} 
     meta_info['author'] = 'AAron Walters'
     meta_info['copyright'] = 'Copyright (c) 2007,2008 AAron Walters'
     meta_info['contact'] = 'awalters@volatilesystems.com'

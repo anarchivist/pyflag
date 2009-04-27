@@ -595,7 +595,7 @@ class HTMLParser(lexer.Lexer):
         [ "CDATA", "<", "TAG_START", "TAG" ],
 
         ## Skip white spaces within a TAG
-        [ "TAG", " +", "SPACE", "TAG" ],
+        [ "TAG", "(?sm)\s+", "SPACE", "TAG" ],
         [ "TAG", ">", "END_TAG", "CDATA" ],
 
         ## Scripts can actually contain lots of <> which confuse us so
@@ -612,14 +612,14 @@ class HTMLParser(lexer.Lexer):
         [ "TAG", "/", "CLOSING_TAG", "TAG" ],
 
         ## Identify the tag name
-        [ "TAG", "[^ /<>]+", "TAG_NAME", "ATTRIBUTE LIST"],
+        [ "TAG", "(?sm)[^\s/<>]+", "TAG_NAME", "ATTRIBUTE LIST"],
 
         ## An attribute list is a list of key=value pairs within a tag
         [ "ATTRIBUTE LIST", "([-a-z0-9A-Z_]+)\s*=", "ATTRIBUTE_NAME", "ATTRIBUTE VALUE"],
         [ "ATTRIBUTE LIST", ">", "END_TAG", "CDATA"],
         
         ## Swallow spaces
-        [ "ATTRIBUTE LIST", "(?ms)\s+", "SPACE", "ATTRIBUTE LIST"],
+        [ "ATTRIBUTE LIST", r"(?ms)[\s\r\n]+", "SPACE", "ATTRIBUTE LIST"],
 
         ## End tag:
         [ "ATTRIBUTE LIST", "/>", "SELF_CLOSING_TAG,END_TAG", "CDATA" ],
@@ -631,7 +631,7 @@ class HTMLParser(lexer.Lexer):
         [ "ATTRIBUTE LIST", r"([-a-z0=9A-Z]+)(?=( [^\s]|[/>]))", "ATTRIBUTE_NAME", "ATTRIBUTE LIST"],
 
         ## Quoted attribute values
-        [ "ATTRIBUTE VALUE", "(?ms)'([^']*)'|\"([^\"]*)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
+        [ "ATTRIBUTE VALUE", "(?ms)'([^'#]*)'|\"([^\"]*)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
         
         ## Non quoted attribute value
         [ "ATTRIBUTE VALUE", " *([^ <>\"\']+) ?", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],

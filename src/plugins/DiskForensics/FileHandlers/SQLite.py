@@ -252,7 +252,7 @@ class SQLiteScannerTest(pyflag.tests.ScannerTest):
 #    test_file = "pyflag_stdimage_0.5.dd"
 #    subsystem = 'Standard'
 
-    offset = "16128s"
+#    offset = "16128s"
     
     def test01RunScanner(self):
         """ Test scanner handling of SQLite files """

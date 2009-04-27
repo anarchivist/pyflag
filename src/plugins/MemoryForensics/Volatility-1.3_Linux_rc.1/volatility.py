@@ -216,7 +216,11 @@ def main(argv=sys.argv):
 
 
 if __name__ == "__main__":
-    main()
-
-1
+    if 1:
+        main()
+    else:
+        import hotshot
+        prof = hotshot.Profile("hotshot_edi_stats")
+        prof.runcall(main)
+        prof.close()
 

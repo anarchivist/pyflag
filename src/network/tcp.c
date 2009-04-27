@@ -373,11 +373,11 @@ TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
 };
 
 static u_int32_t mkhash (const struct tuple4 *addr) {
-  int *data = (int *)addr;
+  u_int32_t *data = (u_int32_t *)addr;
   u_int32_t res=0;
   int i;
 
-  for (i = 0; i < sizeof(struct tuple4) / sizeof(int); i++)
+  for (i = 0; i < sizeof(struct tuple4) / sizeof(u_int32_t); i++)
     res += data[i];
 
   return res % (TCP_STREAM_TABLE_SIZE);

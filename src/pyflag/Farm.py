@@ -250,10 +250,17 @@ config.add_option("JOB_QUEUE", default=10, type='int',
 config.add_option("JOB_QUEUE_POLL", default=10, type='int',
                   help='Number of seconds to wait between worker queue polls')
 
+config.add_option("DISABLE_NANNY", default=False,
+                  action = 'store_true',
+                  help = "Disables the use of a nanny. Useful for debugging")
+
 def nanny(cb, keepalive=None, *args, **kwargs):
     """ Runs cb in another process persistently. If the child process
     quits we restart it.
     """
+    if config.DISABLE_NANNY:
+        cb(*args, **kwargs)
+        
     atexit.register(terminate_children)
     signal.signal(signal.SIGABRT, handler)
     signal.signal(signal.SIGUSR1, handler)
@@ -335,8 +342,10 @@ def worker_run(keepalive=None):
      while 1:
          ## Ping the parent
          try:
-             os.write(keepalive,"Checking")
-         except:
+             if keepalive:
+                 os.write(keepalive,"Checking")
+         except Exception, e:
+             print e
              pyflaglog.log(pyflaglog.WARNING,"Our nanny died - quitting")
              os._exit(1)
 
@@ -401,7 +410,8 @@ def worker_run(keepalive=None):
 
              finally:
                  try:
-                     os.write(keepalive, " ".join(row))
+                     if keepalive:
+                         os.write(keepalive, " ".join(row))
                  except:
                      pyflaglog.log(pyflaglog.WARNING,"Our nanny died - quitting")
                      os._exit(1)

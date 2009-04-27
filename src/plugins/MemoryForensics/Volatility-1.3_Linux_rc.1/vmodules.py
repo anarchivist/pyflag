@@ -249,7 +249,7 @@ def get_dlllist(cmdname, argv):
             op.error("Unable to open image file %s" %(filename))
 
         directory_table_base = process_dtb(flat_address_space, types, offset)
-
+        print "Process directory_table_base %X" % directory_table_base
         process_address_space = create_addr_space(addr_space, directory_table_base)
 
         if process_address_space is None:
@@ -529,7 +529,8 @@ def get_open_files(cmdname, argv):
 
 
         table_levels = handle_table_levels(addr_space, types, table)
-
+        print "Levels %s" % table_levels
+        print hex(table)
         if table_levels == 0:
             num_entries = handle_num_entries(addr_space, types, table)
 
@@ -541,6 +542,7 @@ def get_open_files(cmdname, argv):
         elif table_levels == 1:
             for i in range(0, 0x200):
                 L1_entry = handle_table_L1_entry(addr_space, types, table, i)
+                print i,"L1_entry %X" % L1_entry
                 if not L1_entry is None:
                     L1_table = handle_entry_object(addr_space, types, L1_entry)
 

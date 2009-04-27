@@ -561,7 +561,7 @@ class VolatilityTests(pyflag.tests.ScannerTest):
 
     def test00preLoadCase(self):
         """ Load Memory image """
-        pyflag.tests.ScannerTest.test00preLoadCase(self)
+        #pyflag.tests.ScannerTest.test00preLoadCase(self)
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
                                    "iosource=test",

@@ -66,6 +66,7 @@ class Configure(Reports.report):
                 return
 
             ## Force a re-read of the configuration file:
+            print "Forcing reread of %r" % config
             config.add_file(config.filename)
 
             result.refresh(0, query.__class__())
