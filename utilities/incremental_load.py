@@ -147,13 +147,14 @@ def create_output_file():
         FlagFramework.print_bt_string()
     
 
-pcap_id = 0
-
 def load_file(filename, processor,  pcap_dbh):
-    global pcap_id
     global offset
 
     pyflaglog.log(pyflaglog.INFO, "%s: Processing %s" % (time.ctime(),filename))
+
+    pcap_dbh.execute("select max(id) as m from pcap")
+    row = pcap_dbh.fetch()
+    pcap_id = row['m'] or 0
 
     try:
         input_file = pypcap.PyPCAP(open(filename), output='little')
@@ -168,7 +169,7 @@ def load_file(filename, processor,  pcap_dbh):
             pcap_id += 1
         except StopIteration:
             break
-        
+
         pcap_dbh.mass_insert(
             id = pcap_id,
             iosource = config.iosource,
@@ -212,6 +213,7 @@ def run(keepalive=None):
 
     create_output_file()
 
+    print "Created output_fd"
     ## Get the PCAPFS class and instantiate it:
     pcapfs = Registry.FILESYSTEMS.dispatch("PCAP Filesystem")(config.case)
     pcapfs.mount_point = config.mountpoint

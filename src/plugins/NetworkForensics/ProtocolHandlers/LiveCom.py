@@ -87,6 +87,42 @@ import pyflag.Registry as Registry
 import pyflag.Graph as Graph
 import pyflag.Time as Time
 
+class HTMLStringType(StringType):
+    """ A ColumnType which sanitises its input for HTML.
+    We also fetch images etc from the db if available.
+    """
+    def xxxdisplay(self, value, row, result):
+        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+        parser.feed(value)
+        parser.close()
+
+        return parser.root.innerHTML()
+
+    def render_html(self, value, table_renderer):
+        import plugins.TableRenderers.HTMLBundle as HTMLBundle
+
+        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
+
+        parser.feed(value or '')
+        parser.close()
+
+        text = parser.root.innerHTML()
+
+        ## Make sure its wrapped:
+        ui = HTMLUI.HTMLUI(initial=True)
+        ui.text(text, wrap ='full', font='typewriter')
+        return ui.__str__()
+
+    def display(self, value, row, result):
+        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
+        parser.feed(value or '')
+        parser.close()
+
+        value = parser.root.innerHTML()
+
+	result.text(value, wrap='full', font='typewriter')
+
+
 class WebMailTable(FlagFramework.CaseTable):
     """ Table to store Web mail related information """
     name = 'webmail_messages'
@@ -95,12 +131,12 @@ class WebMailTable(FlagFramework.CaseTable):
         [ InodeIDType, dict(column = 'parent_inode_id')],
         [ StringType, dict(name="Service", column='service')],
         [ StringType, dict(name='Type', column='type')],
-        [ StringType, dict(name='From', column='From')],
+        [ HTMLStringType, dict(name='From', column='From')],
         [ StringType, dict(name='To', column='To')],
         [ StringType, dict(name='CC', column='CC')],
         [ StringType, dict(name='BCC', column='BCC')],
         [ StringType, dict(name='Subject', column='subject')],
-        [ StringType, dict(name='Message', column='message', text=True)],
+        [ HTMLStringType, dict(name='Message', column='message', text=True)],
         [ StringType, dict(name='Identifier', column='message_id')],
         [ TimestampType, dict(name='Sent', column='sent')],
         ]
@@ -497,45 +533,6 @@ class LiveAttachements(FlagFramework.EventHandler):
                                         inode_id = row3['inode_id'],
                                         attachment = attachment)
         
-class HTMLStringType(StringType):
-    """ A ColumnType which sanitises its input for HTML.
-    We also fetch images etc from the db if available.
-    """
-    def xxxdisplay(self, value, row, result):
-        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
-        parser.feed(value)
-        parser.close()
-
-        return parser.root.innerHTML()
-
-    def render_html(self, value, table_renderer):
-        import plugins.TableRenderers.HTMLBundle as HTMLBundle
-#        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag2)
-        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
-#        parser = HTML.HTMLParser(tag_class = \
-#                                 FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
-#                                                     table_renderer = table_renderer,
-#                                                     inode_id = '',
-#                                                     prefix = "inodes/"
-#                                                     ))
-        parser.feed(value or '')
-        parser.close()
-
-        text = parser.root.innerHTML()
-
-        ## Make sure its wrapped:
-        ui = HTMLUI.HTMLUI(initial=True)
-        ui.text(text, wrap ='full', font='typewriter')
-        return ui.__str__()
-
-    def display(self, value, row, result):
-        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
-        parser.feed(value or '')
-        parser.close()
-
-        value = parser.root.innerHTML()
-
-	result.text(value, wrap='full', font='typewriter')
 
 class AttachmentColumn(InodeIDType):
     """ Displays the attachments related to the webmail message """

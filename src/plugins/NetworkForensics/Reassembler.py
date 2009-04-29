@@ -431,10 +431,23 @@ config.add_option("MAX_SESSION_AGE", default=100000, type='int',
                   
 
 import pyflag.tests
+import pyflag.pyflagsh as pyflagsh
 
 class NetworkForensicTests2(pyflag.tests.ScannerTest):
-    """ Tests Reassembler with difficult to reassemble streams """
+    """ Tests Reassembler x with difficult to reassemble streams """
     test_case = "PyFlagTestCase"
+    #test_file = "full_dump.pcap"
     test_file = "stdcapture_0.4.pcap.e01"
-    subsystem = "EWF"
+    #subsystem = "Standard"
+    #subsystem = "EWF"
+    
     fstype = 'PCAP Filesystem'
+
+    def test01(self):
+        """ Test Reassebler """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "NetworkScanners",
+                                   ])                   ## List of Scanners

@@ -38,6 +38,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import pyflag.HTMLUI as HTMLUI
 from pyflag.DB import expand
+import re
 
 config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
                   help = "Directory to emit reports into.")
@@ -249,6 +250,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             </abbr>
             </a>''' % (self.page_name, page_number+1,page_number+1)
 
+        result += '''<a href="toc.html"><abbr title="Home"><img border="0" src="images/home.png" /></abbr></a>'''
+
         return result
 
     def add_constant_files(self):
@@ -268,6 +271,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                 ('images/toolbar-bg.gif',None),
                                 ('images/question.png',None),
                                 ('images/browse.png',None),
+                                ('images/home.png', None),
                                 ('javascript/functions.js', None),
                                 ('javascript/html_render.js', "inodes/javascript/html_render.js"),
                                 ]:
@@ -342,26 +346,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         result.generator.generator = generator(query,result)
 
     def toc(self):
-        result = HTMLUI.HTMLUI(initial = True)
-        result.heading("Case %s" % self.case)
-
-        result.start_table(**{'class': 'PyFlagTable'})
-        result.raw("<thead><th>Filename</th><th>Description</th><th>From</th><th>To</th></thead>")
-        dbh = DB.DBO(self.case)
-        dbh.execute("select * from reporting order by page_name")
-        for row in dbh:
-            if row['start_value'] == 'None': continue
-            
-            result.row(expand("<a href=%r>%s</a>", (row['page_name'],row['page_name'])),
-                       row['description'],
-                       row['start_value'],
-                       row['end_value'],
-                       **{'class':'hoverRow'})
-        result.end_table()
-
-        result.raw("<p><p>\n<font size='-5' color=red>Report Produced using PyFlag Ver. %s</font>" % config.VERSION)
-
-        page = u'''<html><head><link media="all" href="images/pyflag.css" type="text/css" rel="stylesheet">
+        page_template = u'''<html><head><link media="all" href="images/pyflag.css" type="text/css" rel="stylesheet">
         <title>Table of Content</title>
         <style>
         body {
@@ -372,16 +357,62 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         div.PyFlagPage {
         overflow: visible;
         width: 100%%;
-	}
+        }
         </style>
         </head>
         <body>
         <div id="PyFlagPage" class="PyFlagPage">
         %s
         </div>
-        </body></html>''' % result
+        </body></html>'''
 
+        
+        toc = HTMLUI.HTMLUI(initial = True)
+        toc.heading("Case %s" % self.case)
+
+        toc.start_table(**{'class': 'PyFlagTable'})
+        toc.raw("<thead><th>Filename</th><th>Description</th></thead>")
+        dbh = DB.DBO(self.case)
+        pages = dict()
+        dbh.execute("select * from reporting order by page_name")
+        for row in dbh:
+            m=re.match("^([^\d]+)(\d+).html", row['page_name'])
+            pages[m.group(1)] = row['description']
+
+        page_names = pages.keys()
+        page_names.sort()
+
+        for page_name in page_names:
+            toc.row(expand("<a href='%s_toc.html'>%s</a>", (page_name,page_name)))
+
+        page = page_template % toc
         self.add_file_from_string("toc.html", page.encode("utf8"))
+
+        for page_name in page_names:
+            dbh = DB.DBO(self.case)
+            dbh.execute("select * from reporting where page_name like '%s%%' order by page_name", page_name)
+            result = HTMLUI.HTMLUI(initial = True)
+            result.heading("Case %s" % self.case)
+
+            result.start_table(**{'class': 'PyFlagTable'})
+            result.raw("<thead><th>Filename</th><th>Description</th><th>From</th><th>To</th></thead>")
+
+            for row in dbh:
+                if row['start_value'] == 'None': continue
+
+                result.row(expand("<a href=%r>%s</a>", (row['page_name'],row['page_name'])),
+                           row['description'],
+                           row['start_value'],
+                           row['end_value'],
+                           **{'class':'hoverRow'})
+                
+            result.end_table()
+
+            result.raw("<p><p>\n<font size='-5' color=red>Report Produced using PyFlag Ver. %s</font>" % config.VERSION)
+            
+            page = page_template % result
+            m=re.match("^([^\d]+)(\d+).html", row['page_name'])            
+            self.add_file_from_string("%s_toc.html" % m.group(1), page.encode("utf8"))
 
     def generate_rows(self, query, ordering=True):
         """ This implementation gets all the rows, but makes small

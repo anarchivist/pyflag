@@ -111,7 +111,7 @@ struct struct_property_t {
   /** This represents the number of bytes from the begining of the
       struct where this item may be found 
   */
-  uint64_t item;
+  int item;
 
   int size;
   
