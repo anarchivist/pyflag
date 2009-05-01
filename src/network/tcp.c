@@ -25,6 +25,7 @@ struct reassembler_configuration_t reassembler_configuration = {
 
 TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr, int con_id) {
   memcpy(&self->addr, addr, sizeof(*addr));
+  self->addr.pad = 0;
 
   self->con_id = con_id;
   con_id++;
@@ -418,6 +419,8 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   forward.pad    = 0;
   forward_hash = mkhash(&forward);
 
+  assert(forward_hash < TCP_STREAM_TABLE_SIZE);
+
   /** Now try to find the forward stream in our hash table */
   list_for_each_entry(i, &(self->table[forward_hash]->list), list) {
     if(!memcmp(&(i->addr),&forward, sizeof(forward))) {
@@ -426,13 +429,13 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
 	  ordered wrt the last seen time 
       */
       if(1 || i->total_size > reassembler_configuration.minimum_stream_size) {
-	list_del(&(i->global_list));
-	list_add(&(i->global_list), &(self->sorted->global_list));
+	//list_del(&(i->global_list));
+	list_move(&(i->global_list), &(self->sorted->global_list));
       };
 
       if(1 || i->reverse->total_size > reassembler_configuration.minimum_stream_size) {
-	list_del(&(i->reverse->global_list));
-	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
+	//list_del(&(i->reverse->global_list));
+	list_move(&(i->reverse->global_list), &(self->sorted->global_list));
       };
       return i;
     };
@@ -445,18 +448,20 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   reverse.pad    = 0;
   reverse_hash = mkhash(&reverse);
 
+  assert(reverse_hash < TCP_STREAM_TABLE_SIZE);
+
   /** Now try to find the reverse stream in our hash table */
   list_for_each_entry(i, &(self->table[reverse_hash]->list), list) {
     if(!memcmp(&(i->addr),&reverse, sizeof(reverse))) {
       /** Readjust the order of the global list */
       if(1 || i->total_size > reassembler_configuration.minimum_stream_size) {
-	list_del(&(i->global_list));
-	list_add(&(i->global_list), &(self->sorted->global_list));
+	//list_del(&(i->global_list));
+	list_move(&(i->global_list), &(self->sorted->global_list));
       };
 
       if(1 || i->reverse->total_size > reassembler_configuration.minimum_stream_size) {
-	list_del(&(i->reverse->global_list));
-	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
+	//list_del(&(i->reverse->global_list));
+	list_move(&(i->reverse->global_list), &(self->sorted->global_list));
 	return i->reverse;
       };
     };
