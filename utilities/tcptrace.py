@@ -95,14 +95,23 @@ def Callback(mode, packet, connection, options = None):
         connection['l'] = 0
         connection['packets'] = []
 
-        tcp = packet.find_type("TCP")
+        try:
+            tcp = packet.find_type("TCP")
+        except AttributeError:
+            tcp = packet.find_type("UDP")
+            
         connection['src_port'] = tcp.source
         connection['dest_port'] = tcp.dest
+            
         if tcp.data_len > 0:
             Callback('data', packet, connection)
             
     if mode=='data':
-        tcp = packet.find_type("TCP")
+        try:
+            tcp = packet.find_type("TCP")
+        except AttributeError:
+            tcp = packet.find_type("UDP")
+            
         data = tcp.data
         fd = connection['data']
         connection['packets'].append(dict(offset = packet.offset,
