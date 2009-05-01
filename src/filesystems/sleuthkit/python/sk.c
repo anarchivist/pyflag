@@ -1297,15 +1297,11 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 	// may need to start reading a bit ahead.
 	if(self->readptr > count * fs->block_size)
 	  start += (self->readptr - count * fs->block_size);
-
         /* do a direct block read from the filesystem */
-        blockbuf = tsk_data_buf_alloc(buf, overread);
-        len = tsk_fs_read_random(fs, blockbuf->data, to_read, start);
+        len = tsk_fs_read_random(fs, buf+written, to_read, start);
         if(len > 0) {
-            memcpy(buf+written, blockbuf->data, len);
-	    written += len;
+	        written += len;
         }
-        tsk_data_buf_free(blockbuf);
     }
 
     /*
