@@ -16,7 +16,11 @@ AC_DEFUN([AC_PYTHON_DEVEL],[
 	AC_MSG_CHECKING([for python library path])
 	PYTHON_EXTRA_LIBS=`$PYTHON -c "import distutils.sysconfig;print distutils.sysconfig.get_python_lib() "
 	AC_MSG_RESULT($PYTHON_LDFLAGS)`
-	AC_SUBST([PYTHON_LDFLAGS],["-L$python_path -lpython$PYTHON_VERSION"])
+	if test -d "$python_path"; then \
+		AC_SUBST([PYTHON_LDFLAGS],["-L$python_path -lpython$PYTHON_VERSION"]) \
+        else \
+		AC_SUBST([PYTHON_LDFLAGS],["-lpython$PYTHON_VERSION"]) \
+	fi
 	AC_SUBST([PYTHON_EXTENSION], [".so"])
 
 	#
