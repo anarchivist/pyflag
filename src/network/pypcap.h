@@ -30,6 +30,6 @@ typedef struct {
 } PyPCAP;
 
 
-#define FILL_SIZE (1024 * 100)
+#define FILL_SIZE (1024 * 1000)
 
 #endif
