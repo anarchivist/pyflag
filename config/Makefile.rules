@@ -10,3 +10,6 @@
         ## linux. The -fPIC seems to be required for 64 bit machines.
 	$(CC) $(CFLAGS) -shared -fPIC $(AM_CFLAGS) $(PYTHON_CPPFLAGS) -I. -I$(top_srcdir)/src/include $(PYTHON_LDFLAGS) -o $@ $? .libs/$*.a $(PYTHON_EXTRA_LIBS) $(AM_LDFLAGS)
 	## $(STRIP) $@
+
+clean-local:
+	-rm -rf *.so *.pyd
