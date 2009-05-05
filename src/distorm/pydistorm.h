@@ -22,7 +22,7 @@ This library is licensed under the BSD license. See the file COPYING.
 #include "decoder.h"
 
 #ifdef __GNUC__
- #include <python2.5/Python.h>
+ #include <Python.h>
 #elif _MSC_VER
  #include <python.h>
 #endif
