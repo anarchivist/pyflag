@@ -635,7 +635,8 @@ class LoadFS(Reports.report):
 
 
 ## Unit Tests:
-import unittest, md5
+import unittest
+from hashlib import md5
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 

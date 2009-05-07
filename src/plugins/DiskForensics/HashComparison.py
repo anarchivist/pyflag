@@ -33,7 +33,7 @@ import os.path
 from pyflag.Scanner import *
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, ColumnType
 
-import md5
+from hashlib import md5
 
 config.add_option('hashdb', short_option='H', default="nsrldb",
                   help = "The database which will be used to store hash sets (like nsrl)")

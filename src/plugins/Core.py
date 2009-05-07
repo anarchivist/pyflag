@@ -217,7 +217,8 @@ class Help(Reports.report):
 
 ## IO subsystem unit tests:
 import unittest
-import md5,random,time
+import random,time
+from hashlib import md5
 import pyflag.tests as tests
 from pyflag.FileSystem import DBFS
 

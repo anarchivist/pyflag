@@ -28,7 +28,6 @@
 """
 import os,optparse
 import struct
-import sha
 from time import gmtime, strftime
 
 from vutils import is_crash_dump

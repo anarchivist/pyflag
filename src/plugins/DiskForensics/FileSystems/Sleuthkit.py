@@ -401,7 +401,8 @@ class SKFSEventHandler(FlagFramework.EventHandler):
         SKCACHE.expire(cache_key)
 
 ## Unit Tests:
-import unittest, md5
+import unittest
+from hashlib import md5
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests as tests
 

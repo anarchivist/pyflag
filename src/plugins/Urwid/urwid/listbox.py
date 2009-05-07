@@ -28,7 +28,7 @@ class ListWalkerError(Exception):
 	pass
 
 class ListWalker(object):
-	__metaclass__ = MetaSignals
+	#__metaclass__ = MetaSignals
 	
 	signals = ["modified"]
 

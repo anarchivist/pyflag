@@ -586,11 +586,14 @@ class Export(Farm.Task):
         result.heading("How to derive inode %s" % fd.inode)
         
         filename = "inodes/%s_explain.html" % inode_id
+        if not table_renderer.filename_in_archive(filename):        
+            result = HTMLUI.HTMLUI(initial = True)
+            result.heading("How to derive inode %s" % fd.inode)
+
+            result.decoration='naked'
+            fd.explain(None, result)
         
-        result.decoration='naked'
-        fd.explain(None, result)
-        
-        table_renderer.add_file_from_string(filename, result.display())
+            table_renderer.add_file_from_string(filename, result.display())
 
 def render_html(self, inode_id, table_renderer):
     dbh = DB.DBO()

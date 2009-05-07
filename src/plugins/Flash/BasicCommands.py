@@ -694,7 +694,8 @@ class create_case(load):
         yield "Created Case %s" % case
         
 ## Unit tests:
-import unittest,md5
+import unittest
+from hashlib import md5
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
 
