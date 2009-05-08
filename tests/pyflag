@@ -6,6 +6,6 @@ INSTALL_DIR=/var/tmp/build/pyflag/
 
 ######### END CONFIGURATION ####################
 
-export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:/usr/loca/lib/python2.6/site-packages/:$INSTALL_DIR/lib/python2.6/site-packages/pyflag
+export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:/usr/loca/lib/python2.6/site-packages/:$INSTALL_DIR/lib/python2.6/site-packages/pyflag:/usr/loca/lib/python2.5/site-packages/:$INSTALL_DIR/lib/python2.5/site-packages/pyflag
 
-exec /usr/bin/python2.6 $SRC_DIR/src/pyflag/FlagHTTPServer.py --plugins=$SRC_DIR/src/plugins $@
+exec /usr/bin/python $SRC_DIR/src/pyflag/FlagHTTPServer.py --plugins=$SRC_DIR/src/plugins $@

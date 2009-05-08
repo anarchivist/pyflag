@@ -308,6 +308,7 @@ class OrderedRegistry(Registry):
 
         self.classes.sort(sort_function)
         self.class_names = [ self.get_name(i) for i in self.classes ]
+        self.object_names = [ i.__dict__.get("name") for i in self.classes ]
         self.class_names_ex = [ self.get_class_name(i) for i in self.classes ]
         self.scanners = self.class_names
 
