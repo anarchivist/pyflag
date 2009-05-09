@@ -112,6 +112,25 @@ class init_flag_db(pyflagsh.command):
 
         FlagFramework.post_event("init_default_db", None)
         yield "Done"
+
+class delete_iosource(pyflagsh.command):
+    """ Deletes an iosource from the current case """
+    def complete(self, text, state):
+        dbh = DB.DBO(self.environment._CASE)
+        dbh.execute("select substr(name,1,%r) as abbrev,name from iosources where name like '%s%%' group by abbrev limit %s,1",(len(text)+1,text,state))
+        return dbh.fetch()['name']
+    
+    def execute(self):
+        for iosource in self.args:
+            dbh = DB.DBO(self.environment._CASE)
+            dbh2 = dbh.clone()
+            dbh.delete('inode', where=DB.expand("inode like 'I%s|%%'", iosource))
+            dbh.execute("select * from filesystems where iosource = %r", iosource)
+            for row in dbh:
+                dbh2.delete('file', where=DB.expand("path like '%s%%'", iosource))
+
+            dbh.delete("iosources", where=DB.expand("name=%r", iosource))
+            yield "Removed IOSource %s" % iosource
         
 class scan(pyflagsh.command):
     """ Scan a glob of inodes with a glob of scanners """

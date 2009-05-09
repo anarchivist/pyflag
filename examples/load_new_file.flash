@@ -1,9 +1,8 @@
 #Example Flash script for loading a filesystem
-execute Case\ Management.Remove\ case remove_case=%(case)s
-reset Case\ Management.Create\ new\ case create_case=%(case)s
-execute Case\ Management.Create\ new\ case create_case=%(case)s
-set case=%(case)s
+delete_case %(case)s
+create_case %(case)s
+load %(case)s
 
-execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=sgzip io_filename=%(Image filename)s io_offset=0 
+execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=Standard filename=%(Image filename)s offset=0 
 
-execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=linux-ext2 scan=TypeScan scan=DeletedScan scan=MD5Scan scan=IEIndex scan=RegistryScan scan=PstScan scan=Index
+scan * CompressedFile FileScanners GeneralForensics NetworkScanners
