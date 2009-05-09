@@ -139,7 +139,9 @@ class scan(pyflagsh.command):
 
     def complete(self, text,state):
         if len(self.args)>2 or len(self.args)==2 and not text:
-            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ] + \
+                       [ x for x in Registry.SCANNERS.get_groups() if x.startswith(text) ]
+            
             return scanners[state]
         else:
             dbh = DB.DBO(self.environment._CASE)
