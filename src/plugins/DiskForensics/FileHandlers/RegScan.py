@@ -34,6 +34,8 @@ from FileFormats.RegFile import ls_r, RegF
 from format import Buffer
 from pyflag.ColumnTypes import StringType, TimestampType, InodeType
 
+active = False
+
 class RegEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""CREATE TABLE if not exists `reg` (

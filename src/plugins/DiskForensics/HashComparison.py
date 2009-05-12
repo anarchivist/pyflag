@@ -129,7 +129,7 @@ class MD5Scan(GenScanFactory):
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
-            self.m = md5.new()
+            self.m = md5()
             self.type = None
             self.length = 0
             self.ignore = False

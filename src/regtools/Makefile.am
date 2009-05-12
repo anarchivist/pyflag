@@ -1,8 +1,9 @@
 include $(top_srcdir)/config/Makefile.rules
 
+if !HAVE_WINDOWS
 bin_PROGRAMS	= reglookup
-
 nodist_pkgpyexec_PYTHON = pyregistry$(PYTHON_EXTENSION)
+endif
 
 noinst_LTLIBRARIES      = libreg.la pyregistry.la
 

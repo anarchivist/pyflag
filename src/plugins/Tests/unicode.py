@@ -43,6 +43,9 @@ class UnicodeTree(Reports.report):
     
 class UnicodeTest(pyflag.tests.ScannerTest):
     """ Test Unicode handling """
-    test_case = "PyFlagTestCase"
+    test_case = "PyFlagUnicodeTestCase"
     test_file = "unicode.E01"
     subsystem = "EWF"
+
+    def test01LoadScanner(self):
+        """ Tests loading of Unicode image """

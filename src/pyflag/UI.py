@@ -547,7 +547,9 @@ class TableRenderer:
             for e in self.elements:
                 if e.name==self.groupby:
                     new_query = query.clone()
+                    del new_query['callback_stored']
                     del new_query['groupby']
+                    del new_query['order']
                     filter_expression = self.filter_str.strip().replace('%','%%')
                     if filter_expression: filter_expression += " and "
 
@@ -556,7 +558,7 @@ class TableRenderer:
                     new_query['__target__'] = self.filter
                     new_query.clear('limit')
                     e.link = new_query
-                    e.link_pane = 'pane'
+                    e.link_pane = 'parent'
 
                     from pyflag.ColumnTypes import CounterType
 

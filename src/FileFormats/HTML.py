@@ -507,7 +507,8 @@ class ResolvingHTMLTag(SanitizingTag):
         else:
             fsfd = FileSystem.DBFS(self.case)
             new_reference = decode_entity(url_unquote(reference))
-            url = posixpath.normpath(posixpath.join(self.base_url, new_reference))
+            url = posixpath.normpath(posixpath.join(posixpath.dirname(self.base_url),
+                                                    new_reference))
             try:
                 path, inode, inode_id = fsfd.lookup(path = url)
                 if inode_id:

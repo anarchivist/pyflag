@@ -48,7 +48,11 @@ def fill_in_dependancies(scanners):
 
     def find_dependencies(scanner, dependancies):
         """ Fills in scanner's dependancies in dependancies """
-        cls = Registry.SCANNERS.dispatch(scanner)
+        try:
+            cls = Registry.SCANNERS.dispatch(scanner)
+        except ValueError:
+            return
+        
         if type(cls.depends)==type(''):
             depends = [cls.depends]
         else:

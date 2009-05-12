@@ -13,6 +13,10 @@
 #include <time.h>
 #include "common.h"
 
+#ifdef __WIN32__
+#include <windows.h>
+#endif
+
 time_t fileTimeToUnixTime( const FILETIME *filetime, DWORD *remainder );
 char * fileTimeToAscii (const FILETIME *filetime);
 

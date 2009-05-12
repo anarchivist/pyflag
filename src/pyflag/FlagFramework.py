@@ -931,6 +931,7 @@ def print_info():
                               ("Case Tables", "CASE_TABLES"),
                               ("Magic Handlers", "MAGIC_HANDLERS"),
                               ("Carvers", "CARVERS"),
+                              ("Hexeditor Actions", "ACTIONS"),
                               ):
         result += "\n%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)
