@@ -6,6 +6,7 @@ AC_CONFIG_HEADER([src/include/config.h])
 AC_CONFIG_HEADER([src/filesystems/sleuthkit/sleuthkit-2.52/tsk/tsk_config.h])
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE(pyflag, 0.87-pre1)
+AC_CONFIG_MACRO_DIR([config])
 
 # check standard stuff
 AC_PROG_LIBTOOL

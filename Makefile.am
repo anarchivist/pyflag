@@ -1,3 +1,5 @@
+ACLOCAL_AMFLAGS = -I config
+
 SUBDIRS = src debian
 
 my_images	 	=	$(shell find images -not -name .\*)
