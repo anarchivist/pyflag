@@ -28,7 +28,7 @@
 
 PyFlag was originally designed to be a single threaded, single process
 application. As the application grew in capabilities, it became more
-desired to be able to spead the load between CPUs on a single machine,
+desired to be able to spread the load between CPUs on a single machine,
 as well as spread the load to many machines simultaneously.
 
 The typical PyFlag analysis process consists of the following steps:

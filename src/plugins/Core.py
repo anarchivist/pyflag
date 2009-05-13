@@ -279,7 +279,7 @@ class Periodic(Farm.Task):
             dbh.execute("unlock tables")
 
     def run(self, *args):
-        pyflaglog.log(pyflaglog.DEBUG, "Running Housekeeping tasks on %s" % time.ctime())
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Running Housekeeping tasks on %s" % time.ctime())
         try:
             FlagFramework.post_event('periodic', None)
         finally:

@@ -26,7 +26,8 @@ class scan_path(pyflagsh.command):
     
     def complete(self, text,state):
         if len(self.args)>2 or len(self.args)==2 and not text:
-            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ] +\
+                       [ x for x in Registry.SCANNERS.get_groups() if x.startswith(text) ]
             return scanners[state]
         else:
             dbh = DB.DBO(self.environment._CASE)
@@ -208,7 +209,8 @@ class scan_file(scan,BasicCommands.ls):
 
     def complete(self, text,state):
         if len(self.args)>2 or len(self.args)==2 and not text:
-            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ] +\
+                       [ x for x in Registry.SCANNERS.get_groups() if x.startswith(text) ]
             return scanners[state]
         else:
             dbh = DB.DBO(self.environment._CASE)
@@ -311,7 +313,8 @@ class load_and_scan(scan):
         """
     def complete(self, text,state):
         if len(self.args)>4 or len(self.args)==4 and not text:
-            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ] + \
+                       [ x for x in Registry.SCANNERS.get_groups() if x.startswith(text) ]
             return scanners[state]
         elif len(self.args)>3 or len(self.args)==3 and not text:
             fstypes = [ x for x in Registry.FILESYSTEMS.class_names if x.startswith(text) ]
