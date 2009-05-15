@@ -41,11 +41,15 @@ config.optparser.add_option("-f", "--file", default=None,
 
 config.parse_options()
 
-pyflaglog.start_log_thread()
+#pyflaglog.start_log_thread()
 
 dbh = DB.DBO()
 def print_address(address):
-    whois_id = Whois.lookup_whois(address)
+    whois_id = Whois.lookup_whois_id(dbh, address)
+    if not whois_id:
+        print "IP Address %s not found (%s)" % (address, whois_id)
+        return
+    
     dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, netname, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s limit 1",whois_id)
     row = dbh.fetch()
     row['ip'] = address
@@ -53,7 +57,7 @@ def print_address(address):
     print "------ %(ip)s ------\nnetname:        %(netname)s\nCountry:        %(country)s\ninetnum:        %(start_ip)s\nhosts:          %(numhosts)s\ndescr:          %(descr)s\n" % row
 
     try:
-        if config.geoip_display:
+        if 0 and config.geoip_display:
             print Whois.geoip_cached_record(address)
             print Whois.get_all_geoip_data(address)
     except: pass

@@ -32,7 +32,7 @@ from optparse import OptionParser
 # Only have 'RIR' stats for lacnic and arin
 # ...though you may be able to request full databases from them
 
-urls = {'apnic':'ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
+urls = {#'apnic':'ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
         'ripe':'ftp://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz',
         'arin':'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
         'lacnic':'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'}
@@ -139,9 +139,9 @@ class WhoisRec:
       self.netname = self._getsingle('netname', string)
       self.country = self._getsingle('country', string)
       self.adminc = self._getsingle('adminc', string)
-      self.techc = self._getsingle('techc', string)
-      self.descr = self._getmulti('descr', string)
-      self.remarks = self._getmulti('remarks', string)
+      self.techc = self._getsingle('techc', string).decode("UTF8","ignore")
+      self.descr = self._getmulti('descr', string).decode("UTF8","ignore")
+      self.remarks = self._getmulti('remarks', string).decode("UTF8","ignore")
 
       # get status
       status_str = self._getsingle('status', string).lower()
@@ -349,11 +349,13 @@ routes_dbh.mass_insert_start('whois_routes')
 dbh.mass_insert_start('whois')
 
 for k,url in urls.items():
-  if not getattr(config, k): continue
-  
-  db = Whois(url)
-  if not db:
-    print "Invalid url: %s" % url
+#  if not getattr(config, k): continue
+
+  print "Processing %s" % url
+  try:
+    db = Whois(url)
+  except Exception, e:
+    print "Error %s" % e
     continue
 
   # add this source to db
@@ -378,7 +380,7 @@ for k,url in urls.items():
       adminc = rec.adminc[:250],
       techc = rec.techc[:250],
       id = whois_id,
-      descr = rec.descr,
+      __descr = rec.descr,
       remarks = rec.remarks,
       status = rec.status)  
 
