@@ -250,7 +250,8 @@ super.add as well.
     superclass ##_Alloc((superclass)this);				\
     ((Object)this)->__class__ = (Object)&__ ## class;			\
     ((Object)this)->__super__ = (Object)&__ ## superclass;		\
-    ((Object)this)->__size = sizeof(struct class);
+    ((Object)this)->__size = sizeof(struct class);			\
+    ((Object)this)->__name__ = #class;
 
 #endif
 

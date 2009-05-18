@@ -242,7 +242,7 @@ struct tcp_struct {
   unsigned int data_offset;
 
   /** The payload data portion */
-  unsigned int data_len;
+  int data_len;
   char *data;
 } __attribute__((packed));
 

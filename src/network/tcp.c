@@ -373,15 +373,12 @@ TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
   return self;
 };
 
-static u_int32_t mkhash (const struct tuple4 *addr) {
-  u_int32_t *data = (u_int32_t *)addr;
-  u_int32_t res=0;
-  int i;
+// This can not be static as it hits a gcc optimization bug
+static u_int32_t mkhash (struct tuple4 *addr) {
+  u_int32_t res= addr->source + addr->dest + addr->saddr + addr->daddr;
+  res += res >> 8;
 
-  for (i = 0; i < sizeof(struct tuple4) / sizeof(u_int32_t); i++)
-    res += data[i];
-
-  return res % (TCP_STREAM_TABLE_SIZE);
+  return (res % (TCP_STREAM_TABLE_SIZE));
 };
 
 TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
