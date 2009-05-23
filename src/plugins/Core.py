@@ -268,10 +268,10 @@ class Periodic(Farm.Task):
         present.
         """
         dbh=DB.DBO()
-        dbh.execute("lock table jobs write")
+        dbh.execute("lock table high_priority_jobs write")
         try:
-            dbh.execute("delete from jobs where command='Periodic' and state='pending'")
-            dbh.insert("jobs", _fast=True,
+            dbh.execute("delete from high_priority_jobs where command='Periodic' and state='pending'")
+            dbh.insert("high_priority_jobs", _fast=True,
                        command="Periodic", priority=20,
                        _when_valid="from_unixtime(%r)" % (int(time.time()) + config.PERIOD),
                        state = 'pending', cookie=0)
@@ -475,9 +475,20 @@ class CaseDBInit(FlagFramework.EventHandler):
             except: continue
 
         ## Check the schema:
+        dbh.check_index("jobs", "state")
         DB.check_column_in_table(None, 'jobs', 'priority', 'int default 10')
+        DB.check_column_in_table(None, 'jobs', 'pid', 'int default 0')
         DB.check_column_in_table(None, 'jobs', 'when_valid',
                                  'TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL')
+
+        ## Check for the high_priority_jobs table (its basically
+        ## another jobs table for high priority jobs - so workers
+        ## first check this table before the main jobs table).
+        try:
+            dbh.execute("select * from high_priority_jobs limit 1")
+        except:
+            dbh.execute("create table if not exists high_priority_jobs like jobs")
+        
         ## Schedule the first periodic task:
         task = Periodic()
         task.schedule()

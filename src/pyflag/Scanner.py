@@ -649,7 +649,7 @@ def get_factories(case,scanners):
             try:
                 cls=Registry.SCANNERS.dispatch(scanner)
             except:
-                pyflaglog.log(pyflaglog.WARNING, "Unable to find scanner for %s", scanner)
+                #pyflaglog.log(pyflaglog.WARNING, "Unable to find scanner for %s", scanner)
                 continue
 
             #Instatiate it:

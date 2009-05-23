@@ -329,6 +329,8 @@ def worker_run(keepalive=None):
      ## These are all the methods we support
      jobs = []
 
+     my_pid = os.getpid()
+
      ## This is the last broadcast message we handled. We will
      ## only handle broadcasts newer than this.
      broadcast_id = 0
@@ -366,31 +368,48 @@ def worker_run(keepalive=None):
          try:
              dbh = DB.DBO()
              try:
-                 dbh.execute("lock tables jobs write")
-                 ## Higher priority jobs take precendence over lower
-                 ## priority jobs. We only want jobs which are valid
-                 ## now (jobs can be set in the future). We assume
-                 ## that we actually can process all jobs (all workers
-                 ## must have all the same plugins).
-                 dbh.execute("select * from jobs where when_valid <= now() "
-                             " and ((state='pending') or (state='broadcast' and "
-                             " id>%r)) order by id asc, priority desc limit %s",
-                             (broadcast_id, config.JOB_QUEUE))
-                 jobs = [ row for row in dbh ]
-
-                 if not jobs:
-                     continue
-
+                 ## See if there are any high priority jobs to do:
+                 dbh.execute("lock tables high_priority_jobs write")
+                 dbh.execute("select * from high_priority_jobs where "
+                             "when_valid <= now() and state='pending' limit %s", config.JOB_QUEUE)
+                 jobs = [ row for row in dbh ]                 
+                 
                  ## Ensure the jobs are marked as processing so other jobs dont touch them:
-                 for row in jobs:
-                     if row['state'] == 'pending':
-                         dbh.execute("update jobs set state='processing' where id=%r", row['id'])
-                     elif row['state'] == 'broadcast':
-                         broadcast_id = row['id']
+                 if jobs:
+                     for row in jobs:
+                         if row['state'] == 'pending':
+                             dbh.execute("update high_priority_jobs set state='processing', pid=%r where id=%r",
+                                         my_pid,
+                                         row['id'])
+                 else:
+                     dbh.execute("unlock tables")
+                     dbh.execute("lock tables jobs write")
+                     ## Higher priority jobs take precendence over lower
+                     ## priority jobs. We only want jobs which are valid
+                     ## now (jobs can be set in the future). We assume
+                     ## that we actually can process all jobs (all workers
+                     ## must have all the same plugins).
+                     dbh.execute("select * from jobs where ((state='pending') "
+                                 "or (state='broadcast' and id>%r)) limit %s",
+                                 (broadcast_id, config.JOB_QUEUE))
+                     jobs = [ row for row in dbh ]
+
+                     if not jobs:
+                         continue
+
+                     ## Ensure the jobs are marked as processing so other jobs dont touch them:
+                     for row in jobs:
+                         if row['state'] == 'pending':
+                             dbh.execute("update jobs set state='processing', pid=%r where id=%r",
+                                         my_pid,
+                                         row['id'])
+                         elif row['state'] == 'broadcast':
+                             broadcast_id = row['id']
              finally:
                  if dbh:
                      dbh.execute("unlock tables")
-         except:
+         except Exception,e:
+             print e
              continue
 
          ## Now do the jobs
