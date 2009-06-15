@@ -380,7 +380,7 @@ def worker_run(keepalive=None):
                          if row['state'] == 'pending':
                              dbh.execute("update high_priority_jobs set state='processing', pid=%r where id=%r",
                                          my_pid,
-                                         row['id'])
+                                         row['id'])                             
                  else:
                      dbh.execute("unlock tables")
                      dbh.execute("lock tables jobs write")

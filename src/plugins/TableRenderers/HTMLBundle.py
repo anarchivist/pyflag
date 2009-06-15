@@ -447,7 +447,11 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             type, content_type = m.find_inode_magic(self.case, inode_id)
         except:
             content_type = "plain/text"
-            
+
+        ## Remove illegal chars from content_type
+        m = re.match("([a-zA-Z/-]+)", content_type)
+        if m:
+            content_type = m.group(1)
 
         for k,v in {"jpeg": ".jpg",
                     "gif": ".gif",

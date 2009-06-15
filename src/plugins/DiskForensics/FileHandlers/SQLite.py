@@ -209,6 +209,7 @@ class SQLiteScanner(Scanner.GenScanFactory):
             ldbh2 = db.cursor()
             ldbh.execute("select * From sqlite_master")
             dbh = DB.DBO(self.case)
+            dbh.cursor.ignore_warnings = True
             for row in ldbh:
                 if row[0]=='table':
                     dbh.insert('sqlite',
@@ -216,8 +217,12 @@ class SQLiteScanner(Scanner.GenScanFactory):
                                inode_id = self.fd.inode_id,
                                definition = row[4])
 
-                    case_table = build_case_table("sqlite",
-                                                  row[4])
+                    try:
+                        case_table = build_case_table("sqlite",
+                                                      row[4])
+                    except RuntimeError,e:
+                        pyflaglog.log(pyflaglog.WARNING, e)
+                        continue
                     
                     ## Create our copy of this table (if its not
                     ## already there

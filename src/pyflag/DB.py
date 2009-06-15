@@ -241,13 +241,15 @@ def db_expand(sql, params):
     return result
 
 class PyFlagDirectCursor(MySQLdb.cursors.DictCursor):
+    ignore_warnings = False
+    
     def execute(self, string):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
         return MySQLdb.cursors.DictCursor.execute(self, string)
     
     def _warning_check(self):
         last = self._last_executed
-        if self._warnings:
+        if self._warnings and not self.ignore_warnings:
             self.execute("SHOW WARNINGS")
             while 1:
                 a=self.fetchone()

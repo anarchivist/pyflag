@@ -86,6 +86,7 @@ class ThumbnailType(InodeIDType):
 
     ## When exporting to html we need to export the thumbnail too:
     def render_html(self, inode_id, table_renderer):
+        ct=''
         try:
             fd = self.fsfd.open(inode_id = inode_id)
             image = Graph.Thumbnailer(fd, 200)
@@ -101,7 +102,8 @@ class ThumbnailType(InodeIDType):
 
         InodeIDType.render_html(self, inode_id, table_renderer)
         table_renderer.add_file_to_archive(inode_id)
-        return "<a href=%r ><img src=%r /></a>" % (inode_filename, filename)
+        return DB.expand("<a href=%r type=%r ><img src=%r /></a>",
+                         (inode_filename, ct, filename))
 
     def render_thumbnail_hook(self, inode_id, row, result):
         try:

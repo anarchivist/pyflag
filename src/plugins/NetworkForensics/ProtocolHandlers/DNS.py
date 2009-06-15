@@ -31,7 +31,7 @@ import struct
 from pyflag.ColumnTypes import StringType, PacketType, IPType
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-from NetworkScanner import StreamScannerFactory
+from plugins.NetworkForensics.NetworkScanner import StreamScannerFactory
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date, PCAPTime, IPType
 
 class DNSString(STRING):

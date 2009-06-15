@@ -491,7 +491,7 @@ class CaseDBInit(FlagFramework.EventHandler):
         
         ## Schedule the first periodic task:
         task = Periodic()
-        task.schedule()
+        task.run()
         
     def exit(self, dbh, case):
         IO.IO_Cache.flush()

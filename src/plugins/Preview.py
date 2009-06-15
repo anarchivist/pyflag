@@ -26,7 +26,7 @@ import FileFormats.RegFile as RegFile
 from pyflag.format import Buffer,RAW
 import pyflag.FileSystem as FileSystem
 import pyflag.Registry as Registry
-from pyflag.ColumnTypes import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
+from pyflag.ColumnTypes import IntegerType,TimestampType,InodeIDType,FilenameType, StringType, StateType
 from pyflag.ColumnTypes import DeletedType, BinaryType
 import pyflag.DB as DB
 import time
@@ -161,15 +161,14 @@ class PreviewLoad(LoadData.LoadFS):
 
             ## Now display the table
             result.table(
-                elements = [ InodeType('Inode','file.inode',case=query['case']),
-                             StringType('Filename','name'),
-                             DeletedType('Del','file.status'),
-                             IntegerType('File Size','size'),
-                             TimestampType('Last Modified','mtime'),
-                             TimestampType('Mode','file.mode')                             
+                elements = [ InodeIDType(case=query['case']),
+                             FilenameType(case=query['case']),
+                             DeletedType(),
+                             IntegerType(name='File Size',column='size'),
+                             TimestampType(name = 'Last Modified',column = 'mtime'),
                              ],
-                table='file, inode',
-                where="file.inode=inode.inode and path=%r and file.mode!='d/d'" % (path),
+                table='inode',
+                where=DB.expand("file.path=%r and file.mode!='d/d'",(path)),
                 case = query['case'],
                 pagesize=10,
                 )
