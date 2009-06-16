@@ -45,7 +45,7 @@ class FileMethod(IO.FileHandler):
             fd=gzip.open(file,'rb')
             
             ## gzip doesnt really verify the file until you read something:
-            magic = fd.read(10)
+            magic=fd.read(10)
             if len(magic)!=10:
                 fd = open(file,'rb')
             else:

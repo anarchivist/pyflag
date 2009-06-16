@@ -340,7 +340,7 @@ class HTMLUI(UI.GenericUI):
 
         if pane=='new':
             id=self.get_unique_id()
-            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'fullscreen=yes,scrollbars=yes'); return false;" % (target, id,id)
+            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'width=1024, height=800, scrollbars=yes'); return false;" % (target, id,id)
 
         if target:
             ## Try to remove the callback which we are generated from:

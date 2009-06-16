@@ -204,20 +204,31 @@ class Sleuthkit(DBFS):
             else:
                 status = 'deleted'
 
+            args = dict(inode = inodestr,
+                        status = status,
+                        _fast = True)
+
             try:
+                print "%r" % inode
+                if inode.__str__()=="22-0-0":
+                    print "found it"
+                    raise IOError("foo")
+                
+
+                ## If this fails we return the default deleted Inode
+                ## because we dont know anything about this inode (we
+                ## dont know its run list or attributes).
                 f = fs.open(inode=str(inode))
                 s = fs.fstat(f)
 
-                args = dict(inode = inodestr,
-                            status = status,
-                            uid = s.st_uid,
-                            gid = s.st_gid,
-                            mode = s.st_mode,
-                            links = s.st_nlink,
-                            link = "",
-                            size = s.st_size,
-                            _fast = True
-                            )
+                args.update(dict(
+                    uid = s.st_uid,
+                    gid = s.st_gid,
+                    mode = s.st_mode,
+                    links = s.st_nlink,
+                    link = "",
+                    size = s.st_size,
+                    ))
 
                 if s.st_mtime:
                     args['_mtime'] = "from_unixtime(%d)" % s.st_mtime
@@ -228,9 +239,6 @@ class Sleuthkit(DBFS):
                 if s.st_ctime:
                     args['_ctime'] = "from_unixtime(%d)" % s.st_ctime
 
-                dbh_inode.insert( "inode", **args)
-                inode_id = dbh_inode.autoincrement()
-                
                 #insert block runs
                 index = 0
                 for (index, start, count) in runs(f.blocks()):
@@ -242,9 +250,12 @@ class Sleuthkit(DBFS):
                     )
                 #f.close()
 
-            except IOError:
-                pass
+            except IOError,e:
+                pyflaglog.log(pyflaglog.WARNING, "Error creating inode: %s", e)
 
+            dbh_inode.insert( "inode", **args)
+            inode_id = dbh_inode.autoincrement()
+                       
             ## If needed schedule inode for scanning:
             if scanners:
                 pdbh.mass_insert(
@@ -402,7 +413,7 @@ class SKFSEventHandler(FlagFramework.EventHandler):
 
 ## Unit Tests:
 import unittest
-from hashlib import md5
+import hashlib
 import pyflag.pyflagsh as pyflagsh
 import pyflag.tests as tests
 
@@ -444,7 +455,7 @@ class NTFSTests(unittest.TestCase):
         ## This file is Images/250px-Holmes_by_Paget.jpg
         fd = self.fsfd.open(inode='Itest|K33-128-4')
         data = fd.read()
-        m = md5.new()
+        m = hashlib.md5()
         m.update(data)
         self.assertEqual(m.hexdigest(),'f9c4ea83dfcdcf5eb441e130359f4a0d')
         
@@ -452,7 +463,7 @@ class NTFSTests(unittest.TestCase):
         """ Test reading a compressed NTFS file """
         self.fsfd = DBFS(self.test_case)
         fd = self.fsfd.open("/Books/80day11.txt")
-        m = md5.new()
+        m = hashlib.md5()
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
 

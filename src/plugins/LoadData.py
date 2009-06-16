@@ -636,7 +636,7 @@ class LoadFS(Reports.report):
 
 ## Unit Tests:
 import unittest
-from hashlib import md5
+import hashlib
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 
@@ -698,13 +698,13 @@ class LoadDataTests(unittest.TestCase):
         ## Try to read a file from the first source:
         fsfd = DBFS(self.test_case)
         fd = fsfd.open("/stdimage/dscf1081.jpg")
-        m = md5.new()
+        m = hashlib.md5()
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'11bec410aebe0c22c14f3eaaae306f46')
 
         ## Try to read a file from the second source:
         fd = fsfd.open("/ntfsimage/Books/80day11.txt")
-        m = md5.new()
+        m = hashlib.md5()
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
 
