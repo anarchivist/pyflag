@@ -37,10 +37,7 @@ def url_unquote(string):
         return x.group(1).decode("hex")
 
     ## we can use this to handle arbitrary levels of quoting
-    while "%" in string:
-        try:
-            string = re.sub("%(..)", decoder, string)
-        except: break
+    string = re.sub("%(..)", decoder, string)
         
     ## references seem to _always_ be encoded using utf8 - even if the
     ## page is encoded using a different charset??? This whole quoting

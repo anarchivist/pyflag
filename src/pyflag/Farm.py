@@ -554,7 +554,13 @@ if __name__ == "__main__":
 
     Registry.Init()
 
-    #config.parse_options()
-    
+    config.parse_options()
+
+    def handler(sig, frame):
+        import pdb
+        pdb.set_trace()
+
+    print "Setting int"
+    signal.signal(signal.SIGINT, handler)
     pyflaglog.log(pyflaglog.INFO,"Starting PyFlag worker")
-    nanny(worker_run)
+    worker_run()

@@ -170,14 +170,19 @@ def load_file(filename, processor,  pcap_dbh):
         except StopIteration:
             break
 
-        pcap_dbh.mass_insert(
-            id = pcap_id,
-            iosource = config.iosource,
-            offset = offset,
-            length = packet.caplen,
-            _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
-            ts_usec = packet.ts_usec,
-            )
+        try:
+            pcap_dbh.mass_insert(
+                id = pcap_id,
+                iosource = config.iosource,
+                offset = offset,
+                length = packet.caplen,
+                _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
+                ts_usec = packet.ts_usec,
+                )
+        except KeyError,e:
+            print packet.list()
+            print e
+            continue
 
         input_file.set_id(pcap_id)
 
