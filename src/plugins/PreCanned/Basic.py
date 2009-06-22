@@ -74,6 +74,27 @@ class Images(Reports.PreCannedCaseTableReports):
     default_table = "TypeCaseTable"
     columns = ['Thumbnail', 'InodeTable.Size','FileTable.Filename']
 
+class Videos(Reports.PreCannedCaseTableReports):
+    """ Display a preview of Videos """
+    args = {'filter':' "Thumbnail"  has_magic video',
+            'order': 1, 'direction':0}
+    family = "Disk Forensics"
+    description = "View all Videos "
+    name = "/Disk Forensics/Multimedia/Videos"
+    default_table = "TypeCaseTable"
+    columns = ['Thumbnail', 'InodeTable.Size','FileTable.Filename']
+
+class OfficeFiles(Reports.PreCannedCaseTableReports):
+    """ Display a preview of Office files """
+    args = {'filter':' "Thumbnail"  has_magic office ',
+            'order': 1, 'direction':0}
+    family = "Disk Forensics"
+    description = "View all Office files "
+    name = "/Disk Forensics/Multimedia/Office"
+    default_table = "TypeCaseTable"
+    columns = ['Thumbnail', 'InodeTable.Size','FileTable.Filename']
+
+
 class HTMLPages(Registry.PreCanned):
     args = {'filter':' "Thumbnail"  has_magic HTML ',
             'order': 4, 'direction':1}
@@ -97,6 +118,15 @@ class ImageURLs(Reports.PreCannedCaseTableReports):
     name = [ "/Network Forensics/Communications/Web/Images"]
     family = 'Network Forensics'
     args = {'filter':'Thumbnail has_magic image and Size > 20000',
+            'order': 0, 'direction': 1 }
+    default_table = 'HTTPCaseTable'
+    columns = ['Timestamp','TypeCaseTable.Thumbnail','InodeTable.Size', 'URL']
+
+class VideoURLs(Reports.PreCannedCaseTableReports):
+    description = "Show videos downloaded over HTTP"
+    name = [ "/Network Forensics/Communications/Web/Videos"]
+    family = 'Network Forensics'
+    args = {'filter':'Thumbnail has_magic video',
             'order': 0, 'direction': 1 }
     default_table = 'HTTPCaseTable'
     columns = ['Timestamp','TypeCaseTable.Thumbnail','InodeTable.Size', 'URL']

@@ -70,6 +70,7 @@ int Root_Read(Packet self, StringIO input) {
 
   case DLT_RAW:
   case DLT_RAW2:
+  case DLT_RAW3:
     this->packet.eth = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
 

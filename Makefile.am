@@ -8,7 +8,8 @@ my_utilities		=	$(shell find utilities -not -name .\*)
 my_examples		=	$(shell find examples -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
 pkgdata_DATA		=	$(my_data) \
-				data/magic.mgc data/magic.mime.mgc
+				data/magic.mgc data/magic.mime.mgc \
+				images/changelog.html
 pkgpython_PYTHON        =       src/pyflag/conf.py
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
@@ -55,6 +56,11 @@ clean-local:
 deb-pkg:	
 	chmod 744 debian/rules
 	dpkg-buildpackage -rfakeroot
+
+images/changelog.html:
+	echo "<html><body><pre>" > images/changelog.html
+	cat _darcs/inventory >> images/changelog.html
+	echo "</pre></body></html>" >> images/changelog.html
 
 data/magic.mgc: data/magic
 	cd data && file -C -m magic

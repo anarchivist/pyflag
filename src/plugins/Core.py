@@ -618,6 +618,7 @@ class PyFlagStatistics(Reports.report):
         cdbh.execute("select count(*) as count from inode")
         row = cdbh.fetch()
         result.row("Total Inodes in VFS", row['count'])
+        result.link("Changelog", url="images/changelog.html")
         result.end_table()
 
         

@@ -22,6 +22,7 @@ dependancy on libpcap. (We dont actually link against it). */
 #define DLT_FDDI	10	/* FDDI */
 #define DLT_RAW         12      /* Raw headers (no link layer) */
 #define DLT_RAW2        14
+#define DLT_RAW3        101
 
 #define DLT_IEEE802_11  105     /* IEEE 802.11 wireless */
 #define DLT_LINUX_SLL	113
