@@ -1,7 +1,7 @@
 #!/bin/bash
 ## This is a version of the launcher script which run on the src directory - paths are hard coded atm. Configure below:
 
-SRC_DIR=~/pyflag/
+SRC_DIR=~/pyflag/pyflag-mod-raid
 INSTALL_DIR=/var/tmp/build/pyflag/
 
 ######### END CONFIGURATION ####################

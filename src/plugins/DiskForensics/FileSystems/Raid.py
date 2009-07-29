@@ -30,8 +30,45 @@ disks).
 import plugins.Images as Images
 import pyflag.FlagFramework as FlagFramework
 import pyflag.IO as IO
-import re, os.path
+import re, os.path, binascii, sk
 import pyflag.DB as DB
+import copy
+
+class ParityFD(Images.OffsettedFDFile):
+    """An abstraction for reconstructing the missing disk in a RAID5"""
+    def __init__(self, filenames):
+        self.filenames = filenames
+        self.readptr = 0
+        self.offset = 0
+
+    def seek(self, offset, whence=0):
+        """ fake seeking routine """
+        readptr = self.readptr
+        if whence==0:
+            readptr = offset + self.offset
+        elif whence==1:
+            readptr += offset
+        elif whence==2:
+            readptr = self.size
+
+        if readptr < 0:
+            raise IOError("Seek before start of file")
+
+        self.readptr = readptr
+
+    def read(self,length):
+        fds = [ IO.open_URL(f) for f in self.filenames ]
+        for fd in fds:
+            fd.seek(self.readptr)
+        data = False
+        for fd in fds:
+            if data == False:
+                data = map(lambda x: ord(x), fd.read(length))
+            else:
+                data = map(lambda (x,y): x^y,zip(data,map(lambda z: ord(z), fd.read(length))))
+        self.readptr += length
+        return ''.join(map(lambda x: chr(x), data))
+
 
 class RAIDFD(Images.OffsettedFDFile):
     """ A RAID file like object - must be initialised with the correct parameters """
@@ -85,7 +122,7 @@ class RAIDFD(Images.OffsettedFDFile):
 
         ## Now derive the period map
         self.period_map = []
-        for i in range((self.physical_period -1) * self.disks):
+        for i in range(self.physical_period * (self.disks - 1)):
             found = False
             ## Find the required disk in the map:
             for period_index in range(len(self.map)):
@@ -154,11 +191,13 @@ class RAID(Images.Standard):
         query.default('blocksize','4k')
         query.default('period',self.presets[0][2])
         query.default('map',self.presets[0][1])
+        query.default('ismissing',False)
         keys = []
         values = []
         result.fileselector("Disks", name='filename')
         result.textfield("Block size",'blocksize')
         result.textfield("Period",'period')
+        result.checkbox("Is a disk missing?",'ismissing',True)
         self.calculate_map(query, result)
         self.calculate_partition_offset(query, result)
 
@@ -184,6 +223,67 @@ class RAID(Images.Standard):
 
         result.toolbar(cb = preset, text="Select a preset map", icon='spanner.png')
 
+    def calculate_partition_offset(self, query, result, offset = 'offset'):
+        """ A GUI function to allow the user to derive the offset by calling mmls """
+        def mmls_popup(query,result):
+            result.decoration = "naked"
+            my_offset = 0
+            last_offset = 0
+            done = False
+            try:
+                del query[offset]
+            except: pass
+
+            io = self.create(None, query.get('case'), query)
+            #This loops through the disk looking for a partition table.
+            #If it finds a block with the appropriate magic numbers, it
+            #tries to create a mmls object. If it fails, it moves to the
+            #next block.
+            while(1):
+                io.seek(last_offset)
+                while(1):
+                    my_offset = io.tell()#Starting position of this next read; if it works, this will be the partition table offset
+                    foobarbaz = re.sub('=','',binascii.b2a_qp(io.partial_read(512)))
+                    last_offset=io.tell()#This is the offset we will resume our search at if this table doesn't work.
+                    if len(foobarbaz) == 0:#If we've reached the end of the RAID, we're done.
+                        done = True
+                    if re.search('0UAA$',foobarbaz) != None:#Check for magic numbers of DOS partition table
+                        break
+                io.seek(0)
+                try:
+                    print "trying"+str(my_offset) 
+                    parts = sk.mmls(io,my_offset)
+                except IOError, e:
+                    if done:#If we've reached the end without finding a partition table, we give up.
+                        result.heading("No Partitions found")
+                        result.text("TESTFUNC %d Sleuthkit returned: %s" % (my_offset,e))
+                        return
+                else:#If we created mmls object without error, we're done searching, so break
+                    break
+            my_offset_s = my_offset / 512
+            result.heading("Possible IO Sources")
+            result.start_table(border=True)
+            result.row("Chunk", "Start", "End", "Size", "Description")
+            del query[offset]
+            for i in range(len(parts)):
+                new_query = query.clone()
+                tmp = result.__class__(result)
+                new_query[offset] = "%ds" % int(parts[i][0]+my_offset_s)
+                tmp.link("%010d" % int(parts[i][0]+my_offset_s), new_query, pane='parent')
+                result.row(i, tmp, "%010d" % (parts[i][0] + parts[i][1]),
+                           "%010d" % parts[i][1] , parts[i][2])
+            result.end_table()
+        
+        tmp = result.__class__(result)
+        tmp2 = result.__class__(result)
+        tmp2.popup(mmls_popup,
+                   "Survey the partition table",
+                   icon="examine.png")
+
+        tmp.row(tmp2,"Enter partition offset:")
+        result.textfield(tmp,offset)
+
+
     def calculate_map(self, query,result):
         """ Present the GUI for calculating the map """
         def map_popup(query,result):
@@ -197,6 +297,12 @@ class RAID(Images.Standard):
             ## Open all the disks
             filenames = query.getarray('filename') 
             fds = [ IO.open_URL(f) for f in filenames ]
+
+            if query.get('ismissing',False):
+                fds += [ParityFD(copy.deepcopy(filenames))]
+                filenames += ('Missing Disk',)
+
+
             uis = [ result.__class__(result) for f in filenames ]
 
             period_number = int(query.get('period_number',0))
@@ -330,6 +436,8 @@ class RAID(Images.Standard):
         ## Open all the disks
         filenames = query.getarray('filename') 
         fds = [ IO.open_URL(f) for f in filenames ]
+        if query.get('ismissing',False):
+            fds.append(ParityFD(copy.deepcopy(filenames)))
         period_number = int(query.get('period_number',0)) + 1
         blocksize = FlagFramework.calculate_offset_suffix(query['blocksize'])
         period = FlagFramework.calculate_offset_suffix(query['period'])
@@ -362,6 +470,8 @@ class RAID(Images.Standard):
 
         ## Open the io sources here
         fds = [ IO.open_URL(f) for f in filenames ]
+        if query.get('ismissing',False):
+            fds += [ParityFD(copy.deepcopy(filenames))]
         blocksize = FlagFramework.calculate_offset_suffix(query.get('blocksize','32k'))
         period = int(query.get('period',3))
         return RAIDFD(fds, blocksize, query['map'], offset, period)
