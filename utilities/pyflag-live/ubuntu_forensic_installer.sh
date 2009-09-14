@@ -42,7 +42,7 @@ DL_DIR=$HOME/forensics # Directory to hold downloaded forensic tools
 
 # To update script, replace variables with latest program information.
 LIBEWF=libewf-20080501
-LIBEWF_URL="-nc --no-check-certificate https://www.uitwisselplatform.nl/frs/download.php/529/$LIBEWF.tar.gz"
+LIBEWF_URL="http://sourceforge.net/projects/libewf/files/libewf/$LIBEWF/$LIBEWF.tar.gz/download"
 LIBEWF_DEPS="zlib1g-dev uuid-dev libssl-dev"
 
 AFFLIB=afflib-3.3.4
@@ -168,3 +168,4 @@ chown -R $UID $DL_DIR/
 
 
 exit 0
+
