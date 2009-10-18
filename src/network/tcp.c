@@ -392,7 +392,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   if(!ip) return NULL;
 
   tcp =(TCP)ip->packet.payload;
-
+  if(!tcp) return NULL;
   /** If we did not get a TCP packet, we fail */
   /** The below should work but does not because __TCP is defined in 2
       different shared objects reassemble.so and dissect.so. We are
@@ -402,13 +402,13 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
 
       FIXME: A possible optimization would be to create a class hash
       which we can use instead of a string comparison.
-   */
+  */
   if(ISNAMEINSTANCE(tcp,"TCP")) {
     tcp_packet = 1;
   } else if(ISNAMEINSTANCE(tcp,"UDP")) {
     udp_packet = 1;
   } else return NULL;
-  
+
   forward.saddr  = ip->packet.header.saddr;
   forward.daddr  = ip->packet.header.daddr;
   forward.source = tcp->packet.header.source;
@@ -437,7 +437,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
       return i;
     };
   };
-  
+
   reverse.saddr  = ip->packet.header.daddr;
   reverse.daddr  = ip->packet.header.saddr;
   reverse.source = tcp->packet.header.dest;

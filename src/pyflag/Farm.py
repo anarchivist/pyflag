@@ -259,7 +259,11 @@ def nanny(cb, keepalive=None, *args, **kwargs):
     quits we restart it.
     """
     if config.DISABLE_NANNY:
-        cb(*args, **kwargs)
+        try:
+            cb(*args, **kwargs)
+        except Exception,e:
+            import pdb
+            pdb.post_mortem()
         
     atexit.register(terminate_children)
     signal.signal(signal.SIGABRT, handler)

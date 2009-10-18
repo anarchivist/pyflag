@@ -90,10 +90,10 @@ class StreamFile(File):
         self.inode_ids = [ int(x) for x in inode[1:].split("/")]
 
         ## Fill in some vital stats
-        dbh.execute("select inode.inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec, type from `connection_details` join inode on inode.inode_id = connection_details.inode_id where inode.inode=%r limit 1", self.inode)
+        dbh.execute("select inode.inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` join inode on inode.inode_id = connection_details.inode_id where inode.inode=%r limit 1", self.inode)
         row=dbh.fetch()
         if not row:
-            dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec, type from `connection_details` where inode_id = %r", self.inode_ids[0])
+            dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id = %r", self.inode_ids[0])
             row = dbh.fetch()
 
         ## This updates our properties from the db

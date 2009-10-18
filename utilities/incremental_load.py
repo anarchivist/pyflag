@@ -213,6 +213,18 @@ offset = 0
 ## Start up some workers if needed:
 Farm.start_workers()
 
+def update_files(files_we_have):
+    try:
+        log_fd = open(config.log)
+        print "Reading log file"
+        for l in log_fd:
+            files_we_have.add(l.strip())
+        print "Done - added %s files from log" % len(files_we_have)
+        log_fd.close()
+    except IOError:
+        pass
+
+    
 def run(keepalive=None):
     global last_mtime, offset, output_fd
 
@@ -235,15 +247,7 @@ def run(keepalive=None):
     last_time = 0
 
     files_we_have = set()
-    try:
-        log_fd = open(config.log)
-        print "Reading log file"
-        for l in log_fd:
-            files_we_have.add(l.strip())
-        print "Done - added %s files from log" % len(files_we_have)
-    except IOError:
-        pass
-
+    update_files(files_we_have)
     log_fd = open(config.log, "a")
     last_mtime = os.stat(directory).st_mtime
 
@@ -277,11 +281,12 @@ def run(keepalive=None):
                        Farm.check_mem(finish)
 
                    filename = "%s/%s" % (directory,f)
-                   load_file(filename, processor, pcap_dbh)
                    if config.log:
                        log_fd.write(f+"\n")
                        log_fd.flush()
                        files_we_have.add(f)
+
+                   load_file(filename, processor, pcap_dbh)
 
                    last_time = time.time()
             else:

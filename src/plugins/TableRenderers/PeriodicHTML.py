@@ -29,7 +29,7 @@ reports.
 """
 
 import HTMLBundle
-import cPickle
+import cPickle,os
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 import pyflag.pyflaglog as pyflaglog
@@ -84,27 +84,28 @@ class PeriodicRenderer(HTMLBundle.HTMLDirectoryRenderer):
         ## Ok we need to figure out which pages need updating - we
         ## assume that data is only added to the tables not removed.
         self.limit = 0
-        dbh = DB.DBO(self.case)
-        dbh.execute("select count(*) as total from reporting where "
-                    " page_name like '%s%%'", self.page_name)
-        total = dbh.fetch()['total']
+#         dbh = DB.DBO(self.case)
+#         dbh.execute("select count(*) as total from reporting where "
+#                     " page_name like '%s%%'", self.page_name)
+#         total = dbh.fetch()['total']
 
-        ## Now work out the limit of the last page - we redo the last
-        ## page because it may be more complete now.
-        dbh.execute("select * from reporting where "
-                    " page_name like '%s%%' order by `limit` desc limit 1",
-                    self.page_name)
-        row = dbh.fetch()
-        if row:
-            self.query.set("start_limit", row['limit'])
-            ## The initial page
-            page = total
-        else:
-            self.query.set("start_limit",0)
-            page = 1
+#         ## Now work out the limit of the last page - we redo the last
+#         ## page because it may be more complete now.
+#         dbh.execute("select * from reporting where "
+#                     " page_name like '%s%%' order by `limit` desc limit 1",
+#                     self.page_name)
+#         row = dbh.fetch()
+#         if row:
+#             self.query.set("start_limit", row['limit'])
+#             ## The initial page
+#             page = total
+#         else:
+#             self.query.set("start_limit",0)
+#             page = 1
 
+        page = 1
         print "Doing page %s from %s" % (page, self.query['start_limit'])
-        self.parse_limits(self.query)
+#        self.parse_limits(self.query)
         g = self.generate_rows(self.query, ordering=False)
         self.add_constant_files()
 
@@ -121,13 +122,14 @@ class PeriodicRenderer(HTMLBundle.HTMLDirectoryRenderer):
 
         while 1:
             page_name = "%s%03u.html" % (self.page_name, page)
+            start = self.count
             page_data = self.render_page(page_name, page, elements, g)
             if self.row_count ==0: break
 
             self.add_file_from_string(page_name,
                                       page_data.encode("utf8"))
 
-            print "Page %s\n" % page
+            print "(%s): Page %s %s-%s\n" % (os.getpid(), page, start, self.count)
             page +=1
 
         ## update the TOC page:
@@ -165,9 +167,12 @@ class PeriodicExporter(FlagFramework.EventHandler):
                     if tables != new_table:
                         pyflaglog.log(pyflaglog.DEBUG, "Re-exporting HTML Table %s" % renderer.page_name)
                         try:
+                            import pdb
                             renderer.real_render_table()
                         except Exception,e:
-                            print e
+                            print "Exception %s" % e
+                            import pdb
+                            pdb.post_mortem()
                             pass
                         dbh2.execute("update reporting_jobs set tables = %r where id=%r",
                                      cPickle.dumps(new_table), row['id'])

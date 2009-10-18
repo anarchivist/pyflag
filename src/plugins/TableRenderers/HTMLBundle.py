@@ -337,7 +337,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 self.add_file_from_string(page_name,
                                           page_data.encode("utf8"))
                                           
-                yield "Page %s\n" % page
+                yield "(%s) %s: Page %s\n" % (os.getpid(), self.name, page)
                 page +=1
 
                 ## update the TOC page:
@@ -419,19 +419,20 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         queries to maximise the chance of getting cache hits.
         """
         dbh = DB.DBO(self.case)
+        print query, ordering
+        ordering = True
         self.sql = self._make_sql(query, ordering=ordering)
-        print self.sql
-        
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries. FIXME - implement
-        dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit))
+        #dbh.execute(self.sql + " limit %s,%s" % (self.limit,self.end_limit-self.limit))
+        dbh.execute(self.sql)
         self.count = 0
         for row in dbh:
             self.count += 1
             yield row
 
-            if self.end_limit > 0 \
-               and self.count > self.end_limit: return
+            #if self.end_limit > 0 \
+            #   and self.count > self.end_limit: return
 
     def make_archive_filename(self, inode_id, directory = 'inodes/'):
         ## Add the inode to the exported bundle:
@@ -586,8 +587,6 @@ class Export(Farm.Task):
 
         ## Now explain this file:
         import pyflag.HTMLUI as HTMLUI
-        result = HTMLUI.HTMLUI(initial = True)
-        result.heading("How to derive inode %s" % fd.inode)
         
         filename = "inodes/%s_explain.html" % inode_id
         if not table_renderer.filename_in_archive(filename):        
