@@ -43,8 +43,8 @@ AC_DEFUN([AC_PYTHON_XCOMPILE_WINDOWS], [
 	if [ test ! -r $PYTHON_INCLUDE_DIR/Python.h ]; then AC_MSG_ERROR(failed to find include file $PYTHON_INCLUDE_DIR/Python.h maybe you need to install python-dev?); fi
 	
 	## Set library paths
-	AC_SUBST([PYTHON_LDFLAGS],["-shared"])	
-	AC_SUBST([PYTHON_EXTRA_LIBS], [" -L$1/libs/ -lpython25 -lwsock32"])
+	AC_SUBST([PYTHON_LDFLAGS],["-shared"])
+	AC_SUBST([PYTHON_EXTRA_LIBS], [" -L$1/libs/ -lpython$PYTHON_VERSION -lwsock32"])
 	AC_SUBST([PYTHON_SITE_PKG], [$1])
 	AC_SUBST([PYTHON_EXTENSION], [".pyd"])
 ])

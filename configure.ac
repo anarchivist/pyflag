@@ -95,7 +95,7 @@ LIBS=$ac_my_check_lib_save_LIBS
 if test $have_libewf = yes; then
 	  ## Save libs
 	  ac_check_lib_save_LIBS=$LIBS
-	  LIBS="-lewf -static  $LIBS"
+	  LIBS="-lewf $LIBS"
 	  AC_RUN_IFELSE(
 	    [
 	       AC_LANG_PROGRAM([[#include "libewf.h"]], 

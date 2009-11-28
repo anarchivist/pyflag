@@ -55,6 +55,9 @@ class Configure(Reports.report):
 
         ## Try to save the configuration file:
         if query.has_key("__submit__"):
+            ## Post a config_check event to allow anyone to recheck
+            ## their new configuration
+
             try:
                 fd = open(config.filename ,'w')
                 fd.write(self.generate_config_file(query))
