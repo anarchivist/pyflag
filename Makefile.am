@@ -2,10 +2,10 @@ ACLOCAL_AMFLAGS = -I config
 
 SUBDIRS = src debian
 
-my_images	 	=	$(shell find images -not -name .\*)
-my_data			=	$(shell find data -not -name .\*)
-my_utilities		=	$(shell find utilities -not -name .\*)
-my_examples		=	$(shell find examples -not -name .\*)
+my_images	 	=	$(shell find images -type f -not -name .\*)
+my_data			=	$(shell find data -type f -not -name .\*)
+my_utilities		=	$(shell find utilities -type f -not -name .\*)
+my_examples		=	$(shell find examples -type f -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
 pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc \

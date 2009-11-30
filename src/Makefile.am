@@ -1,6 +1,6 @@
 SUBDIRS = lib mailtools indextools_ng network filesystems include pyflag mmedia distorm regtools
 
-my_javascript		=       $(shell find javascript -not -name .\*)
+my_javascript		=       $(shell find javascript -type f -not -name .\*)
 nobase_pkgdata_DATA	=	$(my_javascript)
 EXTRA_DIST		= 	$(nobase_pkgdata_DATA)
 

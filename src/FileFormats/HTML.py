@@ -121,6 +121,26 @@ class Tag:
 
         return result
 
+    def to_unicode(self, code):
+        child_result = ''
+        for c in self.children:
+            if type(c)==str:
+                child_result += c.encode(code)
+            else:
+                child_result += c.to_unicode(code)
+
+        attributes = "".join([expand(" %s='%s'",(k,iri_to_uri(v))) for k,v \
+                              in self.attributes.items() if v != None ])
+
+        if self.type == 'selfclose':
+            result = expand("<%s%s/>", (self.name, attributes))
+        else:
+            result = expand("<%s%s>%s</%s>", (self.name.encode("utf8"), attributes,
+                                              child_result, self.name))
+
+        result = result.encode("latin1")
+        return result
+
     def add_child(self, child):
         ## Try to augment CDATAs together for efficiency:
         try:
@@ -151,6 +171,9 @@ class Tag:
 
         ## Return ourselves first:
         if self.name == name:
+            yield self
+
+        elif re.search(name, self.name):
             yield self
         
         for c in self.children:
