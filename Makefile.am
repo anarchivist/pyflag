@@ -8,7 +8,6 @@ my_utilities		=	$(shell find utilities -type f -not -name .\*)
 my_examples		=	$(shell find examples -type f -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
 pkgdata_DATA		=	$(my_data) \
-				data/magic.mgc data/magic.mime.mgc \
 				images/changelog.html
 pkgpython_PYTHON        =       src/pyflag/conf.py
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
